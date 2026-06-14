@@ -1,0 +1,1072 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroNest Dashboard Starter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #050711;
+        --panel: rgba(13, 18, 32, 0.86);
+        --line: rgba(148, 163, 184, 0.18);
+        --text: #f8fafc;
+        --muted: #9ca3af;
+        --blue: #24c6ff;
+        --violet: #7c3aed;
+        --pink: #fb3f7f;
+        --green: #22c55e;
+        --orange: #f59e0b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font-family: Poppins, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at 24% 14%, rgba(124, 58, 237, 0.2), transparent 26%),
+          radial-gradient(circle at 76% 8%, rgba(36, 198, 255, 0.16), transparent 24%),
+          linear-gradient(145deg, #03050d 0%, #07111f 48%, #03050d 100%);
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr) 430px;
+        gap: 20px;
+        padding: 22px;
+      }
+
+      .panel,
+      .sidebar,
+      .card,
+      .phone {
+        border: 1px solid var(--line);
+        background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(7, 12, 24, 0.78));
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+        backdrop-filter: blur(18px);
+      }
+
+      .panel,
+      .sidebar {
+        border-radius: 14px;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 22px;
+        height: calc(100vh - 44px);
+        padding: 26px 18px 14px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+      }
+
+      .logo,
+      .orb {
+        display: grid;
+        place-items: center;
+        color: #fff;
+        background: radial-gradient(circle, rgba(36, 198, 255, 0.45), rgba(124, 58, 237, 0.9));
+        box-shadow: 0 0 26px rgba(124, 58, 237, 0.7);
+      }
+
+      .logo {
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        font-size: 25px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 30px;
+        line-height: 1.1;
+      }
+
+      .brand p,
+      .promise span,
+      .muted,
+      small {
+        color: var(--muted);
+      }
+
+      .brand p {
+        margin: 5px 0 0;
+        font-size: 12px;
+      }
+
+      .promise {
+        margin: 32px 12px 24px;
+        display: grid;
+        gap: 12px;
+        font-size: 15px;
+      }
+
+      .promise strong {
+        font-size: 18px;
+      }
+
+      .nav {
+        display: grid;
+        gap: 7px;
+        padding: 10px;
+        border-radius: 12px;
+        background: rgba(15, 23, 42, 0.42);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+      }
+
+      .nav button,
+      .assistant,
+      .chip,
+      .ghost-btn,
+      .tab,
+      .send {
+        border: 0;
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      .nav button {
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        padding: 0 12px;
+        border-radius: 8px;
+        background: transparent;
+        text-align: left;
+      }
+
+      .nav button.active,
+      .nav button:hover {
+        background: linear-gradient(90deg, rgba(124, 58, 237, 0.95), rgba(71, 58, 197, 0.72));
+      }
+
+      .assistant {
+        margin-top: auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+      }
+
+      .orb {
+        width: 35px;
+        height: 35px;
+        flex: 0 0 auto;
+        border-radius: 50%;
+      }
+
+      .main,
+      .right {
+        display: grid;
+        align-content: start;
+        gap: 14px;
+      }
+
+      .panel {
+        padding: 16px;
+      }
+
+      .hero {
+        padding: 22px;
+      }
+
+      .section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .section-title h2 {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .search,
+      .chat-input {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-radius: 22px;
+        background: rgba(7, 12, 24, 0.96);
+        border: 1px solid rgba(36, 198, 255, 0.75);
+        box-shadow:
+          0 0 0 1px rgba(124, 58, 237, 0.58) inset,
+          0 0 28px rgba(36, 198, 255, 0.24),
+          0 0 28px rgba(124, 58, 237, 0.28);
+      }
+
+      .search {
+        height: 58px;
+        padding: 0 13px 0 20px;
+      }
+
+      .search input,
+      .chat-input input {
+        width: 100%;
+        min-width: 0;
+        color: var(--text);
+        background: transparent;
+        border: 0;
+        outline: 0;
+      }
+
+      .send {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #2563eb, #7c3aed);
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .chip,
+      .tab {
+        min-height: 34px;
+        padding: 0 16px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.84);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+      }
+
+      .grid-4 {
+        display: grid;
+        grid-template-columns: 1.15fr 1fr 1fr 0.85fr;
+        gap: 14px;
+      }
+
+      .card {
+        min-height: 180px;
+        position: relative;
+        overflow: hidden;
+        padding: 18px;
+        border-radius: 8px;
+      }
+
+      .badge {
+        display: inline-flex;
+        padding: 3px 7px;
+        border-radius: 5px;
+        color: #fff;
+        font-size: 10px;
+        text-transform: uppercase;
+        background: rgba(124, 58, 237, 0.42);
+      }
+
+      .card h3 {
+        position: relative;
+        margin: 13px 0 8px;
+        font-size: 15px;
+        line-height: 1.35;
+        z-index: 1;
+      }
+
+      .card p {
+        position: relative;
+        max-width: 170px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+        z-index: 1;
+      }
+
+      .card-photo {
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: 92px;
+        height: 100%;
+        background-size: cover;
+        background-position: center;
+        background-image: linear-gradient(145deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.34)), url("https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=700&q=80");
+      }
+
+      .neural {
+        position: absolute;
+        right: -6px;
+        bottom: -12px;
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 44% 40%, rgba(36, 198, 255, 0.9), transparent 6%),
+          radial-gradient(circle at 64% 56%, rgba(251, 63, 127, 0.85), transparent 6%),
+          radial-gradient(circle, rgba(124, 58, 237, 0.34), transparent 55%);
+      }
+
+      .rail {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(72px, 1fr));
+        gap: 12px;
+        overflow-x: auto;
+      }
+
+      .thumb {
+        height: 52px;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        background: linear-gradient(135deg, #111827, #4c1d95);
+      }
+
+      .moment {
+        display: grid;
+        gap: 7px;
+        text-align: center;
+      }
+
+      .recent {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(118px, 1fr));
+        gap: 14px;
+      }
+
+      .recent-card {
+        overflow: hidden;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: rgba(15, 23, 42, 0.66);
+      }
+
+      .recent-img {
+        height: 92px;
+        background-size: cover;
+        background-position: center;
+        background-image: linear-gradient(145deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.24)), url("https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=700&q=80");
+      }
+
+      .recent-card h3,
+      .recent-card p,
+      .recent-card span {
+        margin-left: 12px;
+        margin-right: 12px;
+      }
+
+      .recent-card h3 {
+        margin-bottom: 4px;
+        font-size: 12px;
+      }
+
+      .recent-card p {
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .recap {
+        display: grid;
+        grid-template-columns: 1.45fr 1fr 140px;
+        gap: 18px;
+        background:
+          radial-gradient(circle at 88% 36%, rgba(124, 58, 237, 0.28), transparent 22%),
+          linear-gradient(135deg, rgba(46, 16, 101, 0.62), rgba(10, 15, 30, 0.9));
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-top: 24px;
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 20px;
+      }
+
+      .mood {
+        width: 130px;
+        height: 130px;
+        align-self: center;
+        justify-self: center;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background:
+          radial-gradient(circle, rgba(15, 23, 42, 0.96) 50%, transparent 52%),
+          conic-gradient(var(--violet), var(--blue), var(--orange), var(--violet));
+        box-shadow: 0 0 30px rgba(124, 58, 237, 0.46);
+      }
+
+      .map {
+        position: relative;
+        min-height: 270px;
+        overflow: hidden;
+        border-radius: 10px;
+        background:
+          linear-gradient(32deg, transparent 48%, rgba(71, 85, 105, 0.28) 49%, rgba(71, 85, 105, 0.28) 51%, transparent 52%) 0 0 / 86px 86px,
+          linear-gradient(118deg, transparent 48%, rgba(71, 85, 105, 0.22) 49%, rgba(71, 85, 105, 0.22) 51%, transparent 52%) 0 0 / 112px 112px,
+          radial-gradient(circle at 50% 60%, rgba(124, 58, 237, 0.32), transparent 16%),
+          #081225;
+      }
+
+      .pin {
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        border-radius: 50% 50% 50% 0;
+        background: var(--violet);
+        transform: rotate(-45deg);
+        box-shadow: 0 0 22px currentColor;
+      }
+
+      .pin::after {
+        content: "";
+        position: absolute;
+        inset: 7px;
+        border-radius: 50%;
+        background: #fff;
+      }
+
+      .pin.one {
+        left: 36%;
+        top: 18%;
+        color: var(--violet);
+      }
+
+      .pin.two {
+        left: 58%;
+        top: 20%;
+        color: var(--blue);
+        background: var(--blue);
+      }
+
+      .pin.three {
+        left: 72%;
+        top: 35%;
+        color: var(--orange);
+        background: var(--orange);
+      }
+
+      .pin.four {
+        left: 34%;
+        top: 68%;
+        color: var(--green);
+        background: var(--green);
+      }
+
+      .map-card {
+        position: absolute;
+        right: 12px;
+        top: 12px;
+        width: 190px;
+        padding: 10px;
+        border-radius: 10px;
+        background: rgba(6, 10, 21, 0.86);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+      }
+
+      .map-photo {
+        height: 86px;
+        border-radius: 8px;
+        background-size: cover;
+        background-position: center;
+        background-image: url("https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=700&q=80");
+      }
+
+      .chat {
+        min-height: 370px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .bubble {
+        padding: 12px;
+        border-radius: 9px;
+        background: rgba(17, 24, 39, 0.82);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        font-size: 12px;
+      }
+
+      .bubble.user {
+        justify-self: end;
+        max-width: 210px;
+        margin-left: auto;
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.9), rgba(59, 30, 125, 0.92));
+      }
+
+      .chat-body {
+        flex: 1;
+        display: grid;
+        align-content: start;
+        gap: 11px;
+      }
+
+      .chat-input {
+        min-height: 42px;
+        margin-top: 12px;
+        padding: 0 7px 0 13px;
+        box-shadow: none;
+      }
+
+      .phone {
+        width: 260px;
+        min-height: 500px;
+        justify-self: center;
+        padding: 10px;
+        border-radius: 42px;
+        background: linear-gradient(145deg, #1f2937, #050711);
+      }
+
+      .phone-screen {
+        min-height: 480px;
+        padding: 18px;
+        border-radius: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: linear-gradient(180deg, #07111f, #050711);
+      }
+
+      .phone-search {
+        margin: 14px 0 18px;
+        padding: 12px;
+        border-radius: 15px;
+        color: var(--muted);
+        border: 1px solid rgba(36, 198, 255, 0.72);
+        box-shadow: 0 0 22px rgba(124, 58, 237, 0.5);
+        font-size: 11px;
+      }
+
+      .mobile-nav {
+        margin-top: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 13px;
+        border-radius: 18px;
+        background: rgba(5, 7, 17, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+      }
+
+      .right-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+
+      @media (max-width: 1320px) {
+        .app {
+          grid-template-columns: 230px 1fr;
+        }
+
+        .right {
+          grid-column: 1 / -1;
+        }
+      }
+
+      @media (max-width: 920px) {
+        .app,
+        .grid-4,
+        .recent,
+        .recap {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: static;
+          height: auto;
+        }
+      }
+
+      @media (max-width: 640px) {
+        body {
+          background:
+            radial-gradient(circle at 50% -8%, rgba(124, 58, 237, 0.28), transparent 38%),
+            linear-gradient(180deg, #050711 0%, #07111f 48%, #050711 100%);
+        }
+
+        .app {
+          display: block;
+          padding: 10px;
+        }
+
+        .sidebar,
+        .panel,
+        .card,
+        .recent-card {
+          border-radius: 12px;
+          box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+        }
+
+        .sidebar {
+          margin-bottom: 12px;
+          padding: 16px 12px 12px;
+        }
+
+        .brand {
+          align-items: flex-start;
+        }
+
+        .logo {
+          width: 44px;
+          height: 44px;
+          font-size: 20px;
+        }
+
+        .brand h1 {
+          font-size: 24px;
+        }
+
+        .brand p,
+        .promise span {
+          font-size: 11px;
+        }
+
+        .promise {
+          margin: 16px 4px 14px;
+          gap: 6px;
+        }
+
+        .promise strong {
+          font-size: 14px;
+        }
+
+        .nav {
+          display: flex;
+          gap: 8px;
+          overflow-x: auto;
+          padding: 8px;
+          scrollbar-width: none;
+        }
+
+        .nav::-webkit-scrollbar,
+        .chips::-webkit-scrollbar,
+        .rail::-webkit-scrollbar {
+          display: none;
+        }
+
+        .nav button {
+          min-width: max-content;
+          min-height: 34px;
+          padding: 0 12px;
+          font-size: 12px;
+        }
+
+        .assistant {
+          display: none;
+        }
+
+        .main,
+        .right {
+          gap: 12px;
+        }
+
+        .hero,
+        .panel {
+          padding: 14px;
+        }
+
+        .section-title {
+          align-items: flex-start;
+          margin-bottom: 12px;
+        }
+
+        .section-title h2 {
+          font-size: 16px;
+        }
+
+        .search {
+          height: 50px;
+          padding: 0 9px 0 14px;
+          border-radius: 17px;
+        }
+
+        .search input {
+          font-size: 12px;
+        }
+
+        .send {
+          width: 32px;
+          height: 32px;
+        }
+
+        .chips {
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          padding-bottom: 2px;
+        }
+
+        .chip,
+        .tab {
+          min-width: max-content;
+          min-height: 31px;
+          padding: 0 12px;
+          font-size: 11px;
+        }
+
+        .grid-4 {
+          display: flex;
+          overflow-x: auto;
+          gap: 10px;
+          padding-bottom: 3px;
+          scroll-snap-type: x mandatory;
+        }
+
+        .card {
+          min-width: 250px;
+          min-height: 165px;
+          padding: 15px;
+          scroll-snap-align: start;
+        }
+
+        .card h3 {
+          font-size: 14px;
+        }
+
+        .card p {
+          font-size: 11px;
+        }
+
+        .rail {
+          grid-auto-flow: column;
+          grid-auto-columns: 72px;
+          grid-template-columns: none;
+          gap: 10px;
+          padding-bottom: 3px;
+        }
+
+        .thumb {
+          height: 48px;
+        }
+
+        .recent {
+          display: flex;
+          overflow-x: auto;
+          gap: 10px;
+          padding-bottom: 3px;
+          scroll-snap-type: x mandatory;
+        }
+
+        .recent-card {
+          min-width: 158px;
+          scroll-snap-align: start;
+        }
+
+        .recent-img {
+          height: 86px;
+        }
+
+        .recap {
+          gap: 14px;
+        }
+
+        .stats {
+          grid-template-columns: repeat(2, 1fr);
+          margin-top: 16px;
+        }
+
+        .mood {
+          width: 112px;
+          height: 112px;
+          justify-self: start;
+        }
+
+        .map {
+          min-height: 250px;
+        }
+
+        .map-card {
+          left: 12px;
+          right: 12px;
+          top: auto;
+          bottom: 12px;
+          width: auto;
+          display: grid;
+          grid-template-columns: 74px 1fr;
+          column-gap: 10px;
+          align-items: center;
+        }
+
+        .map-photo {
+          grid-row: span 3;
+          height: 68px;
+        }
+
+        .map-card h3,
+        .map-card small {
+          margin: 0;
+        }
+
+        .chat {
+          min-height: 300px;
+        }
+
+        .bubble {
+          font-size: 11px;
+        }
+
+        .phone {
+          display: none;
+        }
+      }
+
+      @media (max-width: 420px) {
+        .app {
+          padding: 8px;
+        }
+
+        .hero,
+        .panel,
+        .sidebar {
+          padding: 12px;
+        }
+
+        .card {
+          min-width: 226px;
+        }
+
+        .recent-card {
+          min-width: 148px;
+        }
+
+        .map {
+          min-height: 230px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="logo">*</div>
+          <div>
+            <h1>NeuroNest</h1>
+            <p>AI Second Brain Memory System</p>
+          </div>
+        </div>
+
+        <div class="promise">
+          <strong>Never forget your life again.</strong>
+          <span>Your AI automatically remembers everything that matters.</span>
+        </div>
+
+        <nav class="nav">
+          <button class="active">⌂ Home</button>
+          <button>◌ AI Chat</button>
+          <button>≡ Timeline</button>
+          <button>□ Memories</button>
+          <button>⌖ Map View</button>
+          <button>◇ Places</button>
+          <button>✦ Insights</button>
+          <button># Tags</button>
+          <button>◉ Voice Notes</button>
+          <button>⌫ Trash</button>
+        </nav>
+
+        <button class="assistant">
+          <span class="orb">✦</span>
+          <span>
+            <strong>AI Assistant</strong><br />
+            <small>Always here to help</small>
+          </span>
+        </button>
+      </aside>
+
+      <section class="main">
+        <div class="panel hero">
+          <div class="section-title">
+            <h2>Dashboard</h2>
+            <span class="muted">Bell · JN</span>
+          </div>
+          <div class="search">
+            <span>⌕</span>
+            <input placeholder="Ask your memories anything..." />
+            <button class="send">➤</button>
+          </div>
+          <div class="chips">
+            <button class="chip">Find that cafe I visited last month</button>
+            <button class="chip">Show my gym workout plan</button>
+            <button class="chip">What did I save about AI?</button>
+            <button class="chip">Where did I go last Friday?</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">
+            <h2>AI Memory Feed</h2>
+            <small>See all</small>
+          </div>
+          <div class="grid-4">
+            <article class="card">
+              <span class="badge">Forgotten Gold</span>
+              <h3>Startup idea from 4 months ago</h3>
+              <p>You were working on an AI tutoring platform.</p>
+              <div class="neural"></div>
+            </article>
+            <article class="card">
+              <span class="badge" style="background: rgba(34, 197, 94, 0.3)">Place Visited</span>
+              <h3>Blue Bottle Cafe</h3>
+              <p>You visited 3 times in the last 2 weeks.</p>
+              <div class="card-photo"></div>
+            </article>
+            <article class="card">
+              <span class="badge">Memory Connection</span>
+              <h3>This idea matches something you saved in February.</h3>
+              <p>AI Project → AI Tutoring</p>
+            </article>
+            <article class="card">
+              <span class="badge" style="background: rgba(245, 158, 11, 0.34)">Insight</span>
+              <h3>You save most of your ideas at night.</h3>
+              <p>Active between 10 PM - 2 AM</p>
+            </article>
+          </div>
+        </div>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>Today's Moments</h2>
+            <div>
+              <button class="tab">All</button>
+              <button class="tab">Places</button>
+              <button class="tab">Notes</button>
+            </div>
+          </div>
+          <div class="rail">
+            <div class="moment"><div class="thumb"></div><small>9:15 AM</small></div>
+            <div class="moment"><div class="thumb"></div><small>11:20 AM</small></div>
+            <div class="moment"><div class="thumb"></div><small>12:47 PM</small></div>
+            <div class="moment"><div class="thumb"></div><small>3:10 PM</small></div>
+            <div class="moment"><div class="thumb"></div><small>5:45 PM</small></div>
+            <div class="moment"><div class="thumb"></div><small>8:30 PM</small></div>
+            <div class="moment"><div class="thumb"></div><small>10:15 PM</small></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>Recent Memories</h2>
+            <small>See all</small>
+          </div>
+          <div class="recent">
+            <article class="recent-card"><div class="recent-img"></div><h3>Upper Body Workout</h3><p>Today, 8:30 PM</p></article>
+            <article class="recent-card"><div class="recent-img"></div><h3>Sorrento Restaurant</h3><p>Today, 7:15 PM</p></article>
+            <article class="recent-card"><div class="recent-img"></div><h3>Business Idea</h3><p>Today, 2:40 PM</p></article>
+            <article class="recent-card"><div class="recent-img"></div><h3>Manali Trip</h3><p>Yesterday</p></article>
+            <article class="recent-card"><div class="recent-img"></div><h3>Book Notes</h3><p>2 days ago</p></article>
+          </div>
+        </section>
+
+        <section class="panel recap">
+          <div>
+            <h2>AI Weekly Recap</h2>
+            <small>May 12 - May 18, 2026</small>
+            <div class="stats">
+              <div class="stat"><strong>12</strong><small>Places Visited</small></div>
+              <div class="stat"><strong>68</strong><small>Memories Saved</small></div>
+              <div class="stat"><strong>34</strong><small>Screenshots</small></div>
+              <div class="stat"><strong>7</strong><small>Voice Notes</small></div>
+            </div>
+          </div>
+          <div>
+            <h3>Top Highlights</h3>
+            <p class="muted">You explored 8 new places</p>
+            <p class="muted">Most visited category: Cafes</p>
+            <p class="muted">Your mood was great this week</p>
+          </div>
+          <div class="mood">
+            <strong>Great</strong>
+          </div>
+        </section>
+      </section>
+
+      <section class="right">
+        <section class="panel">
+          <div class="section-title">
+            <h2>Map View</h2>
+          </div>
+          <div class="map">
+            <span class="pin one"></span>
+            <span class="pin two"></span>
+            <span class="pin three"></span>
+            <span class="pin four"></span>
+            <article class="map-card">
+              <div class="map-photo"></div>
+              <h3>Blue Bottle Cafe</h3>
+              <small>Cafe · 0.4 km</small><br />
+              <small>Visited 3 times</small>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel chat">
+          <h2>AI Chat</h2>
+          <div class="chat-body">
+            <p class="bubble user">What restaurant did I visit last Friday?</p>
+            <p class="bubble">You visited Sorrento Restaurant on Friday, May 16 at 7:30 PM.</p>
+            <p class="bubble">You also saved a note about it: Great pasta and ambience.</p>
+          </div>
+          <div class="chat-input">
+            <input placeholder="Ask anything about your memories..." />
+            <button class="send">➤</button>
+          </div>
+        </section>
+
+        <section class="phone">
+          <div class="phone-screen">
+            <small>9:41</small>
+            <h3>NeuroNest</h3>
+            <p>Good Morning, JAI</p>
+            <div class="phone-search">Ask your memories...</div>
+            <h3>Today's Moments</h3>
+            <div class="rail" style="grid-template-columns: repeat(4, 1fr)">
+              <div class="thumb"></div>
+              <div class="thumb"></div>
+              <div class="thumb"></div>
+              <div class="thumb"></div>
+            </div>
+            <div class="bubble" style="margin-top: 18px">
+              <strong>AI Insight</strong><br />
+              <small>You are most productive between 10 AM - 1 PM</small>
+            </div>
+            <div class="mobile-nav">
+              <span>⌂</span>
+              <span>◌</span>
+              <span>+</span>
+              <span>□</span>
+              <span>⌖</span>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

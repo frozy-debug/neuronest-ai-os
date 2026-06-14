@@ -1,0 +1,193 @@
+-- NeuroNest AI Core V2 production schema.
+-- Run in the Supabase SQL editor. Backend access must use SUPABASE_SERVICE_ROLE_KEY.
+-- No anonymous/public policies are created; user isolation remains server enforced.
+
+create extension if not exists vector;
+create extension if not exists pgcrypto;
+
+create table if not exists public.neuronest_users (
+  id text primary key,
+  google_sub text unique,
+  email text not null unique,
+  name text,
+  picture text,
+  status text not null default 'active',
+  settings jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  last_login_at timestamptz
+);
+
+create table if not exists public.memories (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  type text not null,
+  title text not null,
+  content text not null default '',
+  summary text not null default '',
+  tags text[] not null default '{}',
+  emotions text[] not null default '{}',
+  importance_score numeric not null default 0,
+  ai_score numeric not null default 0,
+  location jsonb,
+  media jsonb,
+  metadata jsonb not null default '{}'::jsonb,
+  source text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+
+create index if not exists memories_user_created_idx on public.memories(user_id, created_at desc);
+create index if not exists memories_user_type_idx on public.memories(user_id, type);
+
+create table if not exists public.memory_vectors (
+  id text primary key,
+  memory_id text not null,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  embedding vector(1536) not null,
+  type text not null,
+  provider text not null default 'openai',
+  model text not null default 'text-embedding-3-small',
+  content_hash text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.memory_vectors add column if not exists provider text not null default 'openai';
+alter table public.memory_vectors add column if not exists model text not null default 'text-embedding-3-small';
+alter table public.memory_vectors add column if not exists content_hash text;
+alter table public.memory_vectors add column if not exists updated_at timestamptz not null default now();
+
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'memory_vectors_memory_id_fkey'
+      and conrelid = 'public.memory_vectors'::regclass
+  ) then
+    alter table public.memory_vectors drop constraint memory_vectors_memory_id_fkey;
+  end if;
+end $$;
+
+create index if not exists memory_vectors_user_idx on public.memory_vectors(user_id);
+create index if not exists memory_vectors_embedding_idx
+  on public.memory_vectors using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+
+create table if not exists public.media_records (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  memory_id text references public.memories(id) on delete cascade,
+  kind text not null check (kind in ('screenshot', 'voice', 'image', 'file')),
+  storage_provider text not null,
+  storage_path text not null,
+  file_name text,
+  mime_type text,
+  size_bytes bigint,
+  transcript text,
+  extracted_text text,
+  ai_description text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.ai_chats (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  role text not null check (role in ('user', 'assistant', 'system')),
+  content text not null,
+  language text,
+  model text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.timeline_events (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  memory_id text references public.memories(id) on delete cascade,
+  type text not null,
+  title text not null,
+  description text,
+  event_at timestamptz not null,
+  data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.goals (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  title text not null,
+  description text,
+  status text not null default 'active',
+  progress numeric not null default 0,
+  data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.intelligence_records (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  type text not null check (type in ('digital-twin', 'relationship-graph', 'prediction', 'replay', 'insight', 'learning-profile')),
+  version text,
+  evidence_count integer not null default 0,
+  data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.ai_usage (
+  id text primary key,
+  user_id text references public.neuronest_users(id) on delete set null,
+  capability text not null,
+  provider text,
+  model text,
+  status text not null,
+  latency_ms integer,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ai_usage_created_idx on public.ai_usage(created_at desc);
+create index if not exists intelligence_records_user_type_idx on public.intelligence_records(user_id, type);
+
+create or replace function public.match_memory_vectors(
+  match_user_id text,
+  query_embedding vector(1536),
+  match_count int default 8
+)
+returns table (
+  id text,
+  memory_id text,
+  user_id text,
+  type text,
+  similarity float
+)
+language sql stable
+as $$
+  select
+    memory_vectors.id,
+    memory_vectors.memory_id,
+    memory_vectors.user_id,
+    memory_vectors.type,
+    1 - (memory_vectors.embedding <=> query_embedding) as similarity
+  from public.memory_vectors
+  where memory_vectors.user_id = match_user_id
+  order by memory_vectors.embedding <=> query_embedding
+  limit match_count;
+$$;
+
+alter table public.neuronest_users enable row level security;
+alter table public.memories enable row level security;
+alter table public.memory_vectors enable row level security;
+alter table public.media_records enable row level security;
+alter table public.ai_chats enable row level security;
+alter table public.timeline_events enable row level security;
+alter table public.goals enable row level security;
+alter table public.intelligence_records enable row level security;
+alter table public.ai_usage enable row level security;
+
+insert into storage.buckets (id, name, public)
+values ('neuronest-media', 'neuronest-media', false)
+on conflict (id) do nothing;

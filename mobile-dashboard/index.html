@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroNest Mobile Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="mobile.css" />
+  </head>
+  <body>
+    <main class="mobile-app">
+      <header class="topbar">
+        <button class="icon-btn" type="button" aria-label="Profile">◉</button>
+        <div>
+          <p>Good Morning, JAI</p>
+          <h1>NeuroNest</h1>
+        </div>
+        <button class="icon-btn" type="button" aria-label="Menu">☰</button>
+      </header>
+
+      <section class="search-card">
+        <div class="search-box">
+          <span>⌕</span>
+          <input placeholder="Ask your memories..." />
+          <button type="button" aria-label="Send">➤</button>
+        </div>
+        <div class="quick-actions">
+          <button type="button">Cafe last month</button>
+          <button type="button">Workout plan</button>
+          <button type="button">Saved about AI</button>
+        </div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-head">
+          <h2>Today's Moments</h2>
+          <button type="button">See all</button>
+        </div>
+        <div class="moment-strip">
+          <article class="moment-card purple">
+            <span>9:15</span>
+            <strong>Screenshot</strong>
+          </article>
+          <article class="moment-card image">
+            <span>11:20</span>
+            <strong>Cafe</strong>
+          </article>
+          <article class="moment-card blue">
+            <span>12:47</span>
+            <strong>AI Note</strong>
+          </article>
+          <article class="moment-card orange">
+            <span>3:10</span>
+            <strong>Idea</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="insight-card">
+        <div>
+          <span>AI Insight</span>
+          <h2>You are most productive between 10 AM - 1 PM</h2>
+        </div>
+        <div class="mini-chart">
+          <i></i><i></i><i></i><i></i><i></i>
+        </div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-head">
+          <h2>AI Memory Feed</h2>
+          <button type="button">Filter</button>
+        </div>
+        <div class="feed-list">
+          <article class="feed-card">
+            <div class="feed-icon violet">✦</div>
+            <div>
+              <span>Forgotten Gold</span>
+              <h3>Startup idea from 4 months ago</h3>
+              <p>You were working on an AI tutoring platform.</p>
+            </div>
+          </article>
+          <article class="feed-card">
+            <div class="feed-photo"></div>
+            <div>
+              <span>Place Visited</span>
+              <h3>Blue Bottle Cafe</h3>
+              <p>You visited 3 times in the last 2 weeks.</p>
+            </div>
+          </article>
+          <article class="feed-card">
+            <div class="feed-icon blue">⌘</div>
+            <div>
+              <span>Connection</span>
+              <h3>Your February AI note matches today's idea.</h3>
+              <p>AI Project → AI Tutoring</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="map-card">
+        <div class="section-head">
+          <h2>Map View</h2>
+          <button type="button">Open</button>
+        </div>
+        <div class="map-box">
+          <span class="pin pin-one"></span>
+          <span class="pin pin-two"></span>
+          <span class="pin pin-three"></span>
+          <article class="place-pop">
+            <div></div>
+            <strong>Blue Bottle Cafe</strong>
+            <small>Visited 3 times</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="chat-card">
+        <h2>AI Chat</h2>
+        <p class="user-bubble">What restaurant did I visit last Friday?</p>
+        <p class="ai-bubble">You visited Sorrento Restaurant on Friday at 7:30 PM.</p>
+        <div class="chat-input">
+          <input placeholder="Ask anything..." />
+          <button type="button">➤</button>
+        </div>
+      </section>
+
+      <nav class="bottom-nav">
+        <button class="active" type="button">⌂<span>Home</span></button>
+        <button type="button">◌<span>Chat</span></button>
+        <button class="add" type="button">+</button>
+        <button type="button">□<span>Timeline</span></button>
+        <button type="button">⌖<span>Map</span></button>
+      </nav>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,2993 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NeuroNest Super Admin</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #030711;
+        --panel: rgba(11, 18, 38, 0.76);
+        --panel-strong: rgba(14, 22, 46, 0.9);
+        --line: rgba(116, 146, 212, 0.18);
+        --line-bright: rgba(142, 95, 255, 0.42);
+        --text: #f7fbff;
+        --muted: #9dadca;
+        --soft: #64728e;
+        --blue: #24c7ff;
+        --purple: #8b4dff;
+        --violet: #b563ff;
+        --green: #16df9d;
+        --yellow: #ffc759;
+        --red: #ff4d6d;
+        --orange: #ff9f31;
+        --radius: 14px;
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+        --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 8% 14%, rgba(34, 203, 255, 0.18), transparent 22rem),
+          radial-gradient(circle at 84% 8%, rgba(151, 70, 255, 0.18), transparent 25rem),
+          radial-gradient(circle at 50% 100%, rgba(47, 92, 255, 0.12), transparent 34rem),
+          var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        overflow: hidden;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        cursor: pointer;
+      }
+
+      .ambient,
+      .ambient::before,
+      .ambient::after {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .ambient {
+        z-index: 0;
+        background-image:
+          linear-gradient(rgba(36, 199, 255, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(139, 77, 255, 0.04) 1px, transparent 1px);
+        background-size: 80px 80px;
+        mask-image: radial-gradient(circle at center, black 0%, transparent 82%);
+      }
+
+      .ambient::before {
+        content: "";
+        background:
+          radial-gradient(circle, rgba(36, 199, 255, 0.55) 0 1px, transparent 2px),
+          radial-gradient(circle, rgba(139, 77, 255, 0.5) 0 1px, transparent 2px);
+        background-size: 150px 150px, 230px 230px;
+        animation: drift 28s linear infinite;
+        opacity: 0.38;
+      }
+
+      .ambient::after {
+        content: "";
+        background: linear-gradient(120deg, transparent, rgba(36, 199, 255, 0.08), transparent, rgba(139, 77, 255, 0.08), transparent);
+        filter: blur(34px);
+        transform: translateX(-20%);
+        animation: aurora 18s ease-in-out infinite alternate;
+      }
+
+      @keyframes drift {
+        to {
+          transform: translate3d(-130px, 90px, 0);
+        }
+      }
+
+      @keyframes aurora {
+        to {
+          transform: translateX(16%) scale(1.08);
+        }
+      }
+
+      @keyframes breathe {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 0.72;
+        }
+        50% {
+          transform: scale(1.06);
+          opacity: 1;
+        }
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(16px) scale(0.98);
+          filter: blur(8px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+          filter: blur(0);
+        }
+      }
+
+      @keyframes shimmer {
+        from {
+          transform: translateX(-120%);
+        }
+        to {
+          transform: translateX(120%);
+        }
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .auth-screen {
+        position: relative;
+        z-index: 2;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .auth-card {
+        width: min(460px, 100%);
+        border: 1px solid var(--line-bright);
+        border-radius: 24px;
+        background: linear-gradient(145deg, rgba(13, 22, 49, 0.9), rgba(5, 8, 18, 0.86));
+        box-shadow: 0 0 80px rgba(139, 77, 255, 0.22), var(--shadow);
+        padding: 28px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .auth-card::before,
+      .glass::before,
+      .metric-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+        transform: translateX(-120%);
+        animation: shimmer 6s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      .brand-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .logo-mark {
+        width: 54px;
+        height: 54px;
+        border: 1px solid rgba(185, 123, 255, 0.72);
+        border-radius: 12px;
+        background:
+          radial-gradient(circle at 70% 20%, rgba(36, 199, 255, 0.58), transparent 8px),
+          linear-gradient(145deg, rgba(148, 86, 255, 0.3), rgba(10, 17, 38, 0.95));
+        display: grid;
+        place-items: center;
+        color: white;
+        font-size: 30px;
+        font-weight: 900;
+        box-shadow: 0 0 34px rgba(139, 77, 255, 0.5);
+        position: relative;
+      }
+
+      .logo-mark::after {
+        content: "";
+        position: absolute;
+        inset: 7px;
+        border-radius: 9px;
+        border: 1px solid rgba(36, 199, 255, 0.18);
+      }
+
+      .brand-title {
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      .brand-kicker {
+        margin-top: 3px;
+        color: #b4a6ff;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+
+      .auth-card h1 {
+        margin: 28px 0 8px;
+        font-size: 34px;
+        line-height: 1.05;
+      }
+
+      .auth-card p {
+        margin: 0 0 22px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .admin-shell {
+        position: relative;
+        z-index: 1;
+        height: 100vh;
+        display: grid;
+        grid-template-columns: 240px minmax(0, 1fr) 272px;
+        gap: 14px;
+        padding: 16px;
+        animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      }
+
+      .sidebar,
+      .main,
+      .right-rail,
+      .glass,
+      .metric-card,
+      .drawer,
+      .modal-card {
+        border: 1px solid var(--line);
+        background: linear-gradient(145deg, rgba(12, 19, 42, 0.86), rgba(5, 9, 20, 0.74));
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(22px);
+      }
+
+      .sidebar,
+      .right-rail {
+        border-radius: 14px;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .sidebar-head {
+        padding: 22px 20px 18px;
+        border-bottom: 1px solid rgba(116, 146, 212, 0.1);
+      }
+
+      .nav-scroll {
+        padding: 14px;
+        overflow: auto;
+      }
+
+      .nav-section {
+        margin: 16px 0 10px;
+        color: #7f8faf;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .nav-item {
+        width: 100%;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 5px 0;
+        padding: 0 12px;
+        border-radius: 9px;
+        background: transparent;
+        color: #bcc9df;
+        text-align: left;
+        transition: transform 0.22s ease, background 0.22s ease, color 0.22s ease, box-shadow 0.22s ease;
+      }
+
+      .nav-item:hover,
+      .nav-item.active {
+        color: white;
+        background: linear-gradient(90deg, rgba(36, 199, 255, 0.2), rgba(139, 77, 255, 0.72));
+        box-shadow: inset 0 0 0 1px rgba(139, 77, 255, 0.25), 0 10px 28px rgba(96, 55, 218, 0.24);
+        transform: translateX(2px);
+      }
+
+      .nav-glyph {
+        width: 22px;
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 900;
+        text-align: center;
+      }
+
+      .control-card {
+        margin: auto 14px 18px;
+        border: 1px solid rgba(36, 199, 255, 0.46);
+        background: linear-gradient(135deg, rgba(36, 199, 255, 0.12), rgba(139, 77, 255, 0.2));
+        border-radius: 10px;
+        padding: 13px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .control-card b {
+        display: block;
+        font-size: 12px;
+      }
+
+      .control-card span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .main {
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        overflow: auto;
+        min-width: 0;
+        padding: 8px 0 20px;
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(260px, 1fr) minmax(260px, 410px) auto;
+        align-items: center;
+        gap: 18px;
+        margin: 10px 10px 22px;
+      }
+
+      .eyebrow {
+        color: #aac0df;
+        font-size: 18px;
+        margin-bottom: 3px;
+      }
+
+      .title-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .title-row h1 {
+        margin: 0;
+        font-size: clamp(30px, 3vw, 42px);
+        line-height: 1;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 25px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: rgba(139, 77, 255, 0.24);
+        color: #d9c9ff;
+        border: 1px solid rgba(139, 77, 255, 0.28);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .subtitle {
+        margin: 10px 0 0;
+        color: var(--muted);
+      }
+
+      .search-shell {
+        height: 42px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border: 1px solid rgba(116, 146, 212, 0.3);
+        background: rgba(5, 9, 20, 0.72);
+        border-radius: 10px;
+        padding: 0 11px;
+      }
+
+      .search-shell input {
+        flex: 1;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: white;
+        min-width: 0;
+      }
+
+      .kbd {
+        border: 1px solid rgba(116, 146, 212, 0.25);
+        border-radius: 6px;
+        padding: 4px 7px;
+        color: #8392b4;
+        font-size: 11px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+
+      .icon-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: rgba(15, 24, 50, 0.72);
+        color: #b8c7e3;
+        border: 1px solid rgba(116, 146, 212, 0.18);
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      }
+
+      .icon-btn:hover {
+        transform: translateY(-2px);
+        border-color: rgba(36, 199, 255, 0.5);
+        box-shadow: 0 0 22px rgba(36, 199, 255, 0.18);
+      }
+
+      .admin-chip {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 235px;
+        border-radius: 15px;
+        padding: 7px 10px;
+        color: white;
+        background: rgba(7, 12, 26, 0.66);
+        border: 1px solid rgba(116, 146, 212, 0.16);
+      }
+
+      .avatar {
+        width: 48px;
+        height: 48px;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle, rgba(36, 199, 255, 0.9), transparent 4px),
+          conic-gradient(from 40deg, #24c7ff, #8b4dff, #d45aff, #24c7ff);
+        box-shadow: 0 0 30px rgba(139, 77, 255, 0.52);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 12px var(--green);
+      }
+
+      .content-grid {
+        display: grid;
+        gap: 14px;
+        padding: 0 10px;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(150px, 1fr));
+        gap: 12px;
+      }
+
+      .metric-card,
+      .glass {
+        position: relative;
+        overflow: hidden;
+        border-radius: var(--radius);
+      }
+
+      .metric-card {
+        min-height: 114px;
+        padding: 17px;
+      }
+
+      .metric-inner {
+        display: grid;
+        grid-template-columns: 40px 1fr;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .metric-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: var(--blue);
+        background: rgba(36, 199, 255, 0.12);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .metric-card[data-accent="purple"] .metric-icon,
+      .metric-card[data-accent="violet"] .metric-icon {
+        color: #c69bff;
+        background: rgba(139, 77, 255, 0.14);
+      }
+
+      .metric-card[data-accent="green"] .metric-icon {
+        color: var(--green);
+        background: rgba(22, 223, 157, 0.12);
+      }
+
+      .metric-card[data-accent="orange"] .metric-icon {
+        color: var(--orange);
+        background: rgba(255, 159, 49, 0.13);
+      }
+
+      .metric-label {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .metric-value {
+        margin-top: 5px;
+        font-size: 27px;
+        font-weight: 850;
+      }
+
+      .metric-trend {
+        margin-top: 11px;
+        color: #9a87ff;
+        font-size: 12px;
+      }
+
+      .panel-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.9fr);
+        gap: 14px;
+      }
+
+      .glass {
+        padding: 18px;
+      }
+
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .panel-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .panel-action {
+        min-height: 33px;
+        padding: 0 13px;
+        border-radius: 8px;
+        color: #d7ceff;
+        background: rgba(139, 77, 255, 0.17);
+        border: 1px solid rgba(139, 77, 255, 0.2);
+      }
+
+      .chart-wrap {
+        height: 214px;
+      }
+
+      .chart-labels {
+        display: flex;
+        justify-content: space-between;
+        color: #8a9abb;
+        font-size: 12px;
+      }
+
+      .donut-layout {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        gap: 24px;
+        align-items: center;
+        min-height: 214px;
+      }
+
+      .donut {
+        width: 190px;
+        height: 190px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 0 48px rgba(139, 77, 255, 0.3);
+        position: relative;
+      }
+
+      .donut::after {
+        content: "";
+        position: absolute;
+        width: 118px;
+        height: 118px;
+        border-radius: 50%;
+        background: #070d1c;
+        box-shadow: inset 0 0 22px rgba(255, 255, 255, 0.04);
+      }
+
+      .donut-center {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+      }
+
+      .donut-center b {
+        display: block;
+        font-size: 26px;
+      }
+
+      .donut-center span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .legend-row {
+        display: grid;
+        grid-template-columns: 14px 1fr auto;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 0;
+        color: #ced7ea;
+        font-size: 13px;
+      }
+
+      .legend-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+      }
+
+      .table-shell {
+        overflow: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 12px 10px;
+        text-align: left;
+        white-space: nowrap;
+        border-bottom: 1px solid rgba(116, 146, 212, 0.08);
+      }
+
+      th {
+        color: #9dafc9;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      td {
+        color: #d7e1f3;
+        font-size: 13px;
+      }
+
+      tbody tr {
+        transition: background 0.2s ease, transform 0.2s ease;
+      }
+
+      tbody tr:hover {
+        background: rgba(36, 199, 255, 0.05);
+      }
+
+      .user-cell {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .mini-avatar {
+        width: 31px;
+        height: 31px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: linear-gradient(145deg, rgba(36, 199, 255, 0.34), rgba(139, 77, 255, 0.5));
+        color: white;
+        font-weight: 800;
+      }
+
+      .mini-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 5px 12px;
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--green);
+        background: rgba(22, 223, 157, 0.12);
+      }
+
+      .status.blocked {
+        color: #ff6c82;
+        background: rgba(255, 77, 109, 0.14);
+      }
+
+      .status.suspended {
+        color: #ffbf57;
+        background: rgba(255, 159, 49, 0.16);
+      }
+
+      .status.admin {
+        color: #cfbcff;
+        background: rgba(139, 77, 255, 0.18);
+      }
+
+      .status.pending-review {
+        color: #8ec5ff;
+        background: rgba(59, 130, 246, 0.16);
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .field label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        box-sizing: border-box;
+        border-radius: 10px;
+        border: 1px solid rgba(116, 146, 212, 0.18);
+        background: rgba(8, 13, 28, 0.88);
+        color: #eef2ff;
+        padding: 10px 12px;
+      }
+
+      .live-grid {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 14px;
+      }
+
+      .live-user-card {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 14px;
+        align-items: center;
+        padding: 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(116, 146, 212, 0.14);
+        background: rgba(255, 255, 255, 0.03);
+        cursor: pointer;
+        transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+      }
+
+      .live-user-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(139, 77, 255, 0.42);
+        box-shadow: 0 12px 32px rgba(36, 199, 255, 0.08);
+      }
+
+      .online-pulse {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 14px var(--green);
+        animation: pulseOnline 1.8s ease-in-out infinite;
+      }
+
+      @keyframes pulseOnline {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.25); opacity: 0.72; }
+      }
+
+      .live-feed-item {
+        display: grid;
+        grid-template-columns: 72px 1fr;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(116, 146, 212, 0.08);
+      }
+
+      .live-feed-time {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      @media (max-width: 1100px) {
+        .live-grid { grid-template-columns: 1fr; }
+      }
+
+      .row-actions {
+        display: flex;
+        gap: 7px;
+      }
+
+      .tiny-btn {
+        min-width: 31px;
+        height: 31px;
+        border-radius: 8px;
+        color: #a9c8ff;
+        background: rgba(57, 79, 145, 0.2);
+        border: 1px solid rgba(116, 146, 212, 0.13);
+      }
+
+      .right-rail {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        overflow: auto;
+        padding: 12px;
+      }
+
+      .rail-card {
+        border: 1px solid rgba(116, 146, 212, 0.12);
+        border-radius: 12px;
+        background: rgba(9, 15, 32, 0.62);
+        overflow: hidden;
+      }
+
+      .rail-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px;
+        border-bottom: 1px solid rgba(116, 146, 212, 0.08);
+        font-weight: 800;
+      }
+
+      .rail-body {
+        padding: 14px 16px;
+      }
+
+      .health-row,
+      .activity-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 8px 0;
+        color: #c1cee3;
+        font-size: 13px;
+      }
+
+      .health-state {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--green);
+        font-size: 12px;
+      }
+
+      .health-state.warning {
+        color: var(--yellow);
+      }
+
+      .health-state::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 10px currentColor;
+      }
+
+      .score-card {
+        margin-top: 13px;
+        display: grid;
+        grid-template-columns: 1fr 56px;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .score-ring {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: white;
+        font-size: 12px;
+        font-weight: 900;
+        position: relative;
+      }
+
+      .score-ring::after {
+        content: "";
+        position: absolute;
+        inset: 7px;
+        border-radius: 50%;
+        background: #091020;
+      }
+
+      .score-ring span {
+        position: relative;
+        z-index: 1;
+      }
+
+      .activity-row {
+        grid-template-columns: 36px 1fr auto;
+      }
+
+      .activity-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: rgba(36, 199, 255, 0.12);
+        color: var(--blue);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .activity-title {
+        color: white;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .activity-detail,
+      .activity-time {
+        color: #8190ad;
+        font-size: 11px;
+      }
+
+      .filters,
+      .collection-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+
+      .filter-btn {
+        min-height: 34px;
+        padding: 0 13px;
+        border-radius: 999px;
+        color: #bfcae1;
+        background: rgba(10, 16, 34, 0.72);
+        border: 1px solid rgba(116, 146, 212, 0.16);
+      }
+
+      .filter-btn.active,
+      .filter-btn:hover {
+        color: white;
+        border-color: rgba(139, 77, 255, 0.55);
+        background: rgba(139, 77, 255, 0.28);
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+
+      .field label {
+        color: #a9b8d1;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .field input,
+      .field textarea,
+      .field select {
+        width: 100%;
+        color: white;
+        background: rgba(3, 8, 18, 0.72);
+        border: 1px solid rgba(116, 146, 212, 0.18);
+        border-radius: 10px;
+        outline: 0;
+        padding: 12px;
+      }
+
+      .field textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+
+      .primary-btn,
+      .danger-btn,
+      .ghost-btn {
+        min-height: 40px;
+        border-radius: 10px;
+        padding: 0 16px;
+        color: white;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .primary-btn {
+        background: linear-gradient(135deg, #1dbdff, #7e45ff);
+        box-shadow: 0 0 28px rgba(139, 77, 255, 0.3);
+      }
+
+      .danger-btn {
+        background: rgba(255, 77, 109, 0.16);
+        color: #ffb2bf;
+        border: 1px solid rgba(255, 77, 109, 0.28);
+      }
+
+      .ghost-btn {
+        background: rgba(255, 255, 255, 0.04);
+        color: #c9d5ea;
+        border: 1px solid rgba(116, 146, 212, 0.16);
+      }
+
+      .primary-btn:hover,
+      .danger-btn:hover,
+      .ghost-btn:hover {
+        transform: translateY(-1px);
+      }
+
+      .drawer-backdrop,
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        background: rgba(0, 0, 0, 0.54);
+        backdrop-filter: blur(14px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+
+      .drawer-backdrop.open,
+      .modal-backdrop.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .drawer {
+        position: fixed;
+        z-index: 25;
+        top: 16px;
+        right: 16px;
+        bottom: 16px;
+        width: min(520px, calc(100vw - 32px));
+        border-radius: 18px;
+        transform: translateX(calc(100% + 24px));
+        transition: transform 0.34s cubic-bezier(0.2, 0.8, 0.2, 1);
+        overflow: auto;
+        padding: 20px;
+      }
+
+      .drawer.open {
+        transform: translateX(0);
+      }
+
+      .drawer-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .drawer-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .drawer-title h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .stat-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .mini-stat {
+        border: 1px solid rgba(116, 146, 212, 0.12);
+        background: rgba(255, 255, 255, 0.035);
+        border-radius: 12px;
+        padding: 12px;
+      }
+
+      .mini-stat span {
+        color: #8798b8;
+        font-size: 12px;
+      }
+
+      .mini-stat b {
+        display: block;
+        margin-top: 4px;
+        font-size: 20px;
+      }
+
+      .timeline-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .timeline-item {
+        border: 1px solid rgba(116, 146, 212, 0.11);
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 12px;
+        padding: 11px;
+      }
+
+      .timeline-item b {
+        display: block;
+      }
+
+      .timeline-item span {
+        color: #8494b0;
+        font-size: 12px;
+      }
+
+      .modal-backdrop {
+        display: grid;
+        place-items: center;
+      }
+
+      .modal-card {
+        width: min(520px, calc(100vw - 32px));
+        border-radius: 18px;
+        padding: 22px;
+        transform: scale(0.96);
+        transition: transform 0.25s ease;
+      }
+
+      .modal-backdrop.open .modal-card {
+        transform: scale(1);
+      }
+
+      .profile-grid {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 18px;
+        align-items: center;
+      }
+
+      .profile-orb {
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: conic-gradient(from 90deg, #24c7ff, #8b4dff, #cf5cff, #24c7ff);
+        box-shadow: 0 0 48px rgba(139, 77, 255, 0.48);
+        animation: breathe 4s ease-in-out infinite;
+      }
+
+      .profile-orb .avatar {
+        width: 96px;
+        height: 96px;
+      }
+
+      .toast {
+        position: fixed;
+        z-index: 50;
+        left: 50%;
+        bottom: 24px;
+        transform: translate(-50%, 24px);
+        opacity: 0;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: rgba(10, 16, 34, 0.94);
+        border: 1px solid rgba(36, 199, 255, 0.28);
+        box-shadow: 0 0 30px rgba(36, 199, 255, 0.18);
+        transition: opacity 0.24s ease, transform 0.24s ease;
+        color: white;
+      }
+
+      .toast.open {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      .empty-state {
+        min-height: 180px;
+        display: grid;
+        place-items: center;
+        color: #8191ae;
+        border: 1px dashed rgba(116, 146, 212, 0.18);
+        border-radius: 12px;
+      }
+
+      @media (max-width: 1280px) {
+        .admin-shell {
+          grid-template-columns: 220px minmax(0, 1fr);
+        }
+
+        .right-rail {
+          display: none;
+        }
+
+        .metric-grid {
+          grid-template-columns: repeat(3, minmax(150px, 1fr));
+        }
+      }
+
+      @media (max-width: 880px) {
+        body {
+          overflow: auto;
+        }
+
+        .admin-shell {
+          height: auto;
+          min-height: 100vh;
+          grid-template-columns: 1fr;
+          padding: 10px;
+        }
+
+        .sidebar {
+          max-height: none;
+        }
+
+        .topbar,
+        .panel-grid,
+        .donut-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .metric-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .admin-chip {
+          min-width: 0;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .metric-grid,
+        .stat-list,
+        .profile-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .top-actions {
+          justify-content: flex-start;
+          flex-wrap: wrap;
+        }
+      }
+      .boot-screen{
+  position:fixed;
+  inset:0;
+  z-index:99999;
+  background:#030711;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+
+.boot-screen::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+  radial-gradient(circle at 20% 20%, rgba(36,199,255,.2), transparent 25%),
+  radial-gradient(circle at 80% 20%, rgba(139,77,255,.2), transparent 25%);
+}
+
+.boot-content{
+  text-align:center;
+  z-index:2;
+}
+
+.boot-logo{
+  width:110px;
+  height:110px;
+  border-radius:50%;
+  margin:auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:48px;
+  font-weight:900;
+  color:white;
+  background:conic-gradient(
+    #24c7ff,
+    #8b4dff,
+    #d45aff,
+    #24c7ff
+  );
+  box-shadow:0 0 50px rgba(139,77,255,.6);
+  animation:pulseBoot 2s infinite;
+}
+
+.boot-content h1{
+  margin-top:25px;
+  font-size:56px;
+  letter-spacing:4px;
+}
+
+.boot-subtitle{
+  color:#9dadca;
+  font-size:14px;
+  letter-spacing:4px;
+  margin-top:8px;
+}
+
+.boot-status{
+  margin-top:35px;
+  color:#24c7ff;
+  font-size:14px;
+}
+
+.boot-progress{
+  width:350px;
+  height:8px;
+  border-radius:999px;
+  background:rgba(255,255,255,.08);
+  margin:20px auto;
+  overflow:hidden;
+}
+
+#bootBar{
+  width:0%;
+  height:100%;
+  border-radius:999px;
+  background:linear-gradient(
+    90deg,
+    #24c7ff,
+    #8b4dff
+  );
+}
+
+.skip-btn{
+  background:none;
+  border:1px solid rgba(255,255,255,.15);
+  color:white;
+  padding:10px 18px;
+  border-radius:12px;
+}
+
+@keyframes pulseBoot{
+  0%,100%{
+    transform:scale(1);
+  }
+  50%{
+    transform:scale(1.08);
+  }
+}
+    </style>
+  </head>
+  <body>
+    <div id="bootScreen" class="boot-screen">
+  <div class="boot-content">
+    <div class="boot-logo">N</div>
+
+    <h1>NEURONEST</h1>
+
+    <div class="boot-subtitle">
+      SUPER ADMIN CONTROL CENTER
+    </div>
+
+    <div class="boot-status" id="bootStatus">
+      Initializing...
+    </div>
+
+    <div class="boot-progress">
+      <div id="bootBar"></div>
+    </div>
+
+    <button id="skipBoot" class="skip-btn">
+      Skip
+    </button>
+  </div>
+</div>
+    <div class="ambient"></div>
+
+    <section id="authScreen" class="auth-screen">
+      <div class="auth-card">
+        <div class="brand-row">
+          <div class="logo-mark">N</div>
+          <div>
+            <div class="brand-title">NeuroNest</div>
+            <div class="brand-kicker">Super Admin</div>
+          </div>
+        </div>
+        <h1>Super Admin Control Center</h1>
+        <p>Monitor, manage, and protect your NeuroNest ecosystem from a separate secured admin application.</p>
+        <div id="googleButton"></div>
+        <div id="devLogin" class="hidden" style="margin-top: 14px">
+          <div class="field">
+            <label>Local dev admin email</label>
+            <input id="devEmail" type="email" placeholder="owner@gmail.com" />
+          </div>
+          <button id="devLoginBtn" class="primary-btn" style="width: 100%; margin-top: 12px">Open Control Center</button>
+        </div>
+        <p id="authStatus" style="margin-top: 18px; color: #ffb2bf"></p>
+      </div>
+    </section>
+
+    <div id="appShell" class="admin-shell hidden">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <div class="brand-row">
+            <div class="logo-mark">N</div>
+            <div>
+              <div class="brand-title">NeuroNest</div>
+              <div class="brand-kicker">Super Admin</div>
+            </div>
+          </div>
+        </div>
+        <div class="nav-scroll" id="nav"></div>
+        <div class="control-card">
+          <div class="logo-mark" style="width: 36px; height: 36px; border-radius: 9px; font-size: 18px">N</div>
+          <div>
+            <b>NeuroNest Control Center</b>
+            <span>You have full system access</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <div class="eyebrow">Welcome back,</div>
+            <div class="title-row">
+              <h1 id="pageTitle">Super Admin</h1>
+              <span class="pill">SUPER ADMIN</span>
+            </div>
+            <p class="subtitle">Monitor, manage and protect your NeuroNest ecosystem</p>
+          </div>
+          <label class="search-shell">
+            <span style="color: var(--blue)">Q</span>
+            <input id="globalSearch" placeholder="Search users, emails, IDs..." />
+            <span class="kbd">⌘K</span>
+          </label>
+          <div class="top-actions">
+            <button class="icon-btn" title="Notifications">12</button>
+            <button class="icon-btn" title="Settings" data-view-shortcut="settings">SET</button>
+            <button id="adminProfileBtn" class="admin-chip" type="button">
+              <div class="avatar" id="topAvatar"></div>
+              <div style="min-width: 0; text-align: left">
+                <b id="adminName">Super Admin</b>
+                <div id="adminEmail" style="color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis"></div>
+              </div>
+              <span class="status-dot"></span>
+            </button>
+          </div>
+        </header>
+        <section id="content" class="content-grid"></section>
+      </main>
+
+      <aside class="right-rail" id="rightRail"></aside>
+    </div>
+
+    <div id="drawerBackdrop" class="drawer-backdrop"></div>
+    <aside id="userDrawer" class="drawer"></aside>
+
+    <div id="profileModal" class="modal-backdrop"></div>
+    <div id="confirmModal" class="modal-backdrop"></div>
+    <div id="toast" class="toast"></div>
+
+    <script>
+      const state = {
+        config: null,
+        admin: null,
+        overview: null,
+        users: [],
+        selectedUser: null,
+        view: "dashboard",
+        filter: "all",
+        collection: "users",
+        database: null,
+        announcements: [],
+        poller: null,
+        syncSource: null,
+        liveMonitor: null,
+        liveWs: null,
+        selectedLiveUser: null,
+        liveUserDetail: null,
+      };
+
+      const navGroups = [
+        {
+          title: "",
+          items: [{ view: "dashboard", label: "Dashboard", glyph: "DA" }],
+        },
+        {
+          title: "User Management",
+          items: [
+            { view: "users", label: "Users", glyph: "US" },
+            { view: "analytics", label: "User Analytics", glyph: "UA" },
+            { view: "blocked", label: "Blocked Users", glyph: "BL" },
+            { view: "activity", label: "User Activity", glyph: "AC" },
+            { view: "live-monitor", label: "Live Monitor", glyph: "LM" },
+          ],
+        },
+        {
+          title: "System Management",
+          items: [
+            { view: "ai-analytics", label: "AI & Usage Analytics", glyph: "AI" },
+            { view: "database", label: "Database Explorer", glyph: "DB" },
+            { view: "health", label: "System Health", glyph: "SH" },
+            { view: "security", label: "Security Center", glyph: "SC" },
+            { view: "announcements", label: "Announcements", glyph: "AN" },
+            { view: "flags", label: "Feature Flags", glyph: "FG" },
+          ],
+        },
+        {
+          title: "Admin Tools",
+          items: [
+            { view: "logs", label: "Logs & Audit", glyph: "LG" },
+            { view: "export", label: "Export Data", glyph: "EX" },
+            { view: "settings", label: "Settings", glyph: "ST" },
+          ],
+        },
+      ];
+
+      const numberFormatter = new Intl.NumberFormat("en-US");
+
+      function $(selector) {
+        return document.querySelector(selector);
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function formatNumber(value) {
+        return numberFormatter.format(Number(value || 0));
+      }
+
+      function initials(name, email) {
+        const source = String(name || email || "N");
+        return source
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((part) => part[0])
+          .join("")
+          .toUpperCase();
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          credentials: "include",
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (response.status === 401 && path !== "/api/admin/me") showAuth();
+          throw new Error(payload.error || "Admin request failed.");
+        }
+        return payload;
+      }
+
+      function showToast(message) {
+        const toast = $("#toast");
+        toast.textContent = message;
+        toast.classList.add("open");
+        clearTimeout(showToast.timer);
+        showToast.timer = setTimeout(() => toast.classList.remove("open"), 2600);
+      }
+
+      function setAvatar(el, picture, name, email) {
+        if (!el) return;
+        el.innerHTML = picture
+          ? `<img src="${escapeHtml(picture)}" alt="${escapeHtml(name || email || "Admin")}" />`
+          : `<span>${escapeHtml(initials(name, email))}</span>`;
+      }
+
+      function showAuth(message = "") {
+        $("#authScreen").classList.remove("hidden");
+        $("#appShell").classList.add("hidden");
+        $("#authStatus").textContent = message;
+        if (state.poller) clearInterval(state.poller);
+      }
+
+      function showApp() {
+        $("#authScreen").classList.add("hidden");
+        $("#appShell").classList.remove("hidden");
+      }
+
+      async function init() {
+        state.config = await api("/api/admin/config");
+        setupGoogleLogin();
+        $("#devLogin").classList.toggle("hidden", !state.config.allowDevLogin);
+        $("#devLoginBtn").addEventListener("click", devLogin);
+        $("#globalSearch").addEventListener("input", debounce((event) => {
+          state.view = "users";
+          loadUsers(event.target.value);
+        }, 220));
+        $("#adminProfileBtn").addEventListener("click", openAdminProfile);
+        $("#drawerBackdrop").addEventListener("click", closeDrawer);
+        document.body.addEventListener("click", handleDocumentClick);
+
+        const me = await api("/api/admin/me");
+        if (me.admin) {
+          state.admin = me.admin;
+          await loadApp();
+        } else {
+          showAuth();
+        }
+      }
+
+      function setupGoogleLogin() {
+        if (!state.config.googleClientId) {
+          $("#authStatus").textContent = "GOOGLE_CLIENT_ID is missing. Add it in Render environment variables.";
+          return;
+        }
+
+        const render = () => {
+          if (!window.google?.accounts?.id) return setTimeout(render, 150);
+          google.accounts.id.initialize({
+            client_id: state.config.googleClientId,
+            callback: async (response) => {
+              try {
+                const payload = await api("/api/admin/auth/google", {
+                  method: "POST",
+                  body: JSON.stringify({ credential: response.credential }),
+                });
+                state.admin = payload.admin;
+                await loadApp();
+              } catch (error) {
+                showAuth(error.message);
+              }
+            },
+          });
+          google.accounts.id.renderButton($("#googleButton"), {
+            theme: "filled_black",
+            size: "large",
+            text: "signin_with",
+            width: 340,
+          });
+        };
+        render();
+      }
+
+      async function devLogin() {
+        try {
+          const email = $("#devEmail").value.trim();
+          const payload = await api("/api/admin/auth/dev", {
+            method: "POST",
+            body: JSON.stringify({ email, name: "Super Admin" }),
+          });
+          state.admin = payload.admin;
+          await loadApp();
+        } catch (error) {
+          $("#authStatus").textContent = error.message;
+        }
+      }
+
+      async function loadApp() {
+        showApp();
+        renderAdminChip();
+        renderNav();
+        if (location.pathname.includes("live-monitor")) state.view = "live-monitor";
+        await Promise.all([loadOverview(), loadUsers(), state.view === "live-monitor" ? loadLiveMonitor() : Promise.resolve()]);
+        render();
+        if (state.view === "live-monitor") connectLiveMonitorWs();
+        if (state.poller) clearInterval(state.poller);
+        if (state.syncSource) state.syncSource.close();
+        state.syncSource = new EventSource("/api/admin/sync/stream");
+        state.syncSource.onmessage = async () => {
+          try {
+            await Promise.all([
+              loadOverview(false),
+              state.view === "users" || state.view === "dashboard" || state.view === "blocked"
+                ? loadUsers($("#globalSearch")?.value || "", false)
+                : Promise.resolve(),
+              state.view === "live-monitor" ? loadLiveMonitor(false) : Promise.resolve(),
+            ]);
+            if (state.selectedUser?.id) {
+              const payload = await api(`/api/admin/users/${encodeURIComponent(state.selectedUser.id)}`);
+              state.selectedUser = payload.user;
+              renderDrawer();
+            }
+            render();
+          } catch {
+            // Keep live sync resilient if a refresh fails briefly.
+          }
+        };
+        state.poller = setInterval(async () => {
+          try {
+            await Promise.all([loadOverview(false), state.view === "users" || state.view === "dashboard" ? loadUsers($("#globalSearch").value, false) : Promise.resolve()]);
+            render();
+          } catch {
+            // Silent refresh failure keeps the admin UI calm.
+          }
+        }, 30000);
+      }
+
+      function renderAdminChip() {
+        $("#adminName").textContent = state.admin?.name || "Super Admin";
+        $("#adminEmail").textContent = state.admin?.email || "";
+        setAvatar($("#topAvatar"), state.admin?.picture, state.admin?.name, state.admin?.email);
+      }
+
+      async function loadOverview(showError = true) {
+        try {
+          state.overview = await api("/api/admin/overview");
+        } catch (error) {
+          if (showError) showToast(error.message);
+        }
+      }
+
+      async function loadUsers(search = "", showError = true) {
+        try {
+          const payload = await api(`/api/admin/users?search=${encodeURIComponent(search)}&filter=${encodeURIComponent(state.filter)}`);
+          state.users = payload.users || [];
+        } catch (error) {
+          if (showError) showToast(error.message);
+        }
+      }
+
+      function renderNav() {
+        $("#nav").innerHTML = navGroups
+          .map((group) => {
+            const title = group.title ? `<div class="nav-section">${escapeHtml(group.title)}</div>` : "";
+            const items = group.items
+              .map(
+                (item) => `
+                  <button class="nav-item ${state.view === item.view ? "active" : ""}" data-view="${item.view}">
+                    <span class="nav-glyph">${escapeHtml(item.glyph)}</span>
+                    <span>${escapeHtml(item.label)}</span>
+                  </button>`,
+              )
+              .join("");
+            return `${title}${items}`;
+          })
+          .join("");
+      }
+
+      function render() {
+        renderNav();
+        renderRightRail();
+        const titleMap = {
+          dashboard: "Super Admin",
+          users: "User Management",
+          blocked: "Blocked Users",
+          analytics: "User Analytics",
+          activity: "User Activity",
+          "live-monitor": "Live User Monitor",
+          "ai-analytics": "AI Analytics",
+          database: "Database Explorer",
+          health: "System Health",
+          security: "Security Center",
+          announcements: "Announcements",
+          flags: "Feature Flags",
+          logs: "Logs & Audit",
+          export: "Export Data",
+          settings: "Settings",
+        };
+        $("#pageTitle").textContent = titleMap[state.view] || "Super Admin";
+
+        if (state.view === "dashboard") return renderDashboard();
+        if (state.view === "users" || state.view === "blocked") return renderUsersView();
+        if (state.view === "database") return renderDatabaseView();
+        if (state.view === "announcements") return renderAnnouncementsView();
+        if (state.view === "health") return renderHealthView();
+        if (state.view === "ai-analytics" || state.view === "analytics") return renderAnalyticsView();
+        if (state.view === "activity" || state.view === "logs") return renderActivityView();
+        if (state.view === "live-monitor") return renderLiveMonitorView();
+        if (state.view === "export") return renderExportView();
+        return renderUtilityView();
+      }
+
+      function metricCards(metrics = []) {
+        return `
+          <div class="metric-grid">
+            ${metrics
+              .map(
+                (metric) => `
+                <article class="metric-card" data-accent="${escapeHtml(metric.accent)}">
+                  <div class="metric-inner">
+                    <div class="metric-icon">${escapeHtml(metric.icon)}</div>
+                    <div>
+                      <div class="metric-label">${escapeHtml(metric.label)}</div>
+                      <div class="metric-value" data-count="${Number(metric.value || 0)}">${formatNumber(metric.value)}</div>
+                    </div>
+                  </div>
+                  <div class="metric-trend">↑ ${escapeHtml(metric.trend)} ${escapeHtml(metric.trendLabel)}</div>
+                </article>`,
+              )
+              .join("")}
+          </div>`;
+      }
+
+      function renderModerationTrendsPanel(moderation = {}) {
+        const trends = moderation.trends || [];
+        return `
+          <section class="glass">
+            <div class="panel-head">
+              <div class="panel-title"><span class="nav-glyph">MD</span>Moderation Analytics</div>
+              <span class="pill">${formatNumber(moderation.totalActions || 0)} actions logged</span>
+            </div>
+            <div class="stat-list">
+              <div class="mini-stat"><span>Active Users</span><b>${formatNumber(moderation.activeUsers || 0)}</b></div>
+              <div class="mini-stat"><span>Blocked Users</span><b>${formatNumber(moderation.blockedUsers || 0)}</b></div>
+              <div class="mini-stat"><span>Suspended Users</span><b>${formatNumber(moderation.suspendedUsers || 0)}</b></div>
+              <div class="mini-stat"><span>Pending Review</span><b>${formatNumber(moderation.pendingReviewUsers || 0)}</b></div>
+            </div>
+            <div class="timeline-list" style="margin-top:14px">
+              ${trends.length
+                ? trends
+                    .map((item) => `<div class="timeline-item"><b>${escapeHtml(item.action)}</b><span>${formatNumber(item.value)} in last 7 days</span></div>`)
+                    .join("")
+                : `<div class="empty-state">No moderation trends yet.</div>`}
+            </div>
+          </section>`;
+      }
+
+      function renderDashboard() {
+        const overview = state.overview || {};
+        $("#content").innerHTML = `
+          ${metricCards((overview.metrics || []).slice(0, 12))}
+          <div class="panel-grid">
+            ${renderGrowthPanel(overview.userGrowth || [])}
+            ${renderAiUsagePanel(overview.aiUsage || [], overview.aiUsageTotal || 0)}
+          </div>
+          ${renderModerationTrendsPanel(overview.moderation || {})}
+          <section class="glass">
+            <div class="panel-head">
+              <div class="panel-title"><span class="nav-glyph">US</span>Recent Users</div>
+              <button class="panel-action" data-view="users">View All Users</button>
+            </div>
+            ${usersTable(overview.recentUsers || state.users)}
+          </section>
+        `;
+        animateCounts();
+      }
+
+      function renderGrowthPanel(points) {
+        const svg = growthSvg(points);
+        return `
+          <section class="glass">
+            <div class="panel-head">
+              <div class="panel-title"><span class="nav-glyph">GR</span>User Growth</div>
+              <button class="panel-action">7 Days</button>
+            </div>
+            <div class="chart-wrap">${svg}</div>
+            <div class="chart-labels">${points.map((point) => `<span>${escapeHtml(point.label)}</span>`).join("")}</div>
+          </section>`;
+      }
+
+      function growthSvg(points) {
+        const width = 720;
+        const height = 220;
+        const pad = 28;
+        const values = points.map((point) => Number(point.value || 0));
+        const max = Math.max(...values, 1);
+        const min = Math.min(...values, 0);
+        const range = Math.max(1, max - min);
+        const coords = points.map((point, index) => {
+          const x = pad + (index / Math.max(1, points.length - 1)) * (width - pad * 2);
+          const y = height - pad - ((Number(point.value || 0) - min) / range) * (height - pad * 2);
+          return [x, y];
+        });
+        const line = coords.map(([x, y], index) => `${index ? "L" : "M"} ${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+        const area = `${line} L ${width - pad} ${height - pad} L ${pad} ${height - pad} Z`;
+        const last = coords[coords.length - 1] || [width - pad, height - pad];
+        return `
+          <svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" role="img" aria-label="User growth chart">
+            <defs>
+              <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#8b4dff" stop-opacity="0.52" />
+                <stop offset="100%" stop-color="#8b4dff" stop-opacity="0.03" />
+              </linearGradient>
+              <filter id="glow"><feGaussianBlur stdDeviation="4" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+            </defs>
+            ${[0, 1, 2, 3].map((i) => `<line x1="${pad}" y1="${pad + i * 45}" x2="${width - pad}" y2="${pad + i * 45}" stroke="rgba(116,146,212,0.12)" />`).join("")}
+            <path d="${area}" fill="url(#growthFill)" />
+            <path d="${line}" fill="none" stroke="#8b4dff" stroke-width="3" filter="url(#glow)" />
+            ${coords.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4" fill="#9f68ff" />`).join("")}
+            <g transform="translate(${Math.max(pad, last[0] - 86)} ${Math.max(16, last[1] - 52)})">
+              <rect width="86" height="46" rx="10" fill="rgba(36,20,78,0.86)" stroke="rgba(139,77,255,0.55)" />
+              <text x="10" y="20" fill="#fff" font-size="14" font-weight="800">${formatNumber(values[values.length - 1] || 0)}</text>
+              <text x="10" y="36" fill="#98a7c3" font-size="11">Live total</text>
+            </g>
+          </svg>`;
+      }
+
+      function renderAiUsagePanel(items, total) {
+        let degrees = 0;
+        const segments = items.map((item) => {
+          const start = degrees;
+          const span = (Number(item.percent || 0) / 100) * 360;
+          degrees += span;
+          return `${item.color} ${start}deg ${degrees}deg`;
+        });
+        const background = `conic-gradient(${segments.join(", ") || "#1c2740 0deg 360deg"})`;
+        return `
+          <section class="glass">
+            <div class="panel-head">
+              <div class="panel-title"><span class="nav-glyph">AI</span>AI Usage Overview</div>
+              <button class="panel-action">7 Days</button>
+            </div>
+            <div class="donut-layout">
+              <div class="donut" style="background: ${background}">
+                <div class="donut-center"><b>${formatNumber(total)}</b><span>Total Requests</span></div>
+              </div>
+              <div>
+                ${items
+                  .map(
+                    (item) => `
+                    <div class="legend-row">
+                      <span class="legend-dot" style="background:${escapeHtml(item.color)}"></span>
+                      <span>${escapeHtml(item.label)}</span>
+                      <b>${escapeHtml(item.percent)}%</b>
+                    </div>`,
+                  )
+                  .join("")}
+              </div>
+            </div>
+          </section>`;
+      }
+
+      function usersTable(users = state.users) {
+        if (!users.length) return `<div class="empty-state">No users found yet.</div>`;
+        return `
+          <div class="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Email</th>
+                  <th>User ID</th>
+                  <th>Signup Date</th>
+                  <th>Last Login</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${users
+                  .map(
+                    (user) => `
+                    <tr data-open-user="${escapeHtml(user.id)}">
+                      <td>
+                        <div class="user-cell">
+                          <div class="mini-avatar">${user.picture ? `<img src="${escapeHtml(user.picture)}" alt="" />` : escapeHtml(initials(user.name, user.email))}</div>
+                          <b>${escapeHtml(user.name)}</b>
+                        </div>
+                      </td>
+                      <td>${escapeHtml(user.email)}</td>
+                      <td>${escapeHtml(user.userId)}</td>
+                      <td>${escapeHtml(new Date(user.signupDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }))}</td>
+                      <td>${escapeHtml(user.lastLogin)}</td>
+                      <td><span class="status ${escapeHtml(user.status)}">${escapeHtml(user.status)}</span></td>
+                      <td>
+                        <div class="row-actions">
+                          <button class="tiny-btn" data-user-action="inspect" data-user-id="${escapeHtml(user.id)}">V</button>
+                          <button class="tiny-btn" data-user-action="exportUserData" data-user-id="${escapeHtml(user.id)}">EX</button>
+                          <button class="tiny-btn" data-user-action="more" data-user-id="${escapeHtml(user.id)}">...</button>
+                        </div>
+                      </td>
+                    </tr>`,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>`;
+      }
+
+      function renderUsersView() {
+        const filters = [
+          ["all", "All"],
+          ["active", "Active"],
+          ["blocked", "Blocked"],
+          ["suspended", "Suspended"],
+          ["admins", "Admins"],
+          ["most-active", "Most Active"],
+          ["new-users", "New Users"],
+        ];
+        $("#content").innerHTML = `
+          <section class="glass">
+            <div class="panel-head">
+              <div class="panel-title"><span class="nav-glyph">US</span>${state.view === "blocked" ? "Blocked Users" : "User Management"}</div>
+              <button class="panel-action" data-refresh-users>Refresh Live Data</button>
+            </div>
+            <div class="filters">
+              ${filters.map(([key, label]) => `<button class="filter-btn ${state.filter === key ? "active" : ""}" data-filter="${key}">${label}</button>`).join("")}
+            </div>
+            ${usersTable(state.users)}
+          </section>`;
+      }
+
+      async function renderDatabaseView() {
+        if (!state.database || state.database.collection !== state.collection) await loadCollection(state.collection);
+        const collections = ["users", "chats", "memories", "timeline", "voice", "places", "screenshots", "activityStream", "fileStorage", "liveMonitoring", "moderationHistory", "embeddings", "vectors", "announcements", "adminLogs"];
+        const columns = state.database?.columns || [];
+        const rows = state.database?.rows || [];
+        $("#content").innerHTML = `
+          <section class="glass">
+            <div class="panel-head">
+              <div class="panel-title"><span class="nav-glyph">DB</span>Read-Only Database Explorer</div>
+              <span class="pill">${escapeHtml(rows.length)} rows</span>
+            </div>
+            <div class="collection-tabs">
+              ${collections.map((name) => `<button class="filter-btn ${state.collection === name ? "active" : ""}" data-collection="${name}">${name}</button>`).join("")}
+            </div>
+            ${
+              rows.length
+                ? `<div class="table-shell"><table><thead><tr>${columns.map((col) => `<th>${escapeHtml(col)}</th>`).join("")}</tr></thead><tbody>${rows
+                    .map(
+                      (row) =>
+                        `<tr>${columns
+                          .map((col) => `<td>${escapeHtml(typeof row[col] === "object" ? JSON.stringify(row[col]).slice(0, 90) : String(row[col] ?? "").slice(0, 120))}</td>`)
+                          .join("")}</tr>`,
+                    )
+                    .join("")}</tbody></table></div>`
+                : `<div class="empty-state">No rows in this collection.</div>`
+            }
+          </section>`;
+      }
+
+      async function loadCollection(collection) {
+        state.collection = collection;
+        state.database = await api(`/api/admin/database/${encodeURIComponent(collection)}`);
+      }
+
+      async function renderAnnouncementsView() {
+        const payload = await api("/api/admin/announcements").catch(() => ({ announcements: [] }));
+        state.announcements = payload.announcements || [];
+        $("#content").innerHTML = `
+          <div class="panel-grid">
+            <section class="glass">
+              <div class="panel-head">
+                <div class="panel-title"><span class="nav-glyph">AN</span>Announcement Center</div>
+                <span class="pill">Broadcast</span>
+              </div>
+              <form id="announcementForm" class="form-grid">
+                <div class="field">
+                  <label>Title</label>
+                  <input name="title" placeholder="Maintenance tonight" required />
+                </div>
+                <div class="field">
+                  <label>Type</label>
+                  <select name="type">
+                    <option value="system">System Notice</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="feature">Feature Update</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Message</label>
+                  <textarea name="message" placeholder="Write the announcement that NeuroNest dashboards can consume from shared data." required></textarea>
+                </div>
+                <button class="primary-btn" type="submit">Send Announcement</button>
+              </form>
+            </section>
+            <section class="glass">
+              <div class="panel-head">
+                <div class="panel-title">Recent Announcements</div>
+              </div>
+              <div class="timeline-list">
+                ${
+                  state.announcements.length
+                    ? state.announcements
+                        .slice(0, 10)
+                        .map((item) => `<div class="timeline-item"><b>${escapeHtml(item.title)}</b><span>${escapeHtml(item.type)} - ${escapeHtml(new Date(item.createdAt).toLocaleString())}</span><p style="color:var(--muted)">${escapeHtml(item.message)}</p></div>`)
+                        .join("")
+                    : `<div class="empty-state">No announcements sent yet.</div>`
+                }
+              </div>
+            </section>
+          </div>`;
+        $("#announcementForm").addEventListener("submit", submitAnnouncement);
+      }
+
+      async function submitAnnouncement(event) {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        try {
+          await api("/api/admin/announcements", {
+            method: "POST",
+            body: JSON.stringify({
+              title: form.get("title"),
+              type: form.get("type"),
+              message: form.get("message"),
+            }),
+          });
+          showToast("Announcement sent to shared NeuroNest data.");
+          renderAnnouncementsView();
+        } catch (error) {
+          showToast(error.message);
+        }
+      }
+
+      function renderHealthView() {
+        const overview = state.overview || {};
+        $("#content").innerHTML = `
+          <section class="glass">
+            <div class="panel-head">
+              <div class="panel-title"><span class="nav-glyph">SH</span>System Health</div>
+              <span class="pill">${escapeHtml(overview.healthScore || 0)}% Health Score</span>
+            </div>
+            <div class="stat-list">
+              ${(overview.health || [])
+                .map(
+                  (item) => `
+                  <div class="mini-stat">
+                    <span>${escapeHtml(item.name)}</span>
+                    <b style="color:${item.status === "healthy" ? "var(--green)" : "var(--yellow)"}">${escapeHtml(item.label)}</b>
+                    <small style="color:var(--muted)">${escapeHtml(item.detail || "")}</small>
+                  </div>`,
+                )
+                .join("")}
+            </div>
+          </section>`;
+      }
+
+      function renderAnalyticsView() {
+        const overview = state.overview || {};
+        $("#content").innerHTML = `
+          ${metricCards((overview.metrics || []).slice(3))}
+          <div class="panel-grid">
+            ${renderAiUsagePanel(overview.aiUsage || [], overview.aiUsageTotal || 0)}
+            <section class="glass">
+              <div class="panel-head">
+                <div class="panel-title"><span class="nav-glyph">LN</span>Language Usage Breakdown</div>
+              </div>
+              <div class="timeline-list">
+                ${(overview.languageBreakdown || [])
+                  .map(
+                    (item) => `
+                    <div class="timeline-item">
+                      <b>${escapeHtml(item.label)} <span style="float:right">${escapeHtml(item.percent)}%</span></b>
+                      <div style="height:6px;background:rgba(116,146,212,.18);border-radius:999px;margin-top:9px;overflow:hidden">
+                        <div style="height:100%;width:${item.percent}%;background:linear-gradient(90deg,var(--purple),var(--blue));border-radius:999px"></div>
+                      </div>
+                    </div>`,
+                  )
+                  .join("") || `<div class="empty-state">No language data yet.</div>`}
+              </div>
+            </section>
+          </div>`;
+        animateCounts();
+      }
+
+      async function loadLiveMonitor(showError = true) {
+        try {
+          state.liveMonitor = await api("/api/admin/live-monitor/overview");
+        } catch (error) {
+          if (showError) showToast(error.message);
+        }
+      }
+
+      function connectLiveMonitorWs() {
+        if (state.liveWs) {
+          try { state.liveWs.close(); } catch { /* ignore */ }
+        }
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        const ws = new WebSocket(`${protocol}//${location.host}/api/admin/live-monitor/ws`);
+        state.liveWs = ws;
+        ws.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data || "{}");
+            if (payload.type === "live-monitor") {
+              state.liveMonitor = payload;
+              if (state.view === "live-monitor") render();
+              if (state.selectedLiveUser?.userId) {
+                const online = (payload.onlineUsers || []).find((item) => item.userId === state.selectedLiveUser.userId);
+                if (online) state.selectedLiveUser = online;
+                renderLiveMonitorDrawer();
+              }
+            }
+          } catch {
+            // Ignore malformed websocket payloads.
+          }
+        };
+        ws.onclose = () => {
+          if (state.view === "live-monitor") {
+            setTimeout(connectLiveMonitorWs, 2500);
+          }
+        };
+      }
+
+      function disconnectLiveMonitorWs() {
+        if (state.liveWs) {
+          try { state.liveWs.close(); } catch { /* ignore */ }
+          state.liveWs = null;
+        }
+      }
+
+      function renderLiveMonitorView() {
+        const data = state.liveMonitor || {};
+        const online = data.onlineUsers || [];
+        const feed = data.feed || [];
+        const analytics = data.analytics || {};
+        $("#content").innerHTML = `
+          <div class="metric-grid">
+            <article class="metric-card" data-accent="green"><div class="metric-inner"><div class="metric-icon">ON</div><div><div class="metric-label">Currently Online</div><div class="metric-value">${formatNumber(analytics.currentlyOnline || online.length)}</div></div></div></article>
+            <article class="metric-card" data-accent="purple"><div class="metric-inner"><div class="metric-icon">PK</div><div><div class="metric-label">Peak Online Today</div><div class="metric-value">${formatNumber(analytics.peakOnlineToday || 0)}</div></div></div></article>
+            <article class="metric-card" data-accent="blue"><div class="metric-inner"><div class="metric-icon">DA</div><div><div class="metric-label">Daily Active Users</div><div class="metric-value">${formatNumber(analytics.dailyActiveUsers || 0)}</div></div></div></article>
+            <article class="metric-card" data-accent="cyan"><div class="metric-inner"><div class="metric-icon">WA</div><div><div class="metric-label">Weekly Active Users</div><div class="metric-value">${formatNumber(analytics.weeklyActiveUsers || 0)}</div></div></div></article>
+          </div>
+          <div class="live-grid">
+            <section class="glass">
+              <div class="panel-head">
+                <div class="panel-title"><span class="nav-glyph">LM</span>Online Users</div>
+                <span class="pill"><span class="online-pulse" style="display:inline-block;margin-right:8px"></span>${formatNumber(online.length)} live</span>
+              </div>
+              <div style="display:grid;gap:10px">
+                ${online.length ? online.map((user) => `
+                  <article class="live-user-card" data-live-user="${escapeHtml(user.userId)}">
+                    <div class="mini-avatar" style="width:52px;height:52px">${user.picture ? `<img src="${escapeHtml(user.picture)}" alt="" />` : escapeHtml(initials(user.name, user.email))}</div>
+                    <div>
+                      <strong>${escapeHtml(user.name)}</strong>
+                      <div style="color:var(--muted);font-size:13px">${escapeHtml(user.email)}</div>
+                      <div style="margin-top:6px;color:#b8c7e6">Currently: <b>${escapeHtml(user.currentAction || user.currentPageLabel || "Active")}</b></div>
+                      <div style="color:var(--soft);font-size:12px;margin-top:4px">Page: ${escapeHtml(user.currentPageLabel || user.currentPage || "Home")} · Session: ${escapeHtml(user.sessionDuration || "0s")}</div>
+                      <div style="color:var(--soft);font-size:11px;margin-top:4px">ID: ${escapeHtml(user.userId || "")} · Last active: ${user.lastActivityTime ? escapeHtml(new Date(user.lastActivityTime).toLocaleTimeString()) : "now"}</div>
+                    </div>
+                    <div class="online-pulse"></div>
+                  </article>`).join("") : `<div class="empty-state">No users online right now.</div>`}
+              </div>
+            </section>
+            <section class="glass">
+              <div class="panel-head"><div class="panel-title">Live Activity Feed</div></div>
+              <div>
+                ${feed.length ? feed.map((item) => `
+                  <div class="live-feed-item">
+                    <div class="live-feed-time">${escapeHtml(item.timeLabel || "")}</div>
+                    <div><strong>${escapeHtml(item.userName || "User")}</strong><div style="color:var(--muted);margin-top:4px">${escapeHtml(item.message || item.action || "Activity")}</div></div>
+                  </div>`).join("") : `<div class="empty-state">Waiting for live activity...</div>`}
+              </div>
+            </section>
+          </div>
+          <section class="glass" style="margin-top:14px">
+            <div class="panel-head"><div class="panel-title">Live Analytics</div></div>
+            <div class="stat-list">
+              <div class="mini-stat"><span>Average Session</span><b>${escapeHtml(analytics.averageSessionDuration || "0s")}</b></div>
+              <div class="mini-stat"><span>Most Visited Page</span><b>${escapeHtml(analytics.mostVisitedPages?.[0]?.label || "Home")}</b></div>
+              <div class="mini-stat"><span>Top AI Feature</span><b>${escapeHtml(analytics.mostUsedFeatures?.[0]?.feature || "AI Chat")}</b></div>
+            </div>
+            <div class="live-grid" style="margin-top:14px;grid-template-columns:1fr 1fr">
+              <div>
+                <div style="color:var(--muted);font-size:12px;margin-bottom:8px">Most Visited Pages</div>
+                ${(analytics.mostVisitedPages || []).slice(0, 6).map((item) => `
+                  <div class="timeline-item"><b>${escapeHtml(item.label || item.page)}</b><span>${formatNumber(item.visits || 0)} visits</span></div>
+                `).join("") || `<div class="empty-state">No page data yet.</div>`}
+              </div>
+              <div>
+                <div style="color:var(--muted);font-size:12px;margin-bottom:8px">Most Used AI Features</div>
+                ${(analytics.mostUsedFeatures || []).slice(0, 6).map((item) => `
+                  <div class="timeline-item"><b>${escapeHtml(item.feature || "Feature")}</b><span>${formatNumber(item.count || 0)} uses</span></div>
+                `).join("") || `<div class="empty-state">No feature data yet.</div>`}
+              </div>
+            </div>
+          </section>`;
+        animateCounts();
+      }
+
+      async function openLiveUser(userId) {
+        try {
+          const payload = await api(`/api/admin/live-monitor/users/${encodeURIComponent(userId)}`);
+          state.selectedLiveUser = payload.detail?.liveSession || payload.detail?.profile || { userId };
+          state.liveUserDetail = payload.detail;
+          renderLiveMonitorDrawer();
+        } catch (error) {
+          showToast(error.message);
+        }
+      }
+
+      function renderLiveMonitorDrawer() {
+        const detail = state.liveUserDetail;
+        const live = detail?.liveSession;
+        const profile = detail?.profile || {};
+        if (!live && !profile.userId) return;
+        $("#drawerBackdrop").classList.add("open");
+        const drawer = $("#userDrawer");
+        drawer.classList.add("open");
+        drawer.innerHTML = `
+          <div class="drawer-head">
+            <div class="drawer-title">
+              <div class="mini-avatar" style="width:54px;height:54px">${profile.picture || live?.picture ? `<img src="${escapeHtml(profile.picture || live.picture)}" alt="" />` : escapeHtml(initials(profile.name || live?.name, profile.email || live?.email))}</div>
+              <div>
+                <h2>${escapeHtml(profile.name || live?.name || "Live User")}</h2>
+                <div style="color:var(--muted)">${escapeHtml(profile.email || live?.email || "")}</div>
+              </div>
+            </div>
+            <button class="icon-btn" data-close-drawer>X</button>
+          </div>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Basic Info</div><span class="online-pulse"></span></div>
+            <div class="timeline-list">
+              <div class="timeline-item"><b>User ID</b><span>${escapeHtml(profile.userId || live?.userId || "")}</span></div>
+              <div class="timeline-item"><b>Google ID</b><span>${escapeHtml(profile.googleId || live?.googleId || "Not available")}</span></div>
+              <div class="timeline-item"><b>Signup Date</b><span>${escapeHtml(profile.signupDate ? new Date(profile.signupDate).toLocaleString() : "Not available")}</span></div>
+              <div class="timeline-item"><b>Last Login</b><span>${escapeHtml(profile.lastLogin ? new Date(profile.lastLogin).toLocaleString() : "Not available")}</span></div>
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Live Session</div></div>
+            <div class="timeline-list">
+              <div class="timeline-item"><b>Current Page</b><span>${escapeHtml(live?.currentPageLabel || "Offline")}</span></div>
+              <div class="timeline-item"><b>Current Action</b><span>${escapeHtml(live?.currentAction || "Offline")}</span></div>
+              <div class="timeline-item"><b>Session Start</b><span>${escapeHtml(live?.loginTime ? new Date(live.loginTime).toLocaleString() : "Not active")}</span></div>
+              <div class="timeline-item"><b>Session Duration</b><span>${escapeHtml(live?.sessionDuration || detail?.totalSessionTime || "0s")}</span></div>
+              <div class="timeline-item"><b>Last Activity</b><span>${escapeHtml(live?.lastActivityTime ? new Date(live.lastActivityTime).toLocaleString() : "Not active")}</span></div>
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Device Information</div></div>
+            <div class="timeline-list">
+              <div class="timeline-item"><b>Browser</b><span>${escapeHtml(live?.device?.browser || "Unknown")}</span></div>
+              <div class="timeline-item"><b>Operating System</b><span>${escapeHtml(live?.device?.os || "Unknown")}</span></div>
+              <div class="timeline-item"><b>Device Type</b><span>${escapeHtml(live?.device?.deviceType || "Unknown")}</span></div>
+              <div class="timeline-item"><b>Screen Resolution</b><span>${escapeHtml(live?.device?.screenResolution || "Unknown")}</span></div>
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Network Information</div></div>
+            <div class="timeline-list">
+              <div class="timeline-item"><b>IP Address</b><span>${escapeHtml(live?.network?.ip || "Unknown")}</span></div>
+              <div class="timeline-item"><b>Country</b><span>${escapeHtml(live?.network?.country || "Unknown")}</span></div>
+              <div class="timeline-item"><b>Region</b><span>${escapeHtml(live?.network?.region || "Unknown")}</span></div>
+              <div class="timeline-item"><b>City</b><span>${escapeHtml(live?.network?.city || "Unknown")}</span></div>
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Session Explorer</div></div>
+            <div class="timeline-list">
+              <div class="timeline-item"><b>Current Sessions</b><span>${formatNumber(detail?.currentSessions?.length || (live ? 1 : 0))}</span></div>
+              <div class="timeline-item"><b>Total Session Time</b><span>${escapeHtml(detail?.totalSessionTime || "0s")}</span></div>
+              <div class="timeline-item"><b>Login History</b><span>${formatNumber(detail?.loginHistory?.length || 0)} records</span></div>
+            </div>
+            <div style="margin-top:10px;color:var(--muted);font-size:12px">Recent Sessions</div>
+            <div class="timeline-list" style="margin-top:8px">
+              ${(detail?.sessionHistory || []).slice(0, 5).map((item) => `
+                <div class="timeline-item">
+                  <b>${escapeHtml(item.currentPageLabel || item.currentPage || "Session")}</b>
+                  <span>${item.durationMs ? `${Math.max(1, Math.floor(item.durationMs / 60000))}m session` : formatRelativeTime(item.endedAt || item.loginAt)}</span>
+                </div>`).join("") || `<div class="empty-state">No session history yet.</div>`}
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none">
+            <div class="panel-head"><div class="panel-title">Force Actions</div></div>
+            <div class="filters">
+              <button class="filter-btn" data-live-action="forceLogout">Force Logout</button>
+              <button class="filter-btn" data-live-action="logoutAllDevices">Logout All Devices</button>
+              <button class="filter-btn" data-live-action="suspend">Suspend User</button>
+              <button class="filter-btn" data-live-action="block">Block User</button>
+              <button class="filter-btn" data-live-action="unsuspend">Unsuspend User</button>
+              <button class="filter-btn" data-live-action="unblock">Unblock User</button>
+            </div>
+          </section>`;
+      }
+
+      function renderActivityView() {
+        const activity = state.overview?.recentActivity || [];
+        $("#content").innerHTML = `
+          <section class="glass">
+            <div class="panel-head">
+              <div class="panel-title"><span class="nav-glyph">AC</span>Recent Activity & Audit</div>
+              <button class="panel-action" data-view="dashboard">Back to Dashboard</button>
+            </div>
+            <div class="timeline-list">
+              ${activity
+                .map((item) => `<div class="timeline-item"><b>${escapeHtml(item.title)}</b><span>${escapeHtml(item.relativeTime)} - ${escapeHtml(item.detail)}</span></div>`)
+                .join("") || `<div class="empty-state">No activity recorded yet.</div>`}
+            </div>
+          </section>`;
+      }
+
+      function renderExportView() {
+        $("#content").innerHTML = `
+          <section class="glass">
+            <div class="panel-head">
+              <div class="panel-title"><span class="nav-glyph">EX</span>Export Data</div>
+              <span class="pill">Admin only</span>
+            </div>
+            <p style="color:var(--muted);line-height:1.7">Download a live summary export of users, admin logs, announcements, and system analytics.</p>
+            <button class="primary-btn" data-export-system>Generate System Export</button>
+            <pre id="exportOutput" style="max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:14px;background:rgba(0,0,0,.24);color:#b9c7de"></pre>
+          </section>`;
+      }
+
+      function renderUtilityView() {
+        $("#content").innerHTML = `
+          <section class="glass">
+            <div class="panel-head">
+              <div class="panel-title"><span class="nav-glyph">NN</span>${escapeHtml($("#pageTitle").textContent)}</div>
+              <span class="pill">Protected</span>
+            </div>
+            <p style="color:var(--muted);line-height:1.8">
+              This admin module is protected server-side and ready for expansion. Current live analytics, users, system health,
+              announcements, audit logs, export tools, and database explorer are already connected.
+            </p>
+          </section>`;
+      }
+
+      function renderRightRail() {
+        const overview = state.overview || {};
+        const health = overview.health || [];
+        const score = overview.healthScore || 0;
+        const activity = overview.recentActivity || [];
+        $("#rightRail").innerHTML = `
+          <section class="rail-card">
+            <div class="rail-head"><span>System Health</span><span>›</span></div>
+            <div class="rail-body">
+              ${health
+                .map(
+                  (item) => `
+                  <div class="health-row">
+                    <span>${escapeHtml(item.name)}</span>
+                    <span class="health-state ${item.status === "healthy" ? "" : "warning"}">${escapeHtml(item.label)}</span>
+                  </div>`,
+                )
+                .join("")}
+              <div class="score-card">
+                <div>
+                  <div style="font-size:12px;color:var(--muted)">Overall Health Score</div>
+                </div>
+                <div class="score-ring" style="background: conic-gradient(var(--green) 0deg ${score * 3.6}deg, rgba(116,146,212,.16) ${score * 3.6}deg 360deg)">
+                  <span>${score}%</span>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="rail-card">
+            <div class="rail-head"><span>Recent Activity</span><span>›</span></div>
+            <div class="rail-body">
+              ${activity
+                .slice(0, 5)
+                .map(
+                  (item) => `
+                    <div class="activity-row">
+                      <div class="activity-icon">${escapeHtml((item.type || "AI").slice(0, 2).toUpperCase())}</div>
+                      <div>
+                        <div class="activity-title">${escapeHtml(item.title)}</div>
+                        <div class="activity-detail">${escapeHtml(item.detail)}</div>
+                      </div>
+                      <div class="activity-time">${escapeHtml(item.relativeTime)}</div>
+                    </div>`,
+                )
+                .join("")}
+              <button class="primary-btn" data-view="activity" style="width:100%;margin-top:14px">View All Activities</button>
+            </div>
+          </section>`;
+      }
+
+      async function openUser(userId) {
+        try {
+          const payload = await api(`/api/admin/users/${encodeURIComponent(userId)}`);
+          state.selectedUser = payload.user;
+          renderDrawer();
+        } catch (error) {
+          showToast(error.message);
+        }
+      }
+
+      function renderDrawer() {
+        const user = state.selectedUser;
+        if (!user) return;
+        $("#drawerBackdrop").classList.add("open");
+        const drawer = $("#userDrawer");
+        drawer.classList.add("open");
+        drawer.innerHTML = `
+          <div class="drawer-head">
+            <div class="drawer-title">
+              <div class="mini-avatar" style="width:54px;height:54px">${user.picture ? `<img src="${escapeHtml(user.picture)}" alt="" />` : escapeHtml(initials(user.name, user.email))}</div>
+              <div>
+                <h2>${escapeHtml(user.name)}</h2>
+                <div style="color:var(--muted)">${escapeHtml(user.email)}</div>
+              </div>
+            </div>
+            <button class="icon-btn" data-close-drawer>X</button>
+          </div>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Basic Information</div><span class="status ${escapeHtml(user.status)}">${escapeHtml(user.status)}</span></div>
+            <div class="timeline-list">
+              <div class="timeline-item"><b>User ID</b><span>${escapeHtml(user.id)}</span></div>
+              <div class="timeline-item"><b>Google ID</b><span>${escapeHtml(user.googleId || "Not available")}</span></div>
+              <div class="timeline-item"><b>Signup Date</b><span>${escapeHtml(new Date(user.createdAt).toLocaleString())}</span></div>
+              <div class="timeline-item"><b>Last Login</b><span>${escapeHtml(user.lastLogin)}</span></div>
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Usage Statistics</div></div>
+            <div class="stat-list">
+              ${Object.entries(user.usage || {})
+                .map(([key, value]) => `<div class="mini-stat"><span>${escapeHtml(labelize(key))}</span><b>${formatNumber(value)}</b></div>`)
+                .join("")}
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Intelligence Statistics</div><span class="pill">${escapeHtml(user.intelligence?.memoryDna || "Memory DNA")}</span></div>
+            <div class="stat-list">
+              <div class="mini-stat"><span>Understanding Level</span><b>${escapeHtml(user.intelligence?.understandingLevel || 0)}%</b></div>
+              <div class="mini-stat"><span>Goal Alignment</span><b>${escapeHtml(user.intelligence?.goalAlignment || 0)}%</b></div>
+              <div class="mini-stat"><span>Activity Score</span><b>${escapeHtml(user.intelligence?.activityScore || 0)}%</b></div>
+              <div class="mini-stat"><span>Digital Twin</span><b>${escapeHtml(user.intelligence?.memoryDna || "Learning")}</b></div>
+            </div>
+            <p style="color:var(--muted);line-height:1.6">${escapeHtml(user.intelligence?.digitalTwinSummary || "")}</p>
+          </section>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Moderation</div><span class="status ${escapeHtml(user.status)}">${escapeHtml(user.moderation?.statusLabel || user.status)}</span></div>
+            <div class="timeline-list">
+              <div class="timeline-item"><b>Last Action</b><span>${escapeHtml(user.moderation?.lastModerationAction || "None")}</span></div>
+              <div class="timeline-item"><b>Reason</b><span>${escapeHtml(user.moderation?.reason || "Not available")}</span></div>
+              <div class="timeline-item"><b>Admin Responsible</b><span>${escapeHtml(user.moderation?.adminResponsible || "Not available")}</span></div>
+            </div>
+            <div class="field" style="margin-top:14px">
+              <label>Private Account Notes</label>
+              <textarea id="accountNotesField" rows="4" placeholder="Visible only to Super Admin">${escapeHtml(user.moderation?.accountNotes || "")}</textarea>
+            </div>
+            <button class="filter-btn" data-drawer-action="saveAccountNotes" style="margin-top:10px">Save Account Notes</button>
+            <div class="timeline-list" style="margin-top:14px">
+              ${(user.moderation?.history || [])
+                .slice(0, 6)
+                .map((item) => `<div class="timeline-item"><b>${escapeHtml(item.action || "Action")}</b><span>${escapeHtml(item.reason || item.adminEmail || "")} - ${escapeHtml(formatRelativeTime(item.timestamp))}</span></div>`)
+                .join("") || `<div class="empty-state">No moderation history yet.</div>`}
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Admin Actions</div></div>
+            <div class="filters">
+              <button class="filter-btn" data-drawer-action="${user.status === "blocked" ? "unblock" : "block"}">${user.status === "blocked" ? "Unblock User" : "Block User"}</button>
+              <button class="filter-btn" data-drawer-action="${user.status === "suspended" ? "unsuspend" : "suspend"}">${user.status === "suspended" ? "Unsuspend User" : "Suspend User"}</button>
+              <button class="filter-btn" data-drawer-action="pendingReview">Mark Pending Review</button>
+              <button class="filter-btn" data-drawer-action="forceLogout">Force Logout</button>
+              <button class="filter-btn" data-drawer-action="exportUserData">Export Data</button>
+              <button class="filter-btn" data-drawer-action="resetUserData">Reset Data</button>
+              <button class="danger-btn" data-drawer-action="deleteUser">Delete User</button>
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Recent AI Chats</div></div>
+            <div class="timeline-list">
+              ${(user.recentChats || [])
+                .slice(0, 5)
+                .map((item) => `<div class="timeline-item"><b>${escapeHtml(item.role || item.type)}</b><span>${escapeHtml(String(item.content || item.title || "").slice(0, 120))} - ${escapeHtml(item.relativeTime || "")}</span></div>`)
+                .join("") || `<div class="empty-state">No chat activity yet.</div>`}
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Screenshots</div></div>
+            <div class="timeline-list">
+              ${(user.screenshots || [])
+                .slice(0, 5)
+                .map((item) => `<div class="timeline-item"><b>${escapeHtml(item.title || item.fileName || "Screenshot")}</b><span>${escapeHtml(String(item.ocrSummary || item.content || "").slice(0, 120))} - ${escapeHtml(item.relativeTime || "")}</span>${item.fileUrl ? `<img src="${escapeHtml(item.fileUrl)}" alt="" style="max-width:100%;margin-top:8px;border-radius:12px" />` : ""}</div>`)
+                .join("") || `<div class="empty-state">No screenshots yet.</div>`}
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none;margin-bottom:12px">
+            <div class="panel-head"><div class="panel-title">Activity History</div></div>
+            <div class="timeline-list">
+              ${(user.activityHistory || [])
+                .slice(0, 8)
+                .map((item) => `<div class="timeline-item"><b>${escapeHtml(item.action || "Activity")}</b><span>${escapeHtml(item.relativeTime || "")}</span></div>`)
+                .join("") || `<div class="empty-state">No activity history yet.</div>`}
+            </div>
+          </section>
+          <section class="glass" style="box-shadow:none">
+            <div class="panel-head"><div class="panel-title">Recent Memory Activity</div></div>
+            <div class="timeline-list">
+              ${(user.recentMemories || [])
+                .slice(0, 7)
+                .map((item) => `<div class="timeline-item"><b>${escapeHtml(item.title)}</b><span>${escapeHtml(item.type)} - ${escapeHtml(item.relativeTime)}</span></div>`)
+                .join("") || `<div class="empty-state">No memory activity yet.</div>`}
+            </div>
+          </section>`;
+      }
+
+      function closeDrawer() {
+        $("#drawerBackdrop").classList.remove("open");
+        $("#userDrawer").classList.remove("open");
+      }
+
+      function formatRelativeTime(value) {
+        const diff = Math.max(0, Date.now() - new Date(value || 0).getTime());
+        const minute = 60 * 1000;
+        const hour = 60 * minute;
+        const day = 24 * hour;
+        if (diff < minute) return "now";
+        if (diff < hour) return `${Math.floor(diff / minute)}m ago`;
+        if (diff < day) return `${Math.floor(diff / hour)}h ago`;
+        return `${Math.floor(diff / day)}d ago`;
+      }
+
+      function openModerationModal(action, user) {
+        const categories = ["Spam", "Abuse", "Harassment", "Fake Account", "Terms Violation", "Security Risk", "Other"];
+        const titles = {
+          block: "Block User",
+          unblock: "Unblock User",
+          suspend: "Suspend User",
+          unsuspend: "Unsuspend User",
+          pendingReview: "Mark Account Pending Review",
+          saveAccountNotes: "Save Account Notes",
+        };
+
+        return new Promise((resolve) => {
+          const modal = $("#confirmModal");
+          const needsCategory = action === "block";
+          const needsDuration = action === "suspend";
+          const needsReason = ["block", "unblock", "suspend", "unsuspend", "pendingReview"].includes(action);
+          modal.innerHTML = `
+            <div class="modal-card">
+              <h2 style="margin-top:0">${escapeHtml(titles[action] || "Moderation Action")}</h2>
+              <p style="color:var(--muted);line-height:1.7">${escapeHtml(user?.name || user?.email || "Selected user")}</p>
+              <form id="moderationForm" class="form-grid">
+                ${needsReason ? `<div class="field"><label>Reason</label><textarea name="reason" rows="3" placeholder="Enter the moderation reason"></textarea></div>` : ""}
+                ${needsCategory ? `<div class="field"><label>Category</label><select name="category">${categories.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("")}</select></div>` : ""}
+                ${action === "block" ? `<div class="field"><label>Internal Notes</label><textarea name="internalNotes" rows="3" placeholder="Private admin notes"></textarea></div>` : ""}
+                ${needsDuration ? `<div class="field"><label>Suspension Duration</label><select name="duration"><option value="1_day">1 Day</option><option value="3_days">3 Days</option><option value="7_days" selected>7 Days</option><option value="30_days">30 Days</option><option value="custom">Custom</option></select></div><div class="field"><label>Custom End Date</label><input type="datetime-local" name="customEndDate" /></div>` : ""}
+                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px">
+                  <button type="button" class="ghost-btn" data-confirm="false">Cancel</button>
+                  <button type="submit" class="danger-btn">${escapeHtml(titles[action] || "Confirm")}</button>
+                </div>
+              </form>
+            </div>`;
+          modal.classList.add("open");
+          modal.querySelector('[data-confirm="false"]')?.addEventListener("click", () => {
+            modal.classList.remove("open");
+            modal.innerHTML = "";
+            resolve(null);
+          });
+          modal.querySelector("#moderationForm")?.addEventListener("submit", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const form = new FormData(event.currentTarget);
+            const payload = Object.fromEntries(form.entries());
+            payload.reason = String(payload.reason || "").trim() || "Moderation action";
+            if (action === "block" && !payload.category) payload.category = "Other";
+            if (action === "suspend" && !payload.duration) payload.duration = "7_days";
+            modal.classList.remove("open");
+            modal.innerHTML = "";
+            resolve(payload);
+          });
+        });
+      }
+
+      async function runLiveUserAction(action) {
+        const profile = state.liveUserDetail?.profile;
+        const userId = profile?.userId || state.selectedLiveUser?.userId;
+        if (!userId) {
+          showToast("Select a live user first.");
+          return;
+        }
+        const previousSelection = state.selectedUser;
+        state.selectedUser = state.selectedUser || {
+          id: userId,
+          name: profile?.name || state.selectedLiveUser?.name,
+          email: profile?.email || state.selectedLiveUser?.email,
+          picture: profile?.picture || state.selectedLiveUser?.picture,
+        };
+        await runUserAction(userId, action);
+        state.selectedUser = previousSelection;
+        await loadLiveMonitor(false);
+        if (state.liveUserDetail?.profile?.userId) {
+          await openLiveUser(state.liveUserDetail.profile.userId);
+        }
+      }
+
+      async function runUserAction(userId, action) {
+        const targetUserId = state.selectedUser?.id || userId;
+        if (!targetUserId) {
+          showToast("Select a user first.");
+          return;
+        }
+
+        const moderationFormActions = new Set(["block", "unblock", "suspend", "unsuspend", "pendingReview"]);
+        const destructive = ["deleteUser", "resetUserData", "forceLogout", "logoutAllDevices"];
+        let body = { action, confirm: true };
+
+        if (action === "saveAccountNotes") {
+          body.notes = $("#accountNotesField")?.value || "";
+        } else if (moderationFormActions.has(action)) {
+          const formPayload = await openModerationModal(action, state.selectedUser);
+          if (!formPayload) return;
+          body = { ...body, ...formPayload, action };
+        } else if (destructive.includes(action)) {
+          const confirmed = await confirmDialog("Confirm admin action", `Run ${labelize(action)} for this user?`);
+          if (!confirmed) return;
+          body.confirm = confirmed;
+        }
+
+        try {
+          const payload = await api(`/api/admin/users/${encodeURIComponent(targetUserId)}/action`, {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
+          if (payload.export) {
+            await navigator.clipboard?.writeText(JSON.stringify(payload.export, null, 2));
+            showToast("User export copied to clipboard.");
+          } else {
+            showToast(`${labelize(action)} completed.`);
+          }
+          if (payload.deleted) {
+            closeDrawer();
+            await loadUsers();
+          } else if (payload.user) {
+            state.selectedUser = payload.user;
+            renderDrawer();
+            await loadUsers($("#globalSearch").value);
+          }
+          await loadOverview(false);
+          render();
+        } catch (error) {
+          showToast(error.message);
+        }
+      }
+
+      function confirmDialog(title, message) {
+        return new Promise((resolve) => {
+          const modal = $("#confirmModal");
+          modal.innerHTML = `
+            <div class="modal-card">
+              <h2 style="margin-top:0">${escapeHtml(title)}</h2>
+              <p style="color:var(--muted);line-height:1.7">${escapeHtml(message)}</p>
+              <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+                <button class="ghost-btn" data-confirm="false">Cancel</button>
+                <button class="danger-btn" data-confirm="true">Confirm</button>
+              </div>
+            </div>`;
+          modal.classList.add("open");
+          modal.onclick = (event) => {
+            const value = event.target?.dataset?.confirm;
+            if (!value) return;
+            modal.classList.remove("open");
+            modal.innerHTML = "";
+            resolve(value === "true");
+          };
+        });
+      }
+
+      function openAdminProfile() {
+        const overview = state.overview || {};
+        const modal = $("#profileModal");
+        const users = overview.metrics?.find((metric) => metric.key === "users")?.value || 0;
+        const memories = overview.metrics?.find((metric) => metric.key === "memories")?.value || 0;
+        const requests = overview.metrics?.find((metric) => metric.key === "requests")?.value || 0;
+        modal.innerHTML = `
+          <div class="modal-card">
+            <div class="profile-grid">
+              <div class="profile-orb"><div class="avatar" id="profileAvatar"></div></div>
+              <div>
+                <div class="brand-kicker">Admin Profile Hub</div>
+                <h2 style="margin:8px 0 4px">${escapeHtml(state.admin?.name || "Super Admin")}</h2>
+                <p style="color:var(--muted);margin:0">${escapeHtml(state.admin?.email || "")}</p>
+                <span class="pill" style="margin-top:12px">Super Admin</span>
+              </div>
+            </div>
+            <div class="stat-list" style="margin-top:20px">
+              <div class="mini-stat"><span>Users Managed</span><b>${formatNumber(users)}</b></div>
+              <div class="mini-stat"><span>Total Memories Stored</span><b>${formatNumber(memories)}</b></div>
+              <div class="mini-stat"><span>AI Requests Processed</span><b>${formatNumber(requests)}</b></div>
+              <div class="mini-stat"><span>System Health Score</span><b>${escapeHtml(overview.healthScore || 0)}%</b></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:10px;margin-top:20px">
+              <button class="ghost-btn" data-logout>Logout</button>
+              <button class="primary-btn" data-close-profile>Close</button>
+            </div>
+          </div>`;
+        setAvatar($("#profileAvatar"), state.admin?.picture, state.admin?.name, state.admin?.email);
+        modal.classList.add("open");
+      }
+
+      async function logout() {
+        await api("/api/admin/logout", { method: "POST" }).catch(() => null);
+        state.admin = null;
+        showAuth("Signed out.");
+      }
+
+      function handleDocumentClick(event) {
+        const view = event.target.closest("[data-view]")?.dataset.view || event.target.closest("[data-view-shortcut]")?.dataset.viewShortcut;
+        if (view) {
+          const previousView = state.view;
+          state.view = view;
+          if (view === "blocked") state.filter = "blocked";
+          if (view === "live-monitor") {
+            history.replaceState(null, "", "/admin/live-monitor");
+            loadLiveMonitor().then(() => {
+              render();
+              connectLiveMonitorWs();
+            });
+          } else {
+            if (previousView === "live-monitor") disconnectLiveMonitorWs();
+            if (location.pathname.includes("live-monitor")) history.replaceState(null, "", "/admin");
+            render();
+          }
+          return;
+        }
+
+        const liveUserId = event.target.closest("[data-live-user]")?.dataset.liveUser;
+        if (liveUserId) {
+          openLiveUser(liveUserId);
+          return;
+        }
+
+        const liveAction = event.target.closest("[data-live-action]")?.dataset.liveAction;
+        if (liveAction) {
+          runLiveUserAction(liveAction);
+          return;
+        }
+
+        const filter = event.target.closest("[data-filter]")?.dataset.filter;
+        if (filter) {
+          state.filter = filter;
+          loadUsers($("#globalSearch").value).then(render);
+          return;
+        }
+
+        const collection = event.target.closest("[data-collection]")?.dataset.collection;
+        if (collection) {
+          loadCollection(collection).then(render);
+          return;
+        }
+
+        const userId = event.target.closest("[data-open-user]")?.dataset.openUser || event.target.closest("[data-user-id]")?.dataset.userId;
+        const action = event.target.closest("[data-user-action]")?.dataset.userAction;
+        if (action === "inspect" || action === "more" || (userId && !action)) {
+          openUser(userId);
+          return;
+        }
+        if (action && userId) {
+          runUserAction(userId, action);
+          return;
+        }
+
+        const drawerAction = event.target.closest("[data-drawer-action]")?.dataset.drawerAction;
+        if (drawerAction && state.selectedUser) {
+          runUserAction(state.selectedUser.id, drawerAction);
+          return;
+        }
+
+        if (event.target.closest("[data-close-drawer]")) closeDrawer();
+        if (event.target.closest("[data-close-profile]")) $("#profileModal").classList.remove("open");
+        if (event.target.closest("[data-logout]")) logout();
+        if (event.target.closest("[data-refresh-users]")) loadUsers($("#globalSearch").value).then(render);
+        if (event.target.closest("[data-export-system]")) exportSystem();
+      }
+
+      async function exportSystem() {
+        try {
+          const payload = await api("/api/admin/export");
+          $("#exportOutput").textContent = JSON.stringify(payload, null, 2);
+          showToast("System export generated.");
+        } catch (error) {
+          showToast(error.message);
+        }
+      }
+
+      function labelize(value) {
+        return String(value || "")
+          .replace(/([A-Z])/g, " $1")
+          .replace(/[-_]/g, " ")
+          .replace(/^./, (char) => char.toUpperCase())
+          .trim();
+      }
+
+      function debounce(fn, wait) {
+        let timer;
+        return (...args) => {
+          clearTimeout(timer);
+          timer = setTimeout(() => fn(...args), wait);
+        };
+      }
+
+      function animateCounts() {
+        document.querySelectorAll("[data-count]").forEach((node) => {
+          const target = Number(node.dataset.count || 0);
+          const start = performance.now();
+          const duration = 700;
+          const tick = (now) => {
+            const progress = Math.min(1, (now - start) / duration);
+            node.textContent = formatNumber(Math.round(target * (1 - Math.pow(1 - progress, 3))));
+            if (progress < 1) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+      }
+
+      init().catch((error) => showAuth(error.message));
+    window.addEventListener("load", () => {
+
+  const boot = document.getElementById("bootScreen");
+  const bar = document.getElementById("bootBar");
+  const status = document.getElementById("bootStatus");
+  const skip = document.getElementById("skipBoot");
+
+  const messages = [
+    "Connecting Database...",
+    "Loading AI Systems...",
+    "Syncing User Analytics...",
+    "Verifying Security Layer...",
+    "Loading Admin Controls...",
+    "Launching Command Center..."
+  ];
+
+  let progress = 0;
+  let step = 0;
+
+  const timer = setInterval(() => {
+
+    progress += 20;
+
+    bar.style.width = progress + "%";
+
+    if(messages[step]){
+      status.textContent = messages[step];
+    }
+
+    step++;
+
+    if(progress >= 100){
+
+      clearInterval(timer);
+
+      setTimeout(() => {
+
+        boot.style.transition =
+          "opacity .8s ease";
+
+        boot.style.opacity = "0";
+
+        setTimeout(() => {
+          boot.remove();
+        },800);
+
+      },500);
+    }
+
+  },700);
+
+  skip.addEventListener("click", () => {
+    clearInterval(timer);
+    boot.remove();
+  });
+
+});
+    </script>
+  </body>
+</html>

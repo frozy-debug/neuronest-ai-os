@@ -1,0 +1,2119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroNest Mobile AI OS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        --bg: #050711;
+        --panel: rgba(13, 18, 32, 0.86);
+        --line: rgba(148, 163, 184, 0.18);
+        --text: #f8fafc;
+        --muted: #9ca3af;
+        --blue: #24c6ff;
+        --violet: #7c3aed;
+        --pink: #fb3f7f;
+        --green: #22c55e;
+        --orange: #f59e0b;
+        --cursor-x: 50vw;
+        --cursor-y: 50vh;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        overflow-x: hidden;
+        color: var(--text);
+        font-family: Poppins, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at 50% -10%, rgba(124, 58, 237, 0.32), transparent 34%),
+          radial-gradient(circle at 0% 24%, rgba(36, 198, 255, 0.18), transparent 32%),
+          linear-gradient(180deg, #050711 0%, #07111f 46%, #02040b 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -4;
+        pointer-events: none;
+        background:
+          radial-gradient(circle at var(--cursor-x) var(--cursor-y), rgba(36, 198, 255, 0.12), transparent 14rem),
+          linear-gradient(120deg, rgba(36, 198, 255, 0.04), transparent 38%, rgba(124, 58, 237, 0.06));
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        color: inherit;
+        cursor: pointer;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      .ambient-stage,
+      .cursor-light {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .ambient-stage {
+        z-index: -3;
+        overflow: hidden;
+      }
+
+      .ambient-stage::before,
+      .ambient-stage::after {
+        content: "";
+        position: absolute;
+        width: 72vw;
+        height: 72vw;
+        min-width: 300px;
+        min-height: 300px;
+        border-radius: 50%;
+        filter: blur(54px);
+        opacity: 0.32;
+        mix-blend-mode: screen;
+      }
+
+      .ambient-stage::before {
+        left: -34vw;
+        top: -20vw;
+        background: radial-gradient(circle, rgba(36, 198, 255, 0.5), transparent 64%);
+        animation: meshFloat 16s ease-in-out infinite alternate;
+      }
+
+      .ambient-stage::after {
+        right: -38vw;
+        bottom: -28vw;
+        background: radial-gradient(circle, rgba(124, 58, 237, 0.58), transparent 64%);
+        animation: meshFloat 19s ease-in-out infinite alternate-reverse;
+      }
+
+      .neural-grid {
+        position: fixed;
+        inset: 0;
+        z-index: -2;
+        opacity: 0.35;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, rgba(148, 163, 184, 0.055) 1px, transparent 1px) 0 0 / 44px 44px,
+          linear-gradient(0deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px) 0 0 / 44px 44px;
+        mask-image: radial-gradient(circle at 50% 30%, #000 0%, transparent 74%);
+        animation: neuralDrift 26s linear infinite;
+      }
+
+      .particle {
+        position: absolute;
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: rgba(125, 211, 252, 0.72);
+        box-shadow: 0 0 14px rgba(36, 198, 255, 0.86);
+        opacity: 0.34;
+        animation: particleFloat var(--particle-duration, 16s) ease-in-out infinite;
+      }
+
+      .boot {
+        position: fixed;
+        inset: 0;
+        z-index: 200;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at 50% 42%, rgba(36, 198, 255, 0.18), transparent 28%),
+          radial-gradient(circle at 50% 50%, rgba(124, 58, 237, 0.24), transparent 36%),
+          rgba(3, 5, 13, 0.96);
+        backdrop-filter: blur(22px);
+      }
+
+      .boot-core {
+        display: grid;
+        place-items: center;
+        gap: 16px;
+        padding: 24px;
+        text-align: center;
+      }
+
+      .boot-logo,
+      .logo,
+      .voice-orb {
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(36, 198, 255, 0.88), rgba(124, 58, 237, 0.78), rgba(5, 7, 17, 0.96));
+        box-shadow: 0 0 34px rgba(36, 198, 255, 0.5), 0 0 90px rgba(124, 58, 237, 0.34);
+      }
+
+      .boot-logo {
+        position: relative;
+        width: 104px;
+        height: 104px;
+        font-size: 40px;
+        font-weight: 700;
+      }
+
+      .boot-logo::before,
+      .boot-logo::after,
+      .voice-orb::before,
+      .voice-orb::after {
+        content: "";
+        position: absolute;
+        inset: -16px;
+        border-radius: inherit;
+        border: 1px solid rgba(36, 198, 255, 0.28);
+        animation: pulseRing 2.3s ease-out infinite;
+      }
+
+      .boot-logo::after,
+      .voice-orb::after {
+        inset: -30px;
+        animation-delay: 650ms;
+      }
+
+      .boot-progress {
+        width: min(300px, 72vw);
+        height: 5px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.14);
+      }
+
+      .boot-progress span {
+        display: block;
+        width: 44%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, transparent, var(--blue), var(--violet), transparent);
+        animation: scanMove 1.15s ease-in-out infinite;
+      }
+
+      .app {
+        position: relative;
+        z-index: 1;
+        width: min(100%, 480px);
+        margin: 0 auto;
+        padding: 14px 12px 96px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr) 44px;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 0 12px;
+        backdrop-filter: blur(18px);
+      }
+
+      .topbar p,
+      .muted,
+      small {
+        color: var(--muted);
+      }
+
+      .topbar h1 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .topbar p {
+        margin: 0 0 4px;
+        font-size: 11px;
+      }
+
+      .logo,
+      .icon-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 15px;
+      }
+
+      .logo {
+        font-weight: 700;
+        animation: orbIdle 3.8s ease-in-out infinite;
+      }
+
+      .icon-btn {
+        background: rgba(15, 23, 42, 0.78);
+        border: 1px solid var(--line);
+      }
+
+      .pc-tab-rail {
+        position: sticky;
+        top: 64px;
+        z-index: 29;
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        margin: -2px -12px 12px;
+        padding: 0 12px 11px;
+        scroll-snap-type: x proximity;
+        backdrop-filter: blur(18px);
+      }
+
+      .pc-tab-rail::-webkit-scrollbar,
+      .chips::-webkit-scrollbar,
+      .scroll-row::-webkit-scrollbar,
+      .filter-row::-webkit-scrollbar {
+        display: none;
+      }
+
+      .pc-tab-rail button {
+        min-width: max-content;
+        min-height: 36px;
+        padding: 0 13px;
+        border-radius: 999px;
+        color: var(--muted);
+        background: rgba(15, 23, 42, 0.78);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        scroll-snap-align: start;
+        transition: transform 220ms ease, border-color 220ms ease, color 220ms ease, background 220ms ease;
+      }
+
+      .pc-tab-rail button.active {
+        color: #fff;
+        border-color: rgba(36, 198, 255, 0.46);
+        background:
+          radial-gradient(circle at 20% 20%, rgba(34, 197, 94, 0.2), transparent 32%),
+          linear-gradient(135deg, rgba(36, 198, 255, 0.22), rgba(124, 58, 237, 0.2));
+        box-shadow: 0 0 24px rgba(36, 198, 255, 0.14);
+        transform: translateY(-1px);
+      }
+
+      .view {
+        display: none;
+        gap: 12px;
+        transform-origin: 50% 24px;
+      }
+
+      .view.active {
+        display: grid;
+      }
+
+      .panel,
+      .card,
+      .sheet {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(7, 12, 24, 0.78));
+        box-shadow: 0 18px 46px rgba(0, 0, 0, 0.32);
+        backdrop-filter: blur(18px);
+        transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1), border-color 280ms ease, box-shadow 280ms ease;
+      }
+
+      .panel {
+        padding: 14px;
+      }
+
+      .panel::before,
+      .card::before,
+      .sheet::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        background:
+          radial-gradient(circle at var(--card-x, 50%) var(--card-y, 50%), rgba(36, 198, 255, 0.18), transparent 30%),
+          linear-gradient(120deg, transparent, rgba(124, 58, 237, 0.08), transparent);
+        transition: opacity 240ms ease;
+      }
+
+      .panel:active,
+      .card:active,
+      .sheet:active {
+        transform: scale(0.992);
+      }
+
+      .panel:hover,
+      .card:hover,
+      .sheet:hover {
+        border-color: rgba(36, 198, 255, 0.32);
+        box-shadow: 0 18px 46px rgba(0, 0, 0, 0.32), 0 0 30px rgba(36, 198, 255, 0.1);
+      }
+
+      .panel:hover::before,
+      .card:hover::before,
+      .sheet:hover::before {
+        opacity: 1;
+      }
+
+      .head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .head h2,
+      .panel h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .head button,
+      .chip,
+      .tiny-btn,
+      .primary-btn,
+      .ghost-btn {
+        min-height: 32px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.82);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        font-size: 11px;
+      }
+
+      .primary-btn {
+        color: #fff;
+        background: linear-gradient(135deg, #2563eb, var(--violet));
+        border: 0;
+        box-shadow: 0 0 22px rgba(124, 58, 237, 0.34);
+      }
+
+      .danger {
+        color: #fecaca;
+        border-color: rgba(248, 113, 113, 0.32);
+      }
+
+      .search-box,
+      .chat-input,
+      .entry-form {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 50px;
+        padding: 8px;
+        border-radius: 18px;
+        background: rgba(6, 10, 21, 0.94);
+        border: 1px solid rgba(36, 198, 255, 0.64);
+        box-shadow:
+          0 0 0 1px rgba(124, 58, 237, 0.42) inset,
+          0 0 24px rgba(36, 198, 255, 0.18);
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        min-width: 0;
+        border: 0;
+        outline: 0;
+        color: var(--text);
+        background: transparent;
+        font-size: 13px;
+      }
+
+      textarea {
+        min-height: 70px;
+        resize: vertical;
+      }
+
+      .send {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #2563eb, var(--violet));
+      }
+
+      .chips,
+      .scroll-row,
+      .filter-row {
+        display: flex;
+        gap: 9px;
+        overflow-x: auto;
+        padding-bottom: 3px;
+      }
+
+      .chips,
+      .filter-row {
+        margin-top: 12px;
+      }
+
+      .chip {
+        min-width: max-content;
+      }
+
+      .chip.active,
+      .nav button.active {
+        color: #fff;
+        border-color: rgba(36, 198, 255, 0.44);
+        background: rgba(36, 198, 255, 0.16);
+        box-shadow: 0 0 20px rgba(36, 198, 255, 0.12);
+      }
+
+      .moment {
+        min-width: 104px;
+        min-height: 92px;
+        display: grid;
+        align-content: end;
+        gap: 4px;
+        padding: 10px;
+        border-radius: 13px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        background:
+          radial-gradient(circle at 72% 24%, rgba(124, 58, 237, 0.72), transparent 35%),
+          #111827;
+      }
+
+      .moment span,
+      .feed-card span,
+      .ai-widget span {
+        color: #a78bfa;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .insight-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 94px;
+        align-items: center;
+        background:
+          radial-gradient(circle at 92% 10%, rgba(36, 198, 255, 0.28), transparent 28%),
+          linear-gradient(135deg, rgba(124, 58, 237, 0.44), rgba(17, 24, 39, 0.92));
+      }
+
+      .bars {
+        height: 70px;
+        display: flex;
+        align-items: end;
+        justify-content: end;
+        gap: 7px;
+      }
+
+      .bars i {
+        width: 10px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, var(--blue), var(--violet));
+        animation: barDance 2.2s ease-in-out infinite;
+      }
+
+      .bars i:nth-child(1) { height: 24px; }
+      .bars i:nth-child(2) { height: 44px; animation-delay: 120ms; }
+      .bars i:nth-child(3) { height: 34px; animation-delay: 240ms; }
+      .bars i:nth-child(4) { height: 58px; animation-delay: 360ms; }
+
+      .feed-list,
+      .ai-list,
+      .entry-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .feed-card,
+      .ai-widget,
+      .entry-card,
+      .place-card {
+        display: grid;
+        gap: 9px;
+        padding: 11px;
+        border-radius: 13px;
+        background: rgba(17, 24, 39, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+      }
+
+      .feed-card {
+        grid-template-columns: 58px minmax(0, 1fr);
+        align-items: center;
+      }
+
+      .icon,
+      .photo {
+        width: 58px;
+        height: 58px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+      }
+
+      .icon {
+        background: radial-gradient(circle, rgba(36, 198, 255, 0.34), rgba(124, 58, 237, 0.86));
+        box-shadow: 0 0 22px rgba(124, 58, 237, 0.46);
+      }
+
+      .photo {
+        background:
+          linear-gradient(145deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.34)),
+          url("https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=400&q=80") center / cover;
+      }
+
+      .feed-card h3,
+      .feed-card p,
+      .entry-card h3,
+      .entry-card p,
+      .ai-widget p {
+        margin: 0;
+      }
+
+      .feed-card h3,
+      .entry-card h3,
+      .place-card h3 {
+        font-size: 13px;
+        line-height: 1.34;
+      }
+
+      .feed-card p,
+      .entry-card p,
+      .place-card p,
+      .ai-widget p {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .map-box,
+      .heatmap-box {
+        position: relative;
+        min-height: 240px;
+        overflow: hidden;
+        border-radius: 14px;
+        background:
+          linear-gradient(32deg, transparent 48%, rgba(71, 85, 105, 0.26) 49%, rgba(71, 85, 105, 0.26) 51%, transparent 52%) 0 0 / 82px 82px,
+          linear-gradient(118deg, transparent 48%, rgba(71, 85, 105, 0.22) 49%, rgba(71, 85, 105, 0.22) 51%, transparent 52%) 0 0 / 104px 104px,
+          radial-gradient(circle at 50% 60%, rgba(124, 58, 237, 0.32), transparent 18%),
+          #081225;
+      }
+
+      .map-box::after,
+      .heatmap-box::after {
+        content: "";
+        position: absolute;
+        inset: -38%;
+        pointer-events: none;
+        opacity: 0.22;
+        background:
+          conic-gradient(from 0deg, transparent 0deg, rgba(36, 198, 255, 0.32) 26deg, transparent 54deg),
+          radial-gradient(circle, transparent 0 42%, rgba(36, 198, 255, 0.18) 43%, transparent 44%);
+        animation: radarSweep 7s linear infinite;
+        mix-blend-mode: screen;
+      }
+
+      .pin,
+      .hotspot {
+        position: absolute;
+        border-radius: 50%;
+        box-shadow: 0 0 22px currentColor;
+      }
+
+      .pin {
+        width: 22px;
+        height: 22px;
+        border-radius: 50% 50% 50% 0;
+        background: var(--violet);
+        transform: rotate(-45deg);
+      }
+
+      .pin::after {
+        content: "";
+        position: absolute;
+        inset: 7px;
+        border-radius: 50%;
+        background: #fff;
+      }
+
+      .hotspot {
+        width: var(--size);
+        height: var(--size);
+        left: var(--x);
+        top: var(--y);
+        background: radial-gradient(circle, rgba(36, 198, 255, 0.44), rgba(124, 58, 237, 0.2), transparent 68%);
+        color: var(--blue);
+        animation: heatPulse 2.6s ease-in-out infinite;
+      }
+
+      .p1 { left: 42%; top: 22%; color: var(--violet); }
+      .p2 { left: 64%; top: 36%; color: var(--orange); background: var(--orange); }
+      .p3 { left: 28%; top: 58%; color: var(--green); background: var(--green); }
+
+      .place-pop {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        display: grid;
+        grid-template-columns: 56px 1fr;
+        gap: 10px;
+        align-items: center;
+        padding: 9px;
+        border-radius: 12px;
+        background: rgba(6, 10, 21, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+      }
+
+      .place-pop div {
+        grid-row: span 2;
+        height: 56px;
+        border-radius: 10px;
+        background: url("https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=400&q=80") center / cover;
+      }
+
+      .graph {
+        width: 100%;
+        height: 280px;
+        border-radius: 14px;
+        background:
+          linear-gradient(90deg, rgba(148, 163, 184, 0.055) 1px, transparent 1px) 0 0 / 34px 34px,
+          linear-gradient(0deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px) 0 0 / 34px 34px,
+          rgba(5, 7, 17, 0.84);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+      }
+
+      .graph-link {
+        stroke: rgba(36, 198, 255, 0.42);
+        stroke-width: 1.4;
+        stroke-dasharray: 8 12;
+        filter: drop-shadow(0 0 6px rgba(36, 198, 255, 0.58));
+        animation: graphFlow 2.8s linear infinite;
+      }
+
+      .graph-node circle {
+        fill: rgba(124, 58, 237, 0.86);
+        stroke: rgba(36, 198, 255, 0.9);
+        stroke-width: 2;
+        filter: drop-shadow(0 0 10px rgba(124, 58, 237, 0.8));
+        animation: nodePulse 2.8s ease-in-out infinite;
+      }
+
+      .graph-node text {
+        fill: #f8fafc;
+        font-size: 9px;
+      }
+
+      .bubble {
+        max-width: 88%;
+        margin: 0 0 10px;
+        padding: 12px;
+        border-radius: 14px;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .user {
+        margin-left: auto;
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.9), rgba(59, 30, 125, 0.92));
+      }
+
+      .ai {
+        background: rgba(17, 24, 39, 0.82);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+      }
+
+      .typing {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .typing::after,
+      .skeleton::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(36, 198, 255, 0.18), transparent);
+        animation: shimmer 1.35s ease-in-out infinite;
+      }
+
+      .entry-form {
+        display: grid;
+        align-items: stretch;
+      }
+
+      .entry-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .voice-orb {
+        position: relative;
+        width: 112px;
+        height: 112px;
+        margin: 8px auto 14px;
+        animation: orbIdle 3.6s ease-in-out infinite;
+      }
+
+      .voice-orb.listening {
+        animation: orbPulse 1.2s ease-in-out infinite;
+      }
+
+      .waveform {
+        height: 46px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+      }
+
+      .waveform span {
+        width: 5px;
+        height: 12px;
+        border-radius: 999px;
+        background: var(--blue);
+        animation: wave 1s ease-in-out infinite;
+      }
+
+      .waveform span:nth-child(2n) { animation-delay: 160ms; }
+      .waveform span:nth-child(3n) { animation-delay: 280ms; }
+
+      .focus-stage {
+        display: grid;
+        place-items: center;
+        min-height: 220px;
+        border-radius: 14px;
+        background:
+          radial-gradient(circle, rgba(36, 198, 255, 0.16), transparent 34%),
+          rgba(5, 7, 17, 0.82);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+      }
+
+      .focus-time {
+        font-size: 46px;
+        font-weight: 700;
+      }
+
+      .scan-box {
+        display: grid;
+        place-items: center;
+        min-height: 142px;
+        padding: 16px;
+        border-radius: 14px;
+        text-align: center;
+        color: var(--muted);
+        background: rgba(6, 10, 21, 0.68);
+        border: 1px dashed rgba(36, 198, 255, 0.36);
+      }
+
+      .scan-line {
+        width: 100%;
+        height: 4px;
+        margin-top: 12px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.12);
+      }
+
+      .scan-line span {
+        display: block;
+        width: 42%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, transparent, var(--blue), transparent);
+        animation: scanMove 1.4s ease-in-out infinite;
+      }
+
+      .place-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .metric-card {
+        display: grid;
+        gap: 4px;
+        min-height: 96px;
+        padding: 12px;
+        border-radius: 14px;
+        background:
+          radial-gradient(circle at 90% 12%, rgba(245, 158, 11, 0.22), transparent 38%),
+          rgba(17, 24, 39, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+      }
+
+      .metric-card strong {
+        font-size: 24px;
+      }
+
+      .tag-cloud {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tag-cloud button {
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        color: #dbeafe;
+        background: rgba(15, 23, 42, 0.78);
+        border: 1px solid rgba(36, 198, 255, 0.24);
+      }
+
+      .tag-cloud button.active {
+        color: #fff;
+        background: rgba(34, 197, 94, 0.18);
+        border-color: rgba(34, 197, 94, 0.46);
+      }
+
+      .mini-map {
+        position: relative;
+        min-height: 300px;
+        overflow: hidden;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        background:
+          linear-gradient(28deg, transparent 48%, rgba(36, 198, 255, 0.16) 49%, rgba(36, 198, 255, 0.16) 51%, transparent 52%) 0 0 / 76px 76px,
+          linear-gradient(118deg, transparent 48%, rgba(34, 197, 94, 0.12) 49%, rgba(34, 197, 94, 0.12) 51%, transparent 52%) 0 0 / 96px 96px,
+          radial-gradient(circle at 62% 40%, rgba(124, 58, 237, 0.34), transparent 24%),
+          #081225;
+      }
+
+      .mini-map .route-line {
+        position: absolute;
+        left: 22%;
+        top: 30%;
+        width: 54%;
+        height: 38%;
+        border-top: 2px dashed rgba(36, 198, 255, 0.44);
+        border-right: 2px dashed rgba(245, 158, 11, 0.36);
+        border-radius: 40% 55% 20% 45%;
+        filter: drop-shadow(0 0 8px rgba(36, 198, 255, 0.46));
+        animation: graphFlow 3.6s linear infinite;
+      }
+
+      .place-card strong,
+      .place-pop strong {
+        font-size: 13px;
+      }
+
+      .nav {
+        position: fixed;
+        left: 50%;
+        bottom: 12px;
+        z-index: 60;
+        width: min(calc(100% - 20px), 456px);
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+        padding: 9px;
+        border-radius: 22px;
+        background: rgba(5, 7, 17, 0.92);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.42);
+        transform: translateX(-50%);
+        backdrop-filter: blur(18px);
+      }
+
+      .nav button {
+        position: relative;
+        overflow: hidden;
+        height: 46px;
+        display: grid;
+        place-items: center;
+        border-radius: 15px;
+        color: var(--muted);
+        background: transparent;
+        font-size: 16px;
+      }
+
+      .nav span {
+        font-size: 9px;
+      }
+
+      .nav .add {
+        width: 50px;
+        height: 50px;
+        justify-self: center;
+        border-radius: 50%;
+        color: #fff;
+        background: linear-gradient(135deg, #2563eb, var(--violet));
+        box-shadow: 0 0 24px rgba(124, 58, 237, 0.5);
+        font-size: 25px;
+      }
+
+      .ripple {
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        pointer-events: none;
+        background: rgba(255, 255, 255, 0.34);
+        transform: translate(-50%, -50%) scale(0);
+        animation: rippleOut 620ms ease-out forwards;
+      }
+
+      @keyframes meshFloat {
+        to { transform: translate3d(8vw, 7vh, 0) scale(1.12); }
+      }
+
+      @keyframes neuralDrift {
+        to { background-position: 44px 44px, -44px 44px; }
+      }
+
+      @keyframes particleFloat {
+        0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+        50% { transform: translate3d(var(--dx, 40px), var(--dy, -90px), 0) scale(1.7); }
+      }
+
+      @keyframes pulseRing {
+        from { opacity: 0.8; transform: scale(0.84); }
+        to { opacity: 0; transform: scale(1.18); }
+      }
+
+      @keyframes scanMove {
+        from { transform: translateX(-120%); }
+        to { transform: translateX(260%); }
+      }
+
+      @keyframes shimmer {
+        to { transform: translateX(100%); }
+      }
+
+      @keyframes radarSweep {
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes graphFlow {
+        to { stroke-dashoffset: -40; }
+      }
+
+      @keyframes nodePulse {
+        50% { stroke-width: 3; filter: drop-shadow(0 0 16px rgba(36, 198, 255, 0.95)); }
+      }
+
+      @keyframes orbIdle {
+        50% { transform: translateY(-4px) scale(1.02); }
+      }
+
+      @keyframes orbPulse {
+        50% { transform: scale(1.08); box-shadow: 0 0 48px rgba(36, 198, 255, 0.52), 0 0 96px rgba(124, 58, 237, 0.36); }
+      }
+
+      @keyframes wave {
+        50% { height: 36px; }
+      }
+
+      @keyframes barDance {
+        50% { transform: scaleY(0.72); opacity: 0.72; }
+      }
+
+      @keyframes heatPulse {
+        50% { transform: scale(1.18); opacity: 0.68; }
+      }
+
+      @keyframes rippleOut {
+        to { opacity: 0; transform: translate(-50%, -50%) scale(18); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ambient-stage" class="ambient-stage" aria-hidden="true">
+      <div class="neural-grid"></div>
+    </div>
+    <section id="boot" class="boot">
+      <div class="boot-core">
+        <div class="boot-logo">N</div>
+        <div>
+          <h2>NeuroNest</h2>
+          <p class="muted">Mobile AI memory OS initializing</p>
+        </div>
+        <div class="boot-progress"><span></span></div>
+      </div>
+    </section>
+
+    <main class="app">
+      <header class="topbar">
+        <div class="logo">N</div>
+        <div>
+          <p>Good Morning, JAI</p>
+          <h1>NeuroNest</h1>
+        </div>
+        <button id="menu-button" class="icon-btn" type="button">AI</button>
+      </header>
+
+      <nav class="pc-tab-rail" aria-label="NeuroNest PC dashboard tabs">
+        <button class="active" data-nav="home" type="button">Home</button>
+        <button data-nav="chat" type="button">AI Chat</button>
+        <button data-nav="systems" type="button">AI Systems</button>
+        <button data-nav="place-hunter" type="button">Place hunter</button>
+        <button data-nav="timeline" type="button">Timeline</button>
+        <button data-nav="memories" type="button">Memories</button>
+        <button data-nav="map" type="button">Map View</button>
+        <button data-nav="places" type="button">Places</button>
+        <button data-nav="insights" type="button">Insights</button>
+        <button data-nav="tags" type="button">Tags</button>
+        <button data-nav="voice" type="button">Voice Notes</button>
+        <button data-nav="trash" type="button">Trash</button>
+      </nav>
+
+      <section class="view active" data-view="home">
+        <section class="panel">
+          <div class="search-box">
+            <span>Search</span>
+            <input id="memory-search" placeholder="Ask your memories anything..." />
+            <button id="memory-search-button" class="send" type="button">></button>
+          </div>
+          <div class="chips">
+            <button class="chip quick-search" data-query="Which cafes inspired startup ideas?" type="button">Cafe ideas</button>
+            <button class="chip quick-search" data-query="What did I do last Friday?" type="button">Last Friday</button>
+            <button class="chip quick-search" data-query="Where was I happiest?" type="button">Happiest</button>
+          </div>
+        </section>
+
+        <section class="panel insight-hero">
+          <div>
+            <span class="muted">AI Insight</span>
+            <h2 id="hero-insight">You are most productive between 10 AM - 1 PM</h2>
+          </div>
+          <div class="bars"><i></i><i></i><i></i><i></i></div>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>Today's Moments</h2>
+            <button data-open-view="timeline" type="button">See all</button>
+          </div>
+          <div class="scroll-row" id="moment-strip"></div>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>AI Memory Feed</h2>
+            <button data-open-view="systems" type="button">AI OS</button>
+          </div>
+          <div class="feed-list" id="memory-feed"></div>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>Mobile Map View</h2>
+            <button data-open-view="map" type="button">Open</button>
+          </div>
+          <div class="map-box">
+            <span class="pin p1"></span>
+            <span class="pin p2"></span>
+            <span class="pin p3"></span>
+            <article class="place-pop">
+              <div></div>
+              <strong>Blue Bottle Cafe</strong>
+              <small>Visited 3 times</small>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <section class="view" data-view="chat">
+        <section class="panel">
+          <div class="head">
+            <h2>AI Chat</h2>
+            <small>Typing memory assistant</small>
+          </div>
+          <div id="chat-stream">
+            <p class="bubble ai">Ask about your timeline, places, tags, productivity, or saved ideas.</p>
+          </div>
+          <div class="chat-input">
+            <input id="chat-input" placeholder="Ask anything..." />
+            <button id="chat-send" class="send" type="button">></button>
+          </div>
+        </section>
+      </section>
+
+      <section class="view" data-view="add">
+        <section class="panel">
+          <div class="head">
+            <h2>New Entry</h2>
+            <small>Saved locally on mobile</small>
+          </div>
+          <form id="entry-form" class="entry-form">
+            <input name="title" placeholder="Title" required />
+            <input name="kind" placeholder="Kind: memory, place, voice, insight, tag" />
+            <textarea name="body" placeholder="Details"></textarea>
+            <input name="tags" placeholder="Tags, comma separated" />
+            <button class="primary-btn" type="submit">Save entry</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>Saved Entries</h2>
+            <small id="entry-count">0 active</small>
+          </div>
+          <div id="entry-list" class="entry-list"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="timeline">
+        <section class="panel">
+          <div class="head">
+            <h2>Timeline</h2>
+            <small>Memories + entries</small>
+          </div>
+          <div id="timeline-list" class="entry-list"></div>
+        </section>
+        <section class="panel">
+          <div class="head">
+            <h2>Trash</h2>
+            <small>Restore deleted entries</small>
+          </div>
+          <div id="trash-list" class="entry-list"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="place-hunter">
+        <section class="panel">
+          <div class="head">
+            <h2>Place Hunter</h2>
+            <small>Mobile nearby scanner</small>
+          </div>
+          <div class="search-box">
+            <input id="place-query" value="restaurant" placeholder="restaurant, cafe, turf, gym..." />
+            <button id="place-search" class="send" type="button">></button>
+          </div>
+          <div class="chips">
+            <button class="chip place-chip active" data-place="restaurant" type="button">Restaurants</button>
+            <button class="chip place-chip" data-place="cafe" type="button">Cafes</button>
+            <button class="chip place-chip" data-place="turf" type="button">Turfs</button>
+            <button class="chip place-chip" data-place="gym" type="button">Gyms</button>
+            <button class="chip place-chip" data-place="pharmacy" type="button">Pharmacy</button>
+          </div>
+          <div id="place-results" class="place-grid"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="map">
+        <section class="panel">
+          <div class="head">
+            <h2>Map View</h2>
+            <button data-open-view="place-hunter" type="button">Hunt places</button>
+          </div>
+          <div class="mini-map">
+            <span class="pin p1"></span>
+            <span class="pin p2"></span>
+            <span class="pin p3"></span>
+            <span class="route-line"></span>
+            <article class="place-pop">
+              <div></div>
+              <strong>Movement memory route</strong>
+              <small>Cafes, gym, restaurants, and focus zones</small>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>Life Heatmap</h2>
+            <div class="filter-row">
+              <button class="chip heat-filter active" data-range="day" type="button">Day</button>
+              <button class="chip heat-filter" data-range="week" type="button">Week</button>
+              <button class="chip heat-filter" data-range="month" type="button">Month</button>
+            </div>
+          </div>
+          <div id="heatmap" class="heatmap-box"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="memories">
+        <section class="panel">
+          <div class="head">
+            <h2>Memories</h2>
+            <button data-open-view="add" type="button">New</button>
+          </div>
+          <div class="feature-grid" id="memory-metrics"></div>
+        </section>
+        <section class="panel">
+          <div class="head">
+            <h2>Memory Library</h2>
+            <small id="memories-count">0 records</small>
+          </div>
+          <div id="memories-list" class="entry-list"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="places">
+        <section class="panel">
+          <div class="head">
+            <h2>Places</h2>
+            <button data-open-view="place-hunter" type="button">Scan</button>
+          </div>
+          <div id="places-summary" class="feature-grid"></div>
+        </section>
+        <section class="panel">
+          <div class="head">
+            <h2>Saved + Nearby</h2>
+            <small>Restaurants, cafes, turfs, gyms</small>
+          </div>
+          <div id="places-list" class="place-grid"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="insights">
+        <section class="panel insight-hero">
+          <div>
+            <span class="muted">AI Auto Memory Engine</span>
+            <h2 id="insight-headline">Patterns loading</h2>
+          </div>
+          <div class="bars"><i></i><i></i><i></i><i></i></div>
+        </section>
+        <section class="panel">
+          <div class="head">
+            <h2>Insights</h2>
+            <button data-open-view="systems" type="button">AI OS</button>
+          </div>
+          <div id="insights-list" class="ai-list"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="tags">
+        <section class="panel">
+          <div class="head">
+            <h2>Tags</h2>
+            <small>Tap to filter</small>
+          </div>
+          <div id="tag-cloud" class="tag-cloud"></div>
+        </section>
+        <section class="panel">
+          <div class="head">
+            <h2 id="tag-title">Tagged memories</h2>
+            <button data-open-view="add" type="button">Add</button>
+          </div>
+          <div id="tag-results" class="entry-list"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="voice">
+        <section class="panel">
+          <div class="head">
+            <h2>Voice Notes</h2>
+            <button data-open-view="add" type="button">Write</button>
+          </div>
+          <div id="voice-page-orb" class="voice-orb">AI</div>
+          <div class="waveform"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="entry-actions">
+            <button id="voice-page-listen" class="primary-btn" type="button">Listen</button>
+            <button id="voice-page-speak" class="ghost-btn" type="button">Speak</button>
+          </div>
+          <p id="voice-page-output" class="muted">Capture a spoken note or ask NeuroNest to recall one.</p>
+        </section>
+        <section class="panel">
+          <div class="head">
+            <h2>Saved Voice Signals</h2>
+            <small>Voice + memory recall</small>
+          </div>
+          <div id="voice-notes-list" class="entry-list"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="trash">
+        <section class="panel">
+          <div class="head">
+            <h2>Trash</h2>
+            <small>Restore deleted entries</small>
+          </div>
+          <div id="trash-page-list" class="entry-list"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="systems">
+        <section class="panel">
+          <div class="head">
+            <h2>AI Systems</h2>
+            <small id="systems-status">Local intelligence</small>
+          </div>
+          <div id="engine-list" class="ai-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>Memory Graph</h2>
+            <input id="graph-search" placeholder="Search graph" />
+          </div>
+          <svg id="memory-graph" class="graph" viewBox="0 0 360 280"></svg>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>Screenshot Memory AI</h2>
+            <small>OCR + classification</small>
+          </div>
+          <label class="scan-box">
+            <input id="screenshot-input" type="file" accept="image/*" hidden />
+            <span id="scan-label">Upload screenshot to scan and create a memory.</span>
+            <span class="scan-line"><span></span></span>
+          </label>
+          <div id="scan-result" class="ai-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>AI Daily Recap</h2>
+            <button id="recap-refresh" type="button">Refresh</button>
+          </div>
+          <div id="recap-list" class="ai-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>AI Voice Assistant</h2>
+            <small>Speech recall</small>
+          </div>
+          <div id="voice-orb" class="voice-orb">AI</div>
+          <div class="waveform"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="entry-actions">
+            <button id="voice-listen" class="primary-btn" type="button">Listen</button>
+            <button id="voice-speak" class="ghost-btn" type="button">Speak</button>
+          </div>
+          <p id="voice-output" class="muted">Ask out loud about memories, cafes, mood, or productivity.</p>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>Smart Journal</h2>
+            <small>Cinematic story</small>
+          </div>
+          <div id="journal-list" class="ai-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>Deep Focus</h2>
+            <small>Session analytics</small>
+          </div>
+          <div class="focus-stage">
+            <div>
+              <div id="focus-time" class="focus-time">25:00</div>
+              <p id="focus-status" class="muted">Ready for a clean focus session.</p>
+            </div>
+          </div>
+          <div class="entry-actions">
+            <button id="focus-start" class="primary-btn" type="button">Start</button>
+            <button id="focus-pause" class="ghost-btn" type="button">Pause</button>
+            <button id="focus-reset" class="ghost-btn" type="button">Reset</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="head">
+            <h2>Prediction Engine</h2>
+            <small>Habit forecast</small>
+          </div>
+          <div id="prediction-list" class="ai-list"></div>
+        </section>
+      </section>
+
+      <nav class="nav">
+        <button class="active" data-nav="home" type="button">H<span>Home</span></button>
+        <button data-nav="chat" type="button">C<span>Chat</span></button>
+        <button class="add" data-nav="add" type="button">+</button>
+        <button data-nav="timeline" type="button">T<span>Time</span></button>
+        <button data-nav="systems" type="button">AI<span>OS</span></button>
+      </nav>
+    </main>
+
+    <script>
+      const storageKey = "neuronest-mobile-ai-os";
+      const motionEnabled = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const hasGsap = () => motionEnabled && typeof window.gsap !== "undefined";
+
+      const demoMemories = [
+        {
+          id: "demo-plan",
+          kind: "note",
+          title: "Morning planning note",
+          body: "Saved goals for coding, gym, and a cleaner launch checklist.",
+          meta: "9:15 AM",
+          tags: ["productivity", "coding"],
+          score: 88,
+          mood: "focused",
+        },
+        {
+          id: "demo-cafe",
+          kind: "place",
+          title: "Blue Bottle Cafe",
+          body: "Focus-friendly cafe visited repeatedly while working on AI ideas.",
+          meta: "Cafe",
+          tags: ["cafe", "startup"],
+          score: 82,
+          mood: "inspired",
+        },
+        {
+          id: "demo-idea",
+          kind: "memory",
+          title: "AI tutoring platform idea",
+          body: "Startup idea connected to saved project notes and screenshots.",
+          meta: "Idea",
+          tags: ["AI", "startup"],
+          score: 91,
+          mood: "excited",
+        },
+        {
+          id: "demo-workout",
+          kind: "memory",
+          title: "Upper Body Workout",
+          body: "Training plan and progress notes for the evening session.",
+          meta: "Health",
+          tags: ["fitness", "routine"],
+          score: 74,
+          mood: "energized",
+        },
+        {
+          id: "demo-food",
+          kind: "place",
+          title: "Sorrento Restaurant",
+          body: "Dinner memory with pasta note, location, and ambience comment.",
+          meta: "Restaurant",
+          tags: ["restaurant", "food"],
+          score: 77,
+          mood: "happy",
+        },
+      ];
+
+      const localPlaces = [
+        { name: "KFC", type: "restaurant", rating: 4.2, body: "Ground floor, Aarzra Inn, Ambala Cantt." },
+        { name: "Ekyam Sattvic Kitchen", type: "restaurant", rating: 4.8, body: "Railway Station Road, healthy food spot." },
+        { name: "Pyramid Ambala", type: "restaurant", rating: 4.5, body: "Restaurant, lounge, cafe, and microbrewery." },
+        { name: "Cafe Coffee Day", type: "cafe", rating: 4.1, body: "Coffee and quick focus sessions nearby." },
+        { name: "City Sports Turf", type: "turf", rating: 4.4, body: "Football and cricket turf location." },
+        { name: "FitZone Gym", type: "gym", rating: 4.6, body: "Strength training and workout memory zone." },
+        { name: "Apollo Pharmacy", type: "pharmacy", rating: 4.0, body: "Medicines and health essentials nearby." },
+      ];
+
+      let entries = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      let activeView = "home";
+      let lastVoiceResponse = "";
+      let focusSeconds = 25 * 60;
+      let focusTimer = null;
+
+      const q = (selector, root = document) => root.querySelector(selector);
+      const qa = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+      function createId() {
+        return window.crypto?.randomUUID ? window.crypto.randomUUID() : `mobile-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+
+      function saveEntries() {
+        localStorage.setItem(storageKey, JSON.stringify(entries));
+      }
+
+      function allActiveRecords() {
+        return [...demoMemories, ...entries.filter((entry) => !entry.deletedAt)];
+      }
+
+      function tokenize(value) {
+        return String(value || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((token) => token.length > 2);
+      }
+
+      function createParticleField() {
+        const stage = q("#ambient-stage");
+        if (!stage || !motionEnabled) return;
+        for (let index = 0; index < 44; index += 1) {
+          const particle = document.createElement("span");
+          particle.className = "particle";
+          particle.style.left = `${Math.random() * 100}%`;
+          particle.style.top = `${Math.random() * 100}%`;
+          particle.style.setProperty("--particle-duration", `${10 + Math.random() * 18}s`);
+          particle.style.setProperty("--dx", `${Math.round((Math.random() - 0.5) * 120)}px`);
+          particle.style.setProperty("--dy", `${Math.round((Math.random() - 0.5) * 160)}px`);
+          particle.style.animationDelay = `${Math.random() * -18}s`;
+          stage.appendChild(particle);
+        }
+      }
+
+      function initMotion() {
+        createParticleField();
+        window.addEventListener("pointermove", (event) => {
+          document.documentElement.style.setProperty("--cursor-x", `${event.clientX}px`);
+          document.documentElement.style.setProperty("--cursor-y", `${event.clientY}px`);
+        });
+        installMotionHooks();
+
+        const boot = q("#boot");
+        if (!boot) return;
+        if (hasGsap()) {
+          gsap.timeline({ defaults: { ease: "power3.out" } })
+            .from(".boot-logo", { scale: 0.72, opacity: 0, filter: "blur(16px)", duration: 0.7 })
+            .from(".boot-core h2, .boot-core p, .boot-progress", { y: 14, opacity: 0, stagger: 0.08, duration: 0.46 }, "-=0.25")
+            .to(boot, { opacity: 0, filter: "blur(18px)", duration: 0.68, delay: 0.18, onComplete: () => boot.remove() });
+        } else {
+          setTimeout(() => boot.remove(), 900);
+        }
+      }
+
+      function installMotionHooks(root = document) {
+        qa(".panel, .card, .sheet, .entry-card, .ai-widget, .place-card", root).forEach((card) => {
+          if (card.dataset.lit) return;
+          card.dataset.lit = "true";
+          card.addEventListener("pointermove", (event) => {
+            const rect = card.getBoundingClientRect();
+            card.style.setProperty("--card-x", `${((event.clientX - rect.left) / rect.width) * 100}%`);
+            card.style.setProperty("--card-y", `${((event.clientY - rect.top) / rect.height) * 100}%`);
+          });
+        });
+
+        qa("button, .chip", root).forEach((button) => {
+          if (button.dataset.motionButton) return;
+          button.dataset.motionButton = "true";
+          button.addEventListener("click", (event) => {
+            const rect = button.getBoundingClientRect();
+            const ripple = document.createElement("span");
+            ripple.className = "ripple";
+            ripple.style.left = `${event.clientX - rect.left}px`;
+            ripple.style.top = `${event.clientY - rect.top}px`;
+            button.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 680);
+          });
+        });
+      }
+
+      function animateIn(container) {
+        installMotionHooks(container);
+        if (!hasGsap()) return;
+        gsap.from(container.querySelectorAll(":scope > *"), {
+          y: 18,
+          opacity: 0,
+          filter: "blur(8px)",
+          stagger: 0.035,
+          duration: 0.48,
+          ease: "power3.out",
+        });
+      }
+
+      function switchView(view) {
+        activeView = view;
+        qa(".view").forEach((panel) => {
+          const active = panel.dataset.view === view;
+          panel.classList.toggle("active", active);
+          if (active && hasGsap()) {
+            gsap.fromTo(panel, { y: 22, opacity: 0, scale: 0.985, filter: "blur(12px)" }, { y: 0, opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.52, ease: "power3.out" });
+            animateIn(panel);
+          }
+        });
+        qa("[data-nav]").forEach((button) => button.classList.toggle("active", button.dataset.nav === view));
+        if (view === "systems") renderSystems();
+        if (view === "place-hunter") renderPlaceHunter();
+        if (view === "map") renderHeatmap("day");
+        if (["memories", "places", "insights", "tags", "voice", "trash"].includes(view)) renderFeatureViews();
+      }
+
+      function renderHome() {
+        const records = allActiveRecords();
+        q("#hero-insight").textContent = `You are most productive between ${productivityWindow(records)}`;
+
+        q("#moment-strip").innerHTML = records.slice(0, 6).map((record) => (
+          `<article class="moment"><span>${record.meta || record.kind}</span><strong>${record.title}</strong></article>`
+        )).join("");
+
+        q("#memory-feed").innerHTML = records.slice(0, 5).map((record, index) => (
+          `<article class="feed-card">
+            <div class="${index === 1 ? "photo" : "icon"}">${index === 1 ? "" : "N"}</div>
+            <div><span>${record.kind}</span><h3>${record.title}</h3><p>${record.body}</p></div>
+          </article>`
+        )).join("");
+        animateIn(q('[data-view="home"]'));
+      }
+
+      function renderEntries() {
+        const active = entries.filter((entry) => !entry.deletedAt);
+        const trash = entries.filter((entry) => entry.deletedAt);
+        q("#entry-count").textContent = `${active.length} active`;
+        q("#entry-list").innerHTML = active.map(entryCard).join("") || `<div class="entry-card"><p>No mobile entries yet.</p></div>`;
+        q("#timeline-list").innerHTML = allActiveRecords().map(entryCard).join("");
+        q("#trash-list").innerHTML = trash.map((entry) => entryCard(entry, true)).join("") || `<div class="entry-card"><p>Trash is empty.</p></div>`;
+        if (q("#trash-page-list")) q("#trash-page-list").innerHTML = trash.map((entry) => entryCard(entry, true)).join("") || `<div class="entry-card"><p>Trash is empty.</p></div>`;
+        qa("[data-delete]").forEach((button) => { button.onclick = () => deleteEntry(button.dataset.delete); });
+        qa("[data-restore]").forEach((button) => { button.onclick = () => restoreEntry(button.dataset.restore); });
+        installMotionHooks();
+      }
+
+      function renderFeatureViews(selectedTag = "") {
+        const records = allActiveRecords();
+        const activeEntries = entries.filter((entry) => !entry.deletedAt);
+        const deletedEntries = entries.filter((entry) => entry.deletedAt);
+        const memoryRecords = records.filter((record) => record.kind !== "place");
+        const placeRecords = records.filter((record) => /place|restaurant|cafe|turf|gym|pharmacy/i.test(`${record.kind} ${record.title} ${record.body} ${(record.tags || []).join(" ")}`));
+        const voiceRecords = records.filter((record) => /voice|spoken|audio/i.test(`${record.kind} ${record.title} ${(record.tags || []).join(" ")}`));
+
+        if (q("#memory-metrics")) {
+          q("#memory-metrics").innerHTML = [
+            ["Records", records.length],
+            ["Saved", activeEntries.length],
+            ["Places", Math.max(placeRecords.length, localPlaces.length)],
+            ["Deleted", deletedEntries.length],
+          ].map(([label, value]) => `<article class="metric-card"><strong>${value}</strong><small>${label}</small></article>`).join("");
+        }
+
+        if (q("#memories-count")) q("#memories-count").textContent = `${memoryRecords.length} records`;
+        if (q("#memories-list")) q("#memories-list").innerHTML = memoryRecords.map(entryCard).join("") || `<div class="entry-card"><p>No memories yet.</p></div>`;
+
+        if (q("#places-summary")) {
+          q("#places-summary").innerHTML = [
+            ["Nearby", localPlaces.length],
+            ["Saved", placeRecords.length],
+            ["Top", "Cafe"],
+            ["Radius", "5 km"],
+          ].map(([label, value]) => `<article class="metric-card"><strong>${value}</strong><small>${label}</small></article>`).join("");
+        }
+
+        if (q("#places-list")) {
+          const savedPlaces = placeRecords.map((record) => ({
+            name: record.title,
+            type: record.meta || record.kind || "place",
+            rating: (record.score || 75) / 20,
+            body: record.body,
+          }));
+          q("#places-list").innerHTML = [...savedPlaces, ...localPlaces].map((place) => (
+            `<article class="place-card">
+              <span>${place.type}</span>
+              <h3>${place.name}</h3>
+              <p>${place.body}</p>
+              <small>${Math.min(5, Number(place.rating) || 4.2).toFixed(1)} rating - Mobile place memory</small>
+            </article>`
+          )).join("");
+        }
+
+        if (q("#insight-headline")) q("#insight-headline").textContent = `You are most productive between ${productivityWindow(records)}`;
+        if (q("#insights-list")) renderAiWidgets("#insights-list", [...buildInsights(records), ...buildPredictions(records)]);
+
+        renderTags(records, selectedTag);
+
+        if (q("#voice-notes-list")) {
+          q("#voice-notes-list").innerHTML = (voiceRecords.length ? voiceRecords : [
+            { id: "voice-demo", kind: "voice", title: "Voice recall ready", body: "Use Listen to ask about cafes, routines, tags, or saved ideas.", meta: "Assistant", tags: ["voice", "AI"], score: 72 },
+          ]).map(entryCard).join("");
+        }
+
+        if (q("#trash-page-list")) q("#trash-page-list").innerHTML = deletedEntries.map((entry) => entryCard(entry, true)).join("") || `<div class="entry-card"><p>Trash is empty.</p></div>`;
+        qa("[data-delete]").forEach((button) => { button.onclick = () => deleteEntry(button.dataset.delete); });
+        qa("[data-restore]").forEach((button) => { button.onclick = () => restoreEntry(button.dataset.restore); });
+        installMotionHooks();
+      }
+
+      function renderTags(records, selectedTag = "") {
+        const counts = new Map();
+        records.forEach((record) => (record.tags || [record.kind]).forEach((tag) => counts.set(tag, (counts.get(tag) || 0) + 1)));
+        const tags = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+        const activeTag = selectedTag || tags[0]?.[0] || "memory";
+        if (q("#tag-cloud")) {
+          q("#tag-cloud").innerHTML = tags.map(([tag, count]) => `<button class="${tag === activeTag ? "active" : ""}" data-tag-filter="${tag}" type="button">${tag} ${count}</button>`).join("") || `<button class="active" data-tag-filter="memory" type="button">memory 0</button>`;
+          qa("[data-tag-filter]").forEach((button) => button.addEventListener("click", () => renderTags(records, button.dataset.tagFilter)));
+        }
+        if (q("#tag-title")) q("#tag-title").textContent = `${activeTag} memories`;
+        if (q("#tag-results")) {
+          const matches = records.filter((record) => (record.tags || []).includes(activeTag) || record.kind === activeTag);
+          q("#tag-results").innerHTML = matches.map(entryCard).join("") || `<div class="entry-card"><p>No records for this tag yet.</p></div>`;
+        }
+      }
+
+      function entryCard(entry, restore = false) {
+        const tags = (entry.tags || []).join(", ");
+        const canMutate = entries.some((saved) => saved.id === entry.id);
+        return `<article class="entry-card">
+          <span>${entry.kind || "memory"} ${entry.meta ? "- " + entry.meta : ""}</span>
+          <h3>${entry.title}</h3>
+          <p>${entry.body || "Saved memory."}</p>
+          <small>${tags}</small>
+          <div class="entry-actions">
+            ${canMutate ? (restore ? `<button class="ghost-btn" data-restore="${entry.id}" type="button">Restore</button>` : `<button class="ghost-btn danger" data-delete="${entry.id}" type="button">Delete</button>`) : ""}
+          </div>
+        </article>`;
+      }
+
+      function deleteEntry(id) {
+        entries = entries.map((entry) => entry.id === id ? { ...entry, deletedAt: new Date().toISOString() } : entry);
+        saveEntries();
+        rerenderAll();
+      }
+
+      function restoreEntry(id) {
+        entries = entries.map((entry) => entry.id === id ? { ...entry, deletedAt: null } : entry);
+        saveEntries();
+        rerenderAll();
+      }
+
+      function productivityWindow(records) {
+        const score = records.reduce((sum, record) => sum + (record.score || 65), 0);
+        if (score % 3 === 0) return "9 AM - 12 PM";
+        if (score % 3 === 1) return "10 AM - 1 PM";
+        return "6 PM - 10 PM";
+      }
+
+      function renderPlaceHunter(query = q("#place-query").value || "restaurant") {
+        q("#place-query").value = query;
+        qa(".place-chip").forEach((button) => button.classList.toggle("active", button.dataset.place === query));
+        const results = localPlaces.filter((place) => place.type.includes(query) || place.name.toLowerCase().includes(query));
+        q("#place-results").innerHTML = (results.length ? results : localPlaces.slice(0, 3)).map((place) => (
+          `<article class="place-card">
+            <span>${place.type}</span>
+            <h3>${place.name}</h3>
+            <p>${place.body}</p>
+            <small>${place.rating.toFixed(1)} rating - Open in Maps</small>
+          </article>`
+        )).join("");
+        animateIn(q("#place-results"));
+      }
+
+      function renderHeatmap(range) {
+        qa(".heat-filter").forEach((button) => button.classList.toggle("active", button.dataset.range === range));
+        const heatmap = q("#heatmap");
+        const sizes = range === "day" ? [80, 120, 68] : range === "week" ? [120, 160, 96] : [150, 190, 120];
+        heatmap.innerHTML = sizes.map((size, index) => (
+          `<span class="hotspot" style="--size:${size}px;--x:${18 + index * 24}%;--y:${20 + index * 17}%;animation-delay:${index * 180}ms"></span>`
+        )).join("") + `<article class="place-pop"><div></div><strong>${range} productivity zones</strong><small>Neon memory heatmap rendered locally</small></article>`;
+      }
+
+      function renderSystems() {
+        const records = allActiveRecords();
+        renderAiWidgets("#engine-list", buildInsights(records));
+        renderGraph(records);
+        renderAiWidgets("#recap-list", buildRecap(records));
+        renderAiWidgets("#journal-list", buildJournal(records));
+        renderAiWidgets("#prediction-list", buildPredictions(records));
+        q("#systems-status").textContent = `${records.length} memory signals analyzed`;
+      }
+
+      function buildInsights(records) {
+        const cafeCount = records.filter((record) => /cafe|coffee/i.test(`${record.title} ${record.body} ${(record.tags || []).join(" ")}`)).length;
+        return [
+          { title: `Peak focus: ${productivityWindow(records)}`, body: "Strongest productivity cluster detected from memory timing.", score: 92 },
+          { title: `Cafe pattern detected`, body: `${cafeCount || 1} cafe-linked memories connect with startup ideas.`, score: 84 },
+          { title: "Mood trend: focused", body: "Recent memories lean toward focus, ideas, and routines.", score: 76 },
+        ];
+      }
+
+      function buildRecap(records) {
+        return [
+          { title: "Daily cinematic recap", body: `Today blended ${records.slice(0, 5).length} memory signals into a focused arc.`, score: 88 },
+          ...records.slice(0, 3).map((record) => ({ title: record.title, body: record.body, score: record.score || 70 })),
+        ];
+      }
+
+      function buildJournal(records) {
+        return [
+          { title: "Smart Journal", body: `Your day connects ${records[0]?.title || "planning"} with places, ideas, and focus sessions.`, score: 82 },
+          { title: "Reflection prompt", body: "Which place gave you the clearest idea today?", score: 58 },
+        ];
+      }
+
+      function buildPredictions(records) {
+        return [
+          { title: `Tomorrow focus peak: ${productivityWindow(records)}`, body: "Your routine suggests this is the best deep-work window.", score: 86 },
+          { title: "Cafe after workout pattern", body: "Fitness and cafe memories may trigger creative planning.", score: 74 },
+          { title: "Startup idea recurrence", body: "AI memories cluster with movement and voice notes.", score: 81 },
+        ];
+      }
+
+      function renderAiWidgets(selector, items) {
+        const container = q(selector);
+        container.innerHTML = items.map((item) => (
+          `<article class="ai-widget">
+            <span>${item.score || 70}% signal</span>
+            <h3>${item.title}</h3>
+            <p>${item.body}</p>
+            <div class="boot-progress"><span style="width:${Math.max(16, Math.min(100, item.score || 70))}%"></span></div>
+          </article>`
+        )).join("");
+        animateIn(container);
+      }
+
+      function renderGraph(records) {
+        const svg = q("#memory-graph");
+        const nodes = records.slice(0, 8).map((record, index) => ({
+          ...record,
+          x: 178 + Math.cos(index * 0.9) * (82 + (index % 3) * 18),
+          y: 138 + Math.sin(index * 0.9) * (58 + (index % 2) * 28),
+        }));
+        const links = [];
+        for (let index = 0; index < nodes.length - 1; index += 1) {
+          links.push({ a: nodes[index], b: nodes[index + 1] });
+          if (index + 2 < nodes.length && index % 2 === 0) links.push({ a: nodes[index], b: nodes[index + 2] });
+        }
+        const filter = q("#graph-search").value.toLowerCase();
+        svg.innerHTML = links.map((link) => `<line class="graph-link" x1="${link.a.x}" y1="${link.a.y}" x2="${link.b.x}" y2="${link.b.y}"></line>`).join("") +
+          nodes.map((node) => `<g class="graph-node" transform="translate(${node.x} ${node.y})"><circle r="${node.kind === "place" ? 16 : 13}" ${filter && node.title.toLowerCase().includes(filter) ? 'fill="#24c6ff"' : ""}></circle><text x="20" y="4">${node.title.slice(0, 14)}</text></g>`).join("");
+      }
+
+      function rankSearch(query) {
+        const queryTokens = new Set(tokenize(query));
+        const aliases = { happiest: ["happy", "inspired"], cafe: ["cafe", "startup"], friday: ["restaurant", "food"], productive: ["focus", "coding"] };
+        [...queryTokens].forEach((token) => (aliases[token] || []).forEach((alias) => queryTokens.add(alias)));
+        return allActiveRecords()
+          .map((record) => {
+            const text = tokenize(`${record.title} ${record.body} ${(record.tags || []).join(" ")} ${record.mood}`);
+            const hits = [...queryTokens].filter((token) => text.includes(token));
+            return { ...record, rank: hits.length * 20 + (record.score || 60) };
+          })
+          .sort((a, b) => b.rank - a.rank)
+          .slice(0, 3);
+      }
+
+      function appendChat(role, text, typing = false) {
+        const bubble = document.createElement("p");
+        bubble.className = `bubble ${role === "user" ? "user" : "ai"} ${typing ? "typing" : ""}`;
+        bubble.textContent = text;
+        q("#chat-stream").appendChild(bubble);
+        bubble.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        return bubble;
+      }
+
+      async function typeInto(element, text) {
+        element.classList.remove("typing");
+        element.textContent = "";
+        if (!motionEnabled) {
+          element.textContent = text;
+          return;
+        }
+        for (let index = 0; index < text.length; index += 1) {
+          element.textContent += text[index];
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+      }
+
+      async function runSearch(query) {
+        if (!query.trim()) return;
+        appendChat("user", query);
+        const loading = appendChat("ai", "Thinking through your memory graph...", true);
+        const results = rankSearch(query);
+        const response = results[0]
+          ? `${results[0].title}: ${results[0].body}`
+          : "I could not find a close memory yet. Add more entries to improve recall.";
+        lastVoiceResponse = response;
+        await typeInto(loading, response);
+        switchView("chat");
+      }
+
+      function classifyScreenshot(text, fileName) {
+        const lower = `${text} ${fileName}`.toLowerCase();
+        const tags = ["screenshot"];
+        if (/idea|startup|ai|build/.test(lower)) tags.push("idea", "AI");
+        if (/buy|price|cart|product/.test(lower)) tags.push("product");
+        if (/todo|remind|deadline|meeting/.test(lower)) tags.push("reminder");
+        if (/chat|message|dm/.test(lower)) tags.push("chat");
+        return {
+          id: createId(),
+          kind: "memory",
+          title: `Screenshot memory: ${fileName}`,
+          body: text || "Screenshot saved. OCR did not find readable text.",
+          meta: tags[1] || "Screenshot",
+          tags,
+          score: 80,
+          mood: "focused",
+        };
+      }
+
+      async function loadOcrEngine() {
+        if (window.Tesseract) return window.Tesseract;
+        return new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+          script.async = true;
+          script.onload = () => resolve(window.Tesseract);
+          script.onerror = () => reject(new Error("OCR engine could not load."));
+          document.head.appendChild(script);
+        });
+      }
+
+      async function scanScreenshot(file) {
+        if (!file) return;
+        q("#scan-label").textContent = `Scanning ${file.name}...`;
+        renderAiWidgets("#scan-result", [{ title: "OCR scan active", body: "Extracting text and classifying screenshot.", score: 68 }]);
+        let text = "";
+        try {
+          const Tesseract = await loadOcrEngine();
+          const result = await Tesseract.recognize(file, "eng");
+          text = result?.data?.text || "";
+        } catch (error) {
+          text = `Screenshot upload: ${file.name}. OCR unavailable: ${error.message}`;
+        }
+        const entry = classifyScreenshot(text, file.name);
+        entries.unshift(entry);
+        saveEntries();
+        q("#scan-label").textContent = "Screenshot saved as AI memory.";
+        renderAiWidgets("#scan-result", [{ title: entry.title, body: `Tags: ${entry.tags.join(", ")}`, score: 84 }]);
+        rerenderAll();
+      }
+
+      function startVoice(target = {}) {
+        const orb = q(target.orb || "#voice-orb");
+        const output = q(target.output || "#voice-output");
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          output.textContent = "Speech recognition is not available in this browser.";
+          return;
+        }
+        const recognition = new SpeechRecognition();
+        recognition.lang = "en-IN";
+        recognition.interimResults = false;
+        orb.classList.add("listening");
+        output.textContent = "Listening...";
+        recognition.onresult = async (event) => {
+          const transcript = event.results?.[0]?.[0]?.transcript || "";
+          output.textContent = `You asked: ${transcript}`;
+          const result = rankSearch(transcript)[0];
+          lastVoiceResponse = result ? `${result.title}. ${result.body}` : "I could not find that memory yet.";
+          output.textContent = lastVoiceResponse;
+          speak(lastVoiceResponse);
+        };
+        recognition.onerror = () => {
+          output.textContent = "Voice capture stopped. Check microphone permission.";
+        };
+        recognition.onend = () => orb.classList.remove("listening");
+        recognition.start();
+      }
+
+      function speak(text) {
+        if (!("speechSynthesis" in window)) return;
+        speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.95;
+        speechSynthesis.speak(utterance);
+      }
+
+      function formatTime(seconds) {
+        return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+      }
+
+      function updateFocus() {
+        q("#focus-time").textContent = formatTime(focusSeconds);
+      }
+
+      function startFocus() {
+        if (focusTimer) return;
+        q("#focus-status").textContent = "Deep focus active. Neural distractions muted.";
+        focusTimer = setInterval(() => {
+          focusSeconds -= 1;
+          updateFocus();
+          if (focusSeconds <= 0) {
+            clearInterval(focusTimer);
+            focusTimer = null;
+            focusSeconds = 25 * 60;
+            updateFocus();
+            q("#focus-status").textContent = "Focus complete. Session saved.";
+            entries.unshift({
+              id: createId(),
+              kind: "insight",
+              title: "Deep Focus Session",
+              body: "Completed a 25 minute mobile focus session.",
+              meta: "Focus",
+              tags: ["focus", "productivity"],
+              score: 86,
+              mood: "focused",
+            });
+            saveEntries();
+            rerenderAll();
+          }
+        }, 1000);
+      }
+
+      function pauseFocus() {
+        if (!focusTimer) return;
+        clearInterval(focusTimer);
+        focusTimer = null;
+        q("#focus-status").textContent = "Focus paused.";
+      }
+
+      function resetFocus() {
+        pauseFocus();
+        focusSeconds = 25 * 60;
+        updateFocus();
+        q("#focus-status").textContent = "Ready for a clean focus session.";
+      }
+
+      function rerenderAll() {
+        renderHome();
+        renderEntries();
+        renderPlaceHunter();
+        renderSystems();
+        renderHeatmap("day");
+        renderFeatureViews();
+      }
+
+      function wireEvents() {
+        qa("[data-nav]").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.nav)));
+        qa("[data-open-view]").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.openView)));
+        q("#menu-button").addEventListener("click", () => switchView("systems"));
+        qa(".quick-search").forEach((button) => button.addEventListener("click", () => runSearch(button.dataset.query)));
+        q("#memory-search-button").addEventListener("click", () => runSearch(q("#memory-search").value));
+        q("#memory-search").addEventListener("keydown", (event) => {
+          if (event.key === "Enter") runSearch(q("#memory-search").value);
+        });
+        q("#chat-send").addEventListener("click", () => runSearch(q("#chat-input").value));
+        q("#chat-input").addEventListener("keydown", (event) => {
+          if (event.key === "Enter") runSearch(q("#chat-input").value);
+        });
+        q("#entry-form").addEventListener("submit", (event) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          entries.unshift({
+            id: createId(),
+            kind: String(formData.get("kind") || "memory").trim().toLowerCase(),
+            title: String(formData.get("title") || "").trim(),
+            body: String(formData.get("body") || "").trim(),
+            meta: "Mobile",
+            tags: String(formData.get("tags") || "").split(",").map((tag) => tag.trim()).filter(Boolean),
+            score: 72,
+            mood: "focused",
+          });
+          saveEntries();
+          event.currentTarget.reset();
+          rerenderAll();
+          switchView("timeline");
+        });
+        qa(".place-chip").forEach((button) => button.addEventListener("click", () => renderPlaceHunter(button.dataset.place)));
+        q("#place-search").addEventListener("click", () => renderPlaceHunter(q("#place-query").value));
+        qa(".heat-filter").forEach((button) => button.addEventListener("click", () => renderHeatmap(button.dataset.range)));
+        q("#graph-search").addEventListener("input", () => renderGraph(allActiveRecords()));
+        q("#screenshot-input").addEventListener("change", (event) => scanScreenshot(event.target.files?.[0]));
+        q("#recap-refresh").addEventListener("click", renderSystems);
+        q("#voice-listen").addEventListener("click", startVoice);
+        q("#voice-speak").addEventListener("click", () => speak(lastVoiceResponse || "Ask me about your memories first."));
+        q("#voice-page-listen").addEventListener("click", () => startVoice({ orb: "#voice-page-orb", output: "#voice-page-output" }));
+        q("#voice-page-speak").addEventListener("click", () => speak(lastVoiceResponse || "Ask me about your memories first."));
+        q("#focus-start").addEventListener("click", startFocus);
+        q("#focus-pause").addEventListener("click", pauseFocus);
+        q("#focus-reset").addEventListener("click", resetFocus);
+      }
+
+      initMotion();
+      wireEvents();
+      updateFocus();
+      rerenderAll();
+    </script>
+  </body>
+</html>

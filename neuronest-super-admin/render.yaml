@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: neuronest-super-admin
+    env: node
+    region: virginia
+    rootDir: neuronest-super-admin
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: SUPER_ADMIN_EMAILS
+        sync: false
+      - key: NEURONEST_APP_URL
+        sync: false
+      - key: NEURONEST_DB_PATH
+        value: ../pc-ai-dashboard/data/db.json
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

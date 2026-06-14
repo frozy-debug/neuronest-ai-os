@@ -1,0 +1,361 @@
+function unique(items) {
+  return [...new Set((Array.isArray(items) ? items : []).filter(Boolean))];
+}
+
+function dataUrlBytes(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return { mimeType: match[1], bytes: Buffer.from(match[2], "base64") };
+}
+
+export function createSupabaseProductionStore() {
+  const baseUrl = String(process.env.SUPABASE_URL || "").replace(/\/$/, "");
+  const serviceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "");
+  const mediaBucket = process.env.SUPABASE_MEDIA_BUCKET || "neuronest-media";
+
+  function ready() {
+    return Boolean(baseUrl && serviceKey);
+  }
+
+  function headers(extra = {}) {
+    return {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      ...extra,
+    };
+  }
+
+  async function rest(path, options = {}) {
+    if (!ready()) return { skipped: true, reason: "Supabase production store is not configured." };
+    const response = await fetch(`${baseUrl}/rest/v1/${path}`, {
+      ...options,
+      headers: headers(options.headers || {}),
+    });
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!response.ok) throw new Error(data?.message || data?.error || text || `Supabase request failed (${response.status}).`);
+    return data;
+  }
+
+  async function upsert(table, record) {
+    return rest(`${table}?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify(record),
+    });
+  }
+
+  async function uploadMedia(userId, memoryId, filePayload) {
+    if (!ready() || !filePayload?.dataUrl) return null;
+    const parsed = dataUrlBytes(filePayload.dataUrl);
+    if (!parsed) return null;
+    const safeName = String(filePayload.fileName || "upload.bin").replace(/[^\w.\-]+/g, "_");
+    const storagePath = `${userId}/${memoryId}/${safeName}`;
+    const response = await fetch(`${baseUrl}/storage/v1/object/${mediaBucket}/${storagePath}`, {
+      method: "POST",
+      headers: headers({
+        "Content-Type": filePayload.mimeType || parsed.mimeType,
+        "x-upsert": "true",
+      }),
+      body: parsed.bytes,
+    });
+    const text = await response.text();
+    if (!response.ok) throw new Error(text || `Supabase media upload failed (${response.status}).`);
+    return { storageProvider: "supabase-storage", storagePath, size: parsed.bytes.length };
+  }
+
+  async function upsertUser(user) {
+    if (!user?.id) return null;
+    return upsert("neuronest_users", {
+      id: user.id,
+      google_sub: user.googleSub || null,
+      email: user.email,
+      name: user.name || null,
+      picture: user.picture || null,
+      status: user.status || "active",
+      settings: user.settings || {},
+      created_at: user.createdAt || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_login_at: user.lastLoginAt || null,
+    });
+  }
+
+  async function upsertMemory(userId, entry, filePayload = null) {
+    if (!entry?.id) return null;
+    const memory = await upsert("memories", {
+      id: entry.id,
+      user_id: userId,
+      type: entry.type || entry.kind || "memory",
+      title: entry.title,
+      content: entry.body || "",
+      summary: entry.summary || "",
+      tags: unique(entry.tags),
+      emotions: unique(entry.emotions),
+      importance_score: Number(entry.importanceScore || 0),
+      ai_score: Number(entry.aiScore || 0),
+      location: entry.location || null,
+      media: entry.media || null,
+      metadata: entry.metadata || {},
+      source: entry.source || null,
+      created_at: entry.createdAt || new Date().toISOString(),
+      updated_at: entry.updatedAt || new Date().toISOString(),
+      deleted_at: entry.deletedAt || null,
+    });
+    await upsert("timeline_events", {
+      id: `timeline_${entry.id}`,
+      user_id: userId,
+      memory_id: entry.id,
+      type: entry.type || entry.kind || "memory",
+      title: entry.title,
+      description: entry.summary || entry.body || "",
+      event_at: entry.createdAt || new Date().toISOString(),
+      data: { tags: entry.tags || [], emotions: entry.emotions || [], source: entry.source || "manual" },
+    });
+    const stored = await uploadMedia(userId, entry.id, filePayload);
+    if (stored) {
+      const kind = String(entry.type || entry.kind || "file").includes("screenshot")
+        ? "screenshot"
+        : String(entry.type || entry.kind || "").includes("voice")
+          ? "voice"
+          : "file";
+      await upsert("media_records", {
+        id: `media_${entry.id}`,
+        user_id: userId,
+        memory_id: entry.id,
+        kind,
+        storage_provider: stored.storageProvider,
+        storage_path: stored.storagePath,
+        file_name: filePayload.fileName || null,
+        mime_type: filePayload.mimeType || null,
+        size_bytes: stored.size,
+        transcript: kind === "voice" ? entry.body || "" : null,
+        extracted_text: kind === "screenshot" ? entry.metadata?.ocrText || "" : null,
+        ai_description: entry.summary || "",
+        metadata: entry.metadata || {},
+      });
+    }
+    return memory;
+  }
+
+  async function upsertChat(userId, message) {
+    if (!message?.id) return null;
+    return upsert("ai_chats", {
+      id: message.id,
+      user_id: userId,
+      role: message.role,
+      content: message.content,
+      language: message.language || null,
+      model: message.model || null,
+      metadata: message.metadata || {},
+      created_at: message.createdAt || new Date().toISOString(),
+    });
+  }
+
+  async function upsertGoal(userId, goal) {
+    if (!goal?.id) return null;
+    return upsert("goals", {
+      id: goal.id,
+      user_id: userId,
+      title: goal.title,
+      description: goal.description || "",
+      status: goal.status || "active",
+      progress: Number(goal.progress || 0),
+      data: goal,
+      created_at: goal.createdAt || new Date().toISOString(),
+      updated_at: goal.updatedAt || new Date().toISOString(),
+    });
+  }
+
+  async function upsertIntelligence(userId, collection, record) {
+    const typeMap = {
+      digitalTwins: "digital-twin",
+      relationships: "relationship-graph",
+      predictions: "prediction",
+      replays: "replay",
+      insights: "insight",
+    };
+    if (collection === "aiUsage") {
+      return upsert("ai_usage", {
+        id: record.id,
+        user_id: userId,
+        capability: record.capability || record.type || "unknown",
+        provider: record.provider || null,
+        model: record.model || null,
+        status: record.status || "completed",
+        metadata: record.metadata || {},
+        created_at: record.timestamp || record.createdAt || new Date().toISOString(),
+      });
+    }
+    const type = typeMap[collection];
+    if (!type) return null;
+    return upsert("intelligence_records", {
+      id: record.id,
+      user_id: userId,
+      type,
+      version: record.version || "v2",
+      evidence_count: Number(record.evidenceMemoryCount || record.memoryCount || 0),
+      data: record,
+      created_at: record.createdAt || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  async function hydrateAdminDb(db) {
+    if (!ready()) return { skipped: true };
+    const [users, memories, chats, goals, media, intelligence, usage, embeddings] = await Promise.all([
+      rest("neuronest_users?select=*&limit=5000"),
+      rest("memories?select=*&order=created_at.desc&limit=5000"),
+      rest("ai_chats?select=*&order=created_at.desc&limit=5000"),
+      rest("goals?select=*&order=updated_at.desc&limit=5000"),
+      rest("media_records?select=*&order=created_at.desc&limit=5000"),
+      rest("intelligence_records?select=*&order=updated_at.desc&limit=5000"),
+      rest("ai_usage?select=*&order=created_at.desc&limit=5000"),
+      rest("memory_vectors?select=id,memory_id,user_id,type,provider,model,created_at,updated_at&order=updated_at.desc&limit=5000"),
+    ]);
+
+    db.users = users.map((user) => ({
+      id: user.id,
+      googleSub: user.google_sub || "",
+      email: user.email,
+      name: user.name || user.email,
+      picture: user.picture || "",
+      status: user.status || "active",
+      settings: user.settings || {},
+      createdAt: user.created_at,
+      lastLoginAt: user.last_login_at,
+      updatedAt: user.updated_at,
+    }));
+    db.entries = {};
+    db.chats = {};
+    db.lifeGoals = {};
+    db.warehouse ||= {};
+    const warehouse = db.warehouse;
+    warehouse.memories = [];
+    warehouse.screenshots = [];
+    warehouse.voiceNotes = [];
+    warehouse.places = [];
+    warehouse.timelineEvents = [];
+    warehouse.aiChats = [];
+    warehouse.goals = [];
+    warehouse.aiUsage = usage.map((item) => ({
+      id: item.id,
+      userId: item.user_id,
+      capability: item.capability,
+      provider: item.provider,
+      model: item.model,
+      status: item.status,
+      metadata: item.metadata || {},
+      timestamp: item.created_at,
+    }));
+    warehouse.fileStorage = [];
+    warehouse.embeddings = embeddings.map((item) => ({
+      id: item.id,
+      memoryId: item.memory_id,
+      userId: item.user_id,
+      type: item.type,
+      provider: item.provider || "openai",
+      model: item.model || "text-embedding-3-small",
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    }));
+    warehouse.relationships = [];
+    warehouse.digitalTwins = [];
+    warehouse.predictions = [];
+    warehouse.replays = [];
+    warehouse.insights = [];
+    warehouse.aiJobs ||= [];
+
+    for (const memory of memories) {
+      const entry = {
+        id: memory.id,
+        kind: memory.type,
+        type: memory.type,
+        title: memory.title,
+        body: memory.content || "",
+        summary: memory.summary || "",
+        tags: memory.tags || [],
+        emotions: memory.emotions || [],
+        importanceScore: memory.importance_score || 0,
+        aiScore: memory.ai_score || 0,
+        location: memory.location,
+        media: memory.media,
+        metadata: memory.metadata || {},
+        source: memory.source || "",
+        createdAt: memory.created_at,
+        updatedAt: memory.updated_at,
+        deletedAt: memory.deleted_at,
+      };
+      db.entries[memory.user_id] ||= [];
+      db.entries[memory.user_id].push(entry);
+      if (!memory.deleted_at) {
+        warehouse.memories.push({
+          id: `memory_${memory.id}`,
+          entryId: memory.id,
+          userId: memory.user_id,
+          title: memory.title,
+          content: memory.content || memory.summary || "",
+          type: memory.type,
+          importance: memory.importance_score || 0,
+          createdDate: memory.created_at,
+          tags: memory.tags || [],
+          embeddingId: null,
+        });
+        warehouse.timelineEvents.push({
+          id: `timeline_${memory.id}`,
+          entryId: memory.id,
+          userId: memory.user_id,
+          title: memory.title,
+          type: memory.type,
+          timestamp: memory.created_at,
+        });
+        if (memory.type === "place") warehouse.places.push({ id: `place_${memory.id}`, entryId: memory.id, userId: memory.user_id, placeName: memory.title, location: memory.location, createdDate: memory.created_at });
+      }
+    }
+
+    for (const chat of chats) {
+      const record = { id: chat.id, role: chat.role, content: chat.content, createdAt: chat.created_at, metadata: chat.metadata || {} };
+      db.chats[chat.user_id] ||= [];
+      db.chats[chat.user_id].push(record);
+      warehouse.aiChats.push({ ...record, userId: chat.user_id, message: chat.content, response: chat.role === "assistant" ? chat.content : "" });
+    }
+    for (const goal of goals) {
+      const record = { ...(goal.data || {}), id: goal.id, title: goal.title, description: goal.description, status: goal.status, progress: goal.progress, createdAt: goal.created_at, updatedAt: goal.updated_at };
+      db.lifeGoals[goal.user_id] ||= [];
+      db.lifeGoals[goal.user_id].push(record);
+      warehouse.goals.push({ ...record, userId: goal.user_id });
+    }
+    for (const item of media) {
+      const fileUrl = `${mediaBucket}/${item.storage_path}`;
+      warehouse.fileStorage.push({ id: item.id, userId: item.user_id, fileName: item.file_name, fileUrl, mimeType: item.mime_type, kind: item.kind, createdAt: item.created_at });
+      if (item.kind === "screenshot") warehouse.screenshots.push({ id: item.id, userId: item.user_id, entryId: item.memory_id, fileName: item.file_name, fileUrl, uploadDate: item.created_at, ocrSummary: item.ai_description || item.extracted_text || "" });
+      if (item.kind === "voice") warehouse.voiceNotes.push({ id: item.id, userId: item.user_id, entryId: item.memory_id, audioUrl: fileUrl, transcript: item.transcript || "", createdDate: item.created_at });
+    }
+    const collectionMap = {
+      "digital-twin": "digitalTwins",
+      "relationship-graph": "relationships",
+      prediction: "predictions",
+      replay: "replays",
+      insight: "insights",
+    };
+    for (const item of intelligence) {
+      const collection = collectionMap[item.type];
+      if (collection) warehouse[collection].push({ ...(item.data || {}), id: item.id, userId: item.user_id, createdAt: item.created_at, updatedAt: item.updated_at });
+    }
+    warehouse.lastSyncAt = new Date().toISOString();
+    warehouse.productionSource = "supabase";
+    return { users: users.length, memories: memories.length, chats: chats.length, media: media.length, intelligence: intelligence.length };
+  }
+
+  return {
+    ready,
+    upsertUser,
+    upsertMemory,
+    upsertChat,
+    upsertGoal,
+    upsertIntelligence,
+    hydrateAdminDb,
+  };
+}

@@ -1,0 +1,10 @@
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules/
+**/data/
+**/uploads/
+**/*.log
+**/*.err
+.DS_Store
+Thumbs.db
