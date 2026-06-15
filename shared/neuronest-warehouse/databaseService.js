@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-const WAREHOUSE_VERSION = 2;
+const WAREHOUSE_VERSION = 3;
 
 export function createEmptyWarehouse() {
   return {
@@ -12,6 +12,10 @@ export function createEmptyWarehouse() {
     screenshots: [],
     voiceNotes: [],
     places: [],
+    placeMemories: [],
+    locationSamples: [],
+    passivePlaceStates: {},
+    placeMetadataQueue: [],
     timelineEvents: [],
     aiChats: [],
     goals: [],
@@ -36,6 +40,10 @@ export function normalizeWarehouse(db) {
   warehouse.screenshots ||= [];
   warehouse.voiceNotes ||= [];
   warehouse.places ||= [];
+  warehouse.placeMemories ||= [];
+  warehouse.locationSamples ||= [];
+  warehouse.passivePlaceStates ||= {};
+  warehouse.placeMetadataQueue ||= [];
   warehouse.timelineEvents ||= [];
   warehouse.aiChats ||= [];
   warehouse.goals ||= [];

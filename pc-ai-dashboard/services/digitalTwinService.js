@@ -172,6 +172,39 @@ function buildDecisionHistory(memories = []) {
   };
 }
 
+function buildMovementProfile(memories = []) {
+  const visits = memories.filter((memory) => memory.type === "place" && memory.metadata?.passivePlaceVisit);
+  const countBy = (selector) => {
+    const counts = new Map();
+    visits.forEach((visit) => {
+      const value = selector(visit);
+      if (value) counts.set(value, (counts.get(value) || 0) + 1);
+    });
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  };
+  const categories = countBy((visit) => visit.metadata?.category || visit.tags?.find((tag) => tag !== "automatic" && tag !== "place"));
+  const locations = countBy((visit) => visit.metadata?.placeName || visit.location?.label);
+  const byWeekday = countBy((visit) => {
+    const date = new Date(visit.metadata?.arrivalTime || visit.createdAt);
+    return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString("en-US", { weekday: "long" });
+  });
+  const categoryMatches = (pattern) =>
+    locations
+      .filter(([label]) => visits.some((visit) => (visit.metadata?.placeName || visit.location?.label) === label && pattern.test(String(visit.metadata?.category || ""))))
+      .map(([name, visitCount]) => ({ name, visitCount }));
+  return {
+    visitCount: visits.length,
+    favoriteRestaurants: categoryMatches(/restaurant|food|meal/i).slice(0, 5),
+    favoriteCafes: categoryMatches(/cafe|coffee/i).slice(0, 5),
+    favoriteGyms: categoryMatches(/gym|fitness|sports/i).slice(0, 5),
+    favoriteLocations: locations.slice(0, 8).map(([name, visitCount]) => ({ name, visitCount })),
+    weeklyMovementPatterns: byWeekday.map(([day, visitCount]) => ({ day, visitCount })),
+    travelPatterns: categories
+      .filter(([category]) => /airport|hotel|tourist|travel|transit/i.test(category))
+      .map(([category, visitCount]) => ({ category, visitCount })),
+  };
+}
+
 export function isDecisionQuestion(message = "") {
   return /should i|kya mujhe|karu|pursue|build this|learn|change my routine|start this|stop this|is it worth|decision|choose/i.test(String(message));
 }
@@ -205,6 +238,7 @@ export function buildDigitalTwin({ user, memories = [], relationships = [], inte
   const goalAlignment = buildGoalAlignment(memories, goals, strengths);
   const decisionHistory = buildDecisionHistory(memories);
   const graph = buildPersonalKnowledgeGraph({ user, memories, relationships, dna });
+  const movementProfile = buildMovementProfile(memories);
   const understanding = intelligenceCore?.understandingLevel || {
     level: memories.length ? clamp(memories.length * 2 + relationships.length * 1.6 + habits.length * 5 + goals.length * 4) : 0,
     breakdown: {},
@@ -233,6 +267,7 @@ export function buildDigitalTwin({ user, memories = [], relationships = [], inte
     personality,
     goalAlignment,
     decisionHistory,
+    movementProfile,
     knowledgeGraph: {
       ...graph,
       connections: {

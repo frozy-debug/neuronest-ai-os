@@ -53,7 +53,10 @@ export function createSupabaseProductionStore() {
     const parsed = dataUrlBytes(filePayload.dataUrl);
     if (!parsed) return null;
     const safeName = String(filePayload.fileName || "upload.bin").replace(/[^\w.\-]+/g, "_");
-    const storagePath = `${userId}/${memoryId}/${safeName}`;
+    const prefix = String(filePayload.storagePrefix || "").replace(/[^\w-]+/g, "");
+    const storagePath = prefix
+      ? `${prefix}/${userId}/${memoryId}/${safeName}`
+      : `${userId}/${memoryId}/${safeName}`;
     const response = await fetch(`${baseUrl}/storage/v1/object/${mediaBucket}/${storagePath}`, {
       method: "POST",
       headers: headers({
@@ -120,6 +123,8 @@ export function createSupabaseProductionStore() {
         ? "screenshot"
         : String(entry.type || entry.kind || "").includes("voice")
           ? "voice"
+          : String(filePayload.mimeType || "").startsWith("image/")
+            ? "image"
           : "file";
       await upsert("media_records", {
         id: `media_${entry.id}`,
@@ -138,6 +143,33 @@ export function createSupabaseProductionStore() {
       });
     }
     return memory;
+  }
+
+  async function upsertPlaceMemory(userId, visit) {
+    if (!visit?.id) return null;
+    return upsert("place_memories", {
+      id: visit.id,
+      user_id: userId,
+      memory_id: visit.memoryId || visit.entryId || null,
+      place_id: visit.placeId || null,
+      place_name: visit.placeName || null,
+      category: visit.category || null,
+      address: visit.address || null,
+      latitude: Number(visit.latitude),
+      longitude: Number(visit.longitude),
+      arrival_time: visit.arrivalTime,
+      departure_time: visit.departureTime,
+      duration_minutes: Number(visit.durationMinutes || 0),
+      rating: visit.rating == null ? null : Number(visit.rating),
+      website: visit.website || null,
+      opening_hours: visit.openingHours || null,
+      photo_url: visit.photoUrl || null,
+      source: visit.source || "AUTOMATIC",
+      metadata_status: visit.metadataStatus || "pending",
+      data: visit,
+      created_at: visit.createdAt || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
   }
 
   async function upsertChat(userId, message) {
@@ -205,7 +237,14 @@ export function createSupabaseProductionStore() {
 
   async function hydrateAdminDb(db) {
     if (!ready()) return { skipped: true };
-    const [users, memories, chats, goals, media, intelligence, usage, embeddings] = await Promise.all([
+    const optionalRest = async (path) => {
+      try {
+        return await rest(path);
+      } catch {
+        return [];
+      }
+    };
+    const [users, memories, chats, goals, media, intelligence, usage, embeddings, placeMemories] = await Promise.all([
       rest("neuronest_users?select=*&limit=5000"),
       rest("memories?select=*&order=created_at.desc&limit=5000"),
       rest("ai_chats?select=*&order=created_at.desc&limit=5000"),
@@ -214,6 +253,7 @@ export function createSupabaseProductionStore() {
       rest("intelligence_records?select=*&order=updated_at.desc&limit=5000"),
       rest("ai_usage?select=*&order=created_at.desc&limit=5000"),
       rest("memory_vectors?select=id,memory_id,user_id,type,provider,model,created_at,updated_at&order=updated_at.desc&limit=5000"),
+      optionalRest("place_memories?select=*&order=departure_time.desc&limit=5000"),
     ]);
 
     db.users = users.map((user) => ({
@@ -237,6 +277,32 @@ export function createSupabaseProductionStore() {
     warehouse.screenshots = [];
     warehouse.voiceNotes = [];
     warehouse.places = [];
+    warehouse.placeMemories = placeMemories.map((visit) => ({
+      ...(visit.data || {}),
+      id: visit.id,
+      userId: visit.user_id,
+      memoryId: visit.memory_id,
+      entryId: visit.memory_id,
+      placeId: visit.place_id,
+      placeName: visit.place_name,
+      category: visit.category,
+      address: visit.address,
+      latitude: visit.latitude,
+      longitude: visit.longitude,
+      arrivalTime: visit.arrival_time,
+      departureTime: visit.departure_time,
+      durationMinutes: visit.duration_minutes,
+      rating: visit.rating,
+      website: visit.website,
+      openingHours: visit.opening_hours,
+      photoUrl: visit.photo_url,
+      source: visit.source,
+      metadataStatus: visit.metadata_status,
+      createdAt: visit.created_at,
+    }));
+    warehouse.locationSamples ||= [];
+    warehouse.passivePlaceStates ||= {};
+    warehouse.placeMetadataQueue ||= [];
     warehouse.timelineEvents = [];
     warehouse.aiChats = [];
     warehouse.goals = [];
@@ -311,7 +377,18 @@ export function createSupabaseProductionStore() {
           type: memory.type,
           timestamp: memory.created_at,
         });
-        if (memory.type === "place") warehouse.places.push({ id: `place_${memory.id}`, entryId: memory.id, userId: memory.user_id, placeName: memory.title, location: memory.location, createdDate: memory.created_at });
+        if (memory.type === "place") {
+          const passiveVisit = warehouse.placeMemories.find((visit) => visit.memoryId === memory.id);
+          warehouse.places.push({
+            ...(passiveVisit || {}),
+            id: passiveVisit?.id || `place_${memory.id}`,
+            entryId: memory.id,
+            userId: memory.user_id,
+            placeName: passiveVisit?.placeName || memory.title,
+            location: memory.location,
+            createdDate: memory.created_at,
+          });
+        }
       }
     }
 
@@ -353,6 +430,7 @@ export function createSupabaseProductionStore() {
     ready,
     upsertUser,
     upsertMemory,
+    upsertPlaceMemory,
     upsertChat,
     upsertGoal,
     upsertIntelligence,

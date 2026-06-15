@@ -32,6 +32,14 @@ import { buildUserBrainModel, summarizeUserBrainModel } from "./services/userBra
 import { buildLifeOsMissionControl, normalizeGoal } from "./services/lifeOsService.js";
 import { extractLearningFeatures, rebuildLearningProfile, summarizeLearningProfile, updateLearningProfile } from "./services/learningEngineService.js";
 import { detectLanguage } from "./services/languageIntelligenceService.js";
+import {
+  buildAutomaticPlaceMemoryPayload,
+  downloadGooglePlacePhoto,
+  finalizePassivePlaceState,
+  normalizePassivePlaceSettings,
+  processPassiveLocationSample,
+  resolveGooglePlaceVisit,
+} from "./services/passivePlaceMemoryService.js";
 import { createNeuroNestWarehouse } from "../shared/neuronest-warehouse/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -54,7 +62,7 @@ const warehouse = createNeuroNestWarehouse({
   appBaseUrl: process.env.NEURONEST_APP_URL || `http://localhost:${PORT}`,
 });
 warehouse.initialize();
-const { adminSyncService, databaseService: warehouseDb, moderationService, liveMonitorService, productionStore } = warehouse;
+const { adminSyncService, databaseService: warehouseDb, moderationService, liveMonitorService, placeService, productionStore } = warehouse;
 const accountSyncClients = new Map();
 let accountWatchTimer = null;
 let lastAccountDbSignature = "";
@@ -93,6 +101,11 @@ function getGoogleClientId() {
 function getGoogleMapsApiKey() {
   loadEnv();
   return process.env.GOOGLE_MAPS_API_KEY || "";
+}
+
+function getGooglePlacesServerApiKey() {
+  loadEnv();
+  return process.env.GOOGLE_PLACES_SERVER_API_KEY || process.env.GOOGLE_MAPS_API_KEY || "";
 }
 
 function getClientMeta(req, body = {}) {
@@ -172,6 +185,26 @@ function publicUser(user) {
     email: user.email,
     picture: user.picture,
   };
+}
+
+function getPassivePlaceSettings(userId) {
+  const user = getUserById(userId);
+  return normalizePassivePlaceSettings(user?.settings?.passivePlaceMemory || {});
+}
+
+function savePassivePlaceSettings(userId, patch = {}) {
+  const db = readDb();
+  const user = db.users.find((item) => item.id === userId);
+  if (!user) throw new Error("User not found.");
+  user.settings ||= {};
+  user.settings.passivePlaceMemory = normalizePassivePlaceSettings({
+    ...(user.settings.passivePlaceMemory || {}),
+    ...patch,
+  });
+  user.updatedAt = new Date().toISOString();
+  writeDb(db);
+  if (productionStore.ready()) void productionStore.upsertUser(user).catch(() => {});
+  return user.settings.passivePlaceMemory;
 }
 
 function upsertUser(profile) {
@@ -453,6 +486,7 @@ async function createEntry(userId, data) {
           dataUrl: data.imageData || data.audioData || data.fileData,
           fileName: data.fileName || data.media?.fileName || title,
           mimeType: data.mimeType || data.media?.mimeType || "",
+          storagePrefix: data.storagePrefix || "",
         }
       : null;
 
@@ -480,7 +514,7 @@ async function createEntry(userId, data) {
     media: data.media || null,
     source: String(data.source || "manual").slice(0, 60),
     metadata: data.metadata || {},
-    createdAt: new Date().toISOString(),
+    createdAt: data.createdAt && !Number.isNaN(new Date(data.createdAt).getTime()) ? new Date(data.createdAt).toISOString() : new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     deletedAt: null,
   };
@@ -593,6 +627,114 @@ async function createEntry(userId, data) {
   else syncLiveAction(userId, "MEMORY_CREATED", { page: "memories", label: "Creating Memory" });
 
   return publicEntry(entry);
+}
+
+async function persistPassivePlaceVisit(userId, rawVisit, existingEntryId = null) {
+  const apiKey = getGooglePlacesServerApiKey();
+  let visit = { ...rawVisit };
+  let photoPayload = null;
+  let metadataError = null;
+
+  try {
+    visit = await resolveGooglePlaceVisit(visit, apiKey);
+    if (visit.photoName) {
+      try {
+        photoPayload = await downloadGooglePlacePhoto(visit.photoName, apiKey);
+      } catch (error) {
+        visit.photoError = error.message;
+      }
+    }
+  } catch (error) {
+    metadataError = error.message;
+    visit.metadataStatus = "pending";
+    visit.metadataError = metadataError;
+  }
+
+  let entry;
+  if (!existingEntryId) {
+    entry = await createEntry(userId, buildAutomaticPlaceMemoryPayload(visit, photoPayload));
+  } else {
+    const db = readDb();
+    const stored = (db.entries[userId] || []).find((item) => item.id === existingEntryId);
+    if (!stored) throw new Error("Passive place memory entry not found.");
+    const payload = buildAutomaticPlaceMemoryPayload(visit, photoPayload);
+    Object.assign(stored, {
+      title: payload.title,
+      body: payload.body,
+      summary: payload.summary,
+      meta: payload.meta,
+      tags: String(payload.tags).split(",").map((tag) => tag.trim()).filter(Boolean),
+      location: payload.location,
+      media: payload.media || stored.media,
+      metadata: { ...(stored.metadata || {}), ...payload.metadata },
+      updatedAt: new Date().toISOString(),
+    });
+    adminSyncService.syncEntry(db, userId, stored, photoPayload ? { ...photoPayload, storagePrefix: "places" } : null);
+    writeDb(db);
+    if (productionStore.ready()) {
+      await productionStore.upsertMemory(userId, stored, photoPayload ? { ...photoPayload, storagePrefix: "places" } : null);
+    }
+    entry = publicEntry(stored);
+  }
+
+  const db = readDb();
+  const queueItem = db.warehouse.placeMetadataQueue.find((item) => item.visitId === visit.id && item.userId === userId);
+  const placeMemory = {
+    ...visit,
+    userId,
+    memoryId: entry.id,
+    entryId: entry.id,
+    photoUrl: photoPayload && process.env.SUPABASE_URL
+      ? `${String(process.env.SUPABASE_URL || "").replace(/\/$/, "")}/storage/v1/object/authenticated/${process.env.SUPABASE_MEDIA_BUCKET || "neuronest-media"}/places/${userId}/${entry.id}/${photoPayload.fileName}`
+      : visit.photoUrl || null,
+    updatedAt: new Date().toISOString(),
+  };
+  const index = db.warehouse.placeMemories.findIndex((item) => item.id === visit.id && item.userId === userId);
+  if (index === -1) db.warehouse.placeMemories.unshift(placeMemory);
+  else db.warehouse.placeMemories[index] = { ...db.warehouse.placeMemories[index], ...placeMemory };
+  if (queueItem) {
+    queueItem.attempts = Number(queueItem.attempts || 0) + 1;
+    queueItem.lastAttemptAt = new Date().toISOString();
+    queueItem.memoryId = entry.id;
+    queueItem.status = metadataError ? "pending" : "completed";
+    queueItem.error = metadataError;
+    queueItem.nextAttemptAt = metadataError ? new Date(Date.now() + 30 * 60_000).toISOString() : null;
+  }
+  writeDb(db);
+  if (productionStore.ready()) {
+    void productionStore.upsertPlaceMemory(userId, placeMemory).catch(() => {});
+  }
+  return { visit: placeMemory, entry, metadataError };
+}
+
+async function retryPendingPlaceMetadata(userId, limit = 5) {
+  const db = readDb();
+  const queue = db.warehouse.placeMetadataQueue
+    .filter((item) => item.userId === userId && item.status !== "completed" && new Date(item.nextAttemptAt || 0).getTime() <= Date.now())
+    .slice(0, limit);
+  const results = [];
+  for (const item of queue) {
+    const visit = db.warehouse.placeMemories.find((record) => record.id === item.visitId && record.userId === userId);
+    if (!visit) continue;
+    try {
+      results.push(await persistPassivePlaceVisit(userId, visit, item.memoryId || visit.memoryId));
+    } catch (error) {
+      results.push({ visitId: item.visitId, error: error.message });
+    }
+  }
+  return results;
+}
+
+async function retryAllPendingPlaceMetadata() {
+  const db = readDb();
+  const userIds = [...new Set(
+    db.warehouse.placeMetadataQueue
+      .filter((item) => item.status !== "completed" && new Date(item.nextAttemptAt || 0).getTime() <= Date.now())
+      .map((item) => item.userId),
+  )].slice(0, 10);
+  for (const userId of userIds) {
+    await retryPendingPlaceMetadata(userId, 1).catch(() => {});
+  }
 }
 
 function setEntryDeleted(userId, entryId, deleted) {
@@ -1399,6 +1541,12 @@ async function handleApi(req, res, url) {
         embeddings: getVectorStatus(),
         generation: getProductionAiStatus(),
       },
+      passivePlaces: {
+        googlePlacesServerReady: Boolean(getGooglePlacesServerApiKey()),
+        supabaseReady: productionStore.ready(),
+        minimumStayMinutes: 10,
+        movementRadiusMeters: 100,
+      },
       warehouse: adminSyncService.buildSyncSnapshot(readDb()),
     });
   }
@@ -1516,6 +1664,103 @@ async function handleApi(req, res, url) {
 
   if (!enforceAuthenticatedAccess(req, res, session)) {
     return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/passive-places/settings") {
+    return sendJson(res, 200, {
+      settings: getPassivePlaceSettings(session.user.id),
+      capability: {
+        browserForegroundTracking: true,
+        nativeBackgroundTrackingReady: true,
+        googlePlacesServerReady: Boolean(getGooglePlacesServerApiKey()),
+      },
+    });
+  }
+
+  if (req.method === "PATCH" && url.pathname === "/api/passive-places/settings") {
+    try {
+      const body = await readBody(req);
+      const settings = savePassivePlaceSettings(session.user.id, body.settings || body);
+      if (!settings.enabled) {
+        const db = readDb();
+        delete db.warehouse.passivePlaceStates[session.user.id];
+        writeDb(db);
+      }
+      return sendJson(res, 200, { settings });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/passive-places/visits") {
+    const db = readDb();
+    void retryPendingPlaceMetadata(session.user.id, 2).catch(() => {});
+    return sendJson(res, 200, {
+      visits: placeService.getUserPlaceMemories(db, session.user.id, 250),
+      activeVisit: db.warehouse.passivePlaceStates[session.user.id] || null,
+      pendingMetadata: db.warehouse.placeMetadataQueue.filter(
+        (item) => item.userId === session.user.id && item.status !== "completed",
+      ).length,
+    });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/passive-places/samples") {
+    try {
+      const body = await readBody(req);
+      const db = readDb();
+      const result = processPassiveLocationSample(
+        db,
+        session.user.id,
+        body.sample || body,
+        getPassivePlaceSettings(session.user.id),
+      );
+      if (result.visit) {
+        db.warehouse.placeMemories.unshift({ ...result.visit });
+        db.warehouse.placeMemories = db.warehouse.placeMemories.slice(0, 10_000);
+      }
+      writeDb(db);
+      let persisted = null;
+      if (result.visit) persisted = await persistPassivePlaceVisit(session.user.id, result.visit);
+      else void retryPendingPlaceMetadata(session.user.id, 1).catch(() => {});
+      return sendJson(res, 200, {
+        ...result,
+        visit: persisted?.visit || result.visit,
+        entry: persisted?.entry || null,
+        metadataError: persisted?.metadataError || null,
+      });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/passive-places/flush") {
+    try {
+      const body = await readBody(req);
+      const db = readDb();
+      const result = finalizePassivePlaceState(
+        db,
+        session.user.id,
+        getPassivePlaceSettings(session.user.id),
+        body.departureTime,
+      );
+      if (result.visit) {
+        db.warehouse.placeMemories.unshift({ ...result.visit });
+        db.warehouse.placeMemories = db.warehouse.placeMemories.slice(0, 10_000);
+      }
+      writeDb(db);
+      if (result.visit) void persistPassivePlaceVisit(session.user.id, result.visit).catch(() => {});
+      return sendJson(res, 200, result);
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/passive-places/retry") {
+    try {
+      return sendJson(res, 200, { results: await retryPendingPlaceMetadata(session.user.id, 10) });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
   }
 
   if (req.method === "GET" && url.pathname === "/api/chat/history") {
@@ -2252,7 +2497,9 @@ const server = http.createServer(async (req, res) => {
 
     const skipRateLimit = [
         "/api/presence/heartbeat",
-        "/api/presence/action"
+        "/api/presence/action",
+        "/api/passive-places/samples",
+        "/api/passive-places/flush"
     ];
 
     if (
@@ -2282,4 +2529,8 @@ server.listen(PORT, () => {
   if (!getGoogleClientId()) {
     console.log("Google login is not configured. Add GOOGLE_CLIENT_ID to .env.");
   }
+  const placeRetryTimer = setInterval(() => {
+    void retryAllPendingPlaceMetadata();
+  }, 10 * 60_000);
+  placeRetryTimer.unref?.();
 });

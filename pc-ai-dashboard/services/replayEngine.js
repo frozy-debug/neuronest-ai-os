@@ -13,7 +13,14 @@ function modeFilter(memory, mode) {
 
 export function buildMemoryReplay(memories, relationships = [], range = "day", mode = "today") {
   const now = Date.now();
-  const windowMs = range === "month" ? 31 * 24 * 60 * 60 * 1000 : range === "week" ? 7 * 24 * 60 * 60 * 1000 : 36 * 60 * 60 * 1000;
+  const windowMs =
+    range === "year"
+      ? 366 * 24 * 60 * 60 * 1000
+      : range === "month"
+        ? 31 * 24 * 60 * 60 * 1000
+        : range === "week"
+          ? 7 * 24 * 60 * 60 * 1000
+          : 36 * 60 * 60 * 1000;
   const selected = memories
     .filter((memory) => now - new Date(memory.createdAt).getTime() <= windowMs)
     .filter((memory) => modeFilter(memory, mode))
@@ -30,6 +37,7 @@ export function buildMemoryReplay(memories, relationships = [], range = "day", m
       timestamp: memory.createdAt,
       title: memory.title,
       type: memory.type,
+      category: memory.metadata?.category || null,
       emotion: memory.emotions?.[0] || "neutral",
       importanceScore: memory.importanceScore || memory.aiScore || 60,
       productivityScore: /focus|productive|coding|study/i.test(`${memory.title} ${memory.content}`) ? 86 : 62,
@@ -46,6 +54,11 @@ export function buildMemoryReplay(memories, relationships = [], range = "day", m
   const deepFocus = events.find((event) => /focus|deep work|productive|coding/i.test(`${event.title} ${event.body}`));
   const creativeSpike = events.find((event) => /idea|startup|creative|ai/i.test(`${event.title} ${event.body}`));
   const relationshipMoment = events.find((event) => event.relationships.length);
+  const placeCategoryCounts = new Map();
+  events
+    .filter((event) => event.type === "place" && event.category)
+    .forEach((event) => placeCategoryCounts.set(event.category, (placeCategoryCounts.get(event.category) || 0) + 1));
+  const mostVisitedCategory = [...placeCategoryCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
   return {
     range,
@@ -63,7 +76,7 @@ export function buildMemoryReplay(memories, relationships = [], range = "day", m
       relationshipMoment ? { label: "Memory relationship detected", title: relationshipMoment.title, body: relationshipMoment.relationships[0]?.reason || relationshipMoment.body } : null,
     ].filter(Boolean),
     controls: {
-      modes: ["today", "weekly", "monthly", "deep-focus", "creative", "travel", "ai-idea"],
+      modes: ["today", "weekly", "monthly", "yearly", "deep-focus", "creative", "travel", "ai-idea"],
       speeds: [0.75, 1, 1.5, 2],
       fullscreen: true,
     },
@@ -71,6 +84,8 @@ export function buildMemoryReplay(memories, relationships = [], range = "day", m
       productivity: Math.round(events.reduce((sum, event) => sum + event.productivityScore, 0) / Math.max(1, events.length)),
       emotional: emotionalArc[0] || "neutral",
       placeJourney: events.filter((event) => event.type === "place").map((event) => event.title),
+      placesVisited: events.filter((event) => event.type === "place").length,
+      mostVisitedCategory,
     },
   };
 }

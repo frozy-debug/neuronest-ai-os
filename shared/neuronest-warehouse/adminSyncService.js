@@ -73,6 +73,7 @@ export function createAdminSyncService({
     db.warehouse.screenshots = db.warehouse.screenshots.filter((item) => !(item.userId === userId && item.entryId === entryId));
     db.warehouse.voiceNotes = db.warehouse.voiceNotes.filter((item) => !(item.userId === userId && item.entryId === entryId));
     db.warehouse.places = db.warehouse.places.filter((item) => !(item.userId === userId && item.entryId === entryId));
+    db.warehouse.placeMemories = db.warehouse.placeMemories.filter((item) => !(item.userId === userId && item.entryId === entryId));
     db.warehouse.timelineEvents = db.warehouse.timelineEvents.filter((item) => !(item.userId === userId && item.entryId === entryId));
     return db;
   }
@@ -127,6 +128,7 @@ export function createAdminSyncService({
       voiceNotesCount: voiceNotes.length,
       screenshotCount: screenshots.length,
       placeCount: places.length,
+      passivePlaceCount: placeService.getUserPlaceMemories(db, userId, 10000).length,
       timelineCount: timeline.length,
       aiRequestsCount: aiUsage.length,
       goalCount: goalService.getUserGoals(db, userId, 10000).length,
@@ -146,6 +148,7 @@ export function createAdminSyncService({
       chats: chatService.getUserChats(db, userId, 50),
       voiceNotes: voiceNoteService.getUserVoiceNotes(db, userId, 50),
       places: placeService.getUserPlaces(db, userId, 50),
+      placeMemories: placeService.getUserPlaceMemories(db, userId, 50),
       timeline: timelineService.getUserTimeline(db, userId, 50),
       goals: goalService.getUserGoals(db, userId, 50),
       aiUsage: chatService.getUserAiUsage(db, userId, 50),
@@ -164,6 +167,7 @@ export function createAdminSyncService({
         screenshots: db.warehouse.screenshots.length,
         voiceNotes: db.warehouse.voiceNotes.length,
         places: db.warehouse.places.length,
+        placeMemories: db.warehouse.placeMemories.length,
         timelineEvents: db.warehouse.timelineEvents.length,
         aiChats: db.warehouse.aiChats.length,
         activityEvents: db.warehouse.activityStream.length,
@@ -187,6 +191,7 @@ export function createAdminSyncService({
       screenshots: warehouse.screenshots,
       voiceNotes: warehouse.voiceNotes,
       places: warehouse.places,
+      placeMemories: warehouse.placeMemories,
       timeline: warehouse.timelineEvents,
       aiChats: warehouse.aiChats,
       goals: warehouse.goals,
@@ -213,6 +218,10 @@ export function createAdminSyncService({
     db.warehouse.screenshots = filterOut(db.warehouse.screenshots);
     db.warehouse.voiceNotes = filterOut(db.warehouse.voiceNotes);
     db.warehouse.places = filterOut(db.warehouse.places);
+    db.warehouse.placeMemories = filterOut(db.warehouse.placeMemories);
+    db.warehouse.locationSamples = filterOut(db.warehouse.locationSamples);
+    delete db.warehouse.passivePlaceStates[userId];
+    db.warehouse.placeMetadataQueue = filterOut(db.warehouse.placeMetadataQueue);
     db.warehouse.timelineEvents = filterOut(db.warehouse.timelineEvents);
     db.warehouse.aiChats = filterOut(db.warehouse.aiChats);
     db.warehouse.goals = filterOut(db.warehouse.goals);

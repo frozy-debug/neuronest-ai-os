@@ -114,6 +114,34 @@ create table if not exists public.timeline_events (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.place_memories (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  memory_id text references public.memories(id) on delete set null,
+  place_id text,
+  place_name text,
+  category text,
+  address text,
+  latitude double precision not null,
+  longitude double precision not null,
+  arrival_time timestamptz not null,
+  departure_time timestamptz not null,
+  duration_minutes integer not null,
+  rating numeric,
+  website text,
+  opening_hours jsonb,
+  photo_url text,
+  source text not null default 'AUTOMATIC',
+  metadata_status text not null default 'pending',
+  data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists place_memories_user_departure_idx on public.place_memories(user_id, departure_time desc);
+create index if not exists place_memories_user_place_idx on public.place_memories(user_id, place_id);
+create index if not exists place_memories_user_category_idx on public.place_memories(user_id, category);
+
 create table if not exists public.goals (
   id text primary key,
   user_id text not null references public.neuronest_users(id) on delete cascade,
@@ -184,6 +212,7 @@ alter table public.memory_vectors enable row level security;
 alter table public.media_records enable row level security;
 alter table public.ai_chats enable row level security;
 alter table public.timeline_events enable row level security;
+alter table public.place_memories enable row level security;
 alter table public.goals enable row level security;
 alter table public.intelligence_records enable row level security;
 alter table public.ai_usage enable row level security;

@@ -23,10 +23,31 @@ export function createPlaceService({ databaseService, activityService }) {
       latitude: Number(location.lat ?? location.latitude ?? 0),
       longitude: Number(location.lng ?? location.longitude ?? 0),
       address: location.label || entry.meta || entry.body || "",
+      placeId: entry.metadata?.placeId || location.placeId || null,
+      category: entry.metadata?.category || entry.meta || null,
+      arrivalTime: entry.metadata?.arrivalTime || null,
+      departureTime: entry.metadata?.departureTime || null,
+      durationMinutes: Number(entry.metadata?.durationMinutes || 0) || null,
+      rating: Number(entry.metadata?.rating || 0) || null,
+      website: entry.metadata?.website || null,
+      openingHours: entry.metadata?.openingHours || null,
+      photoUrl: entry.metadata?.photoUrl || entry.media?.fileUrl || null,
+      photoAttributions: entry.metadata?.photoAttributions || [],
+      source: entry.source || entry.metadata?.source || "MANUAL",
+      metadataStatus: entry.metadata?.metadataStatus || null,
       createdDate: entry.createdAt || new Date().toISOString(),
     };
 
     upsertByKey(db.warehouse.places, "entryId", entry.id, record);
+    if (entry.metadata?.passivePlaceVisit) {
+      const placeMemory = {
+        ...record,
+        id: entry.metadata.visitId || record.id,
+        memoryId: entry.id,
+        createdAt: entry.createdAt || new Date().toISOString(),
+      };
+      upsertByKey(db.warehouse.placeMemories, "id", placeMemory.id, placeMemory);
+    }
     if (!silent && !existing) {
       activityService.logActivity(db, userId, activityService.ActivityActions.PLACE_SAVED, {
         entryId: entry.id,
@@ -44,9 +65,18 @@ export function createPlaceService({ databaseService, activityService }) {
       .slice(0, limit);
   }
 
+  function getUserPlaceMemories(db, userId, limit = 100) {
+    databaseService.normalizeWarehouse(db);
+    return db.warehouse.placeMemories
+      .filter((item) => item.userId === userId)
+      .sort((a, b) => new Date(b.departureTime || b.createdAt) - new Date(a.departureTime || a.createdAt))
+      .slice(0, limit);
+  }
+
   return {
     syncFromEntry,
     getUserPlaces,
+    getUserPlaceMemories,
   };
 }
 

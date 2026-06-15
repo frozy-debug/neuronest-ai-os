@@ -1206,6 +1206,60 @@
         border: 1px solid rgba(148, 163, 184, 0.14);
       }
 
+      .passive-place-control {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: start;
+        margin-bottom: 14px;
+        padding: 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(36, 198, 255, 0.22);
+        background: rgba(6, 10, 21, 0.56);
+      }
+
+      .passive-place-control p {
+        margin: 5px 0 0;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.55;
+      }
+
+      .passive-place-actions,
+      .passive-place-exclusions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .passive-place-actions button,
+      .passive-place-exclusions button {
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        color: var(--text);
+        background: rgba(15, 23, 42, 0.84);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+      }
+
+      .passive-place-actions button.active {
+        border-color: rgba(36, 198, 255, 0.58);
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.75), rgba(124, 58, 237, 0.75));
+        box-shadow: 0 0 20px rgba(36, 198, 255, 0.16);
+      }
+
+      .passive-place-exclusions {
+        grid-column: 1 / -1;
+        padding-top: 12px;
+        border-top: 1px solid rgba(148, 163, 184, 0.12);
+      }
+
+      .passive-place-exclusions span {
+        align-self: center;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
       .entry-form input,
       .entry-form textarea {
         min-width: 0;
@@ -2521,6 +2575,14 @@
       }
 
       @media (max-width: 640px) {
+        .passive-place-control {
+          grid-template-columns: 1fr;
+        }
+
+        .passive-place-exclusions {
+          grid-column: 1;
+        }
+
         .timeline-item,
         .memory-row,
         .voice-row,
@@ -4679,6 +4741,25 @@
               <h2>Places</h2>
               <span id="place-count-label" class="muted">0 saved</span>
             </div>
+            <div class="passive-place-control">
+              <div>
+                <strong>Passive Place Memory</strong>
+                <p id="passive-place-status">Off by default. When enabled, NeuroNest records real visits after a 10-minute stay within 100 meters while this browser is open.</p>
+              </div>
+              <div class="passive-place-actions">
+                <button id="passive-place-toggle" type="button">Enable</button>
+                <button id="passive-place-retry" type="button">Retry metadata</button>
+              </div>
+              <div class="passive-place-exclusions">
+                <span>Private exclusions:</span>
+                <button data-place-exclusion="home" type="button">Set current as Home</button>
+                <button data-place-exclusion="work" type="button">Set current as Work</button>
+                <button data-place-exclusion="school" type="button">Set current as School</button>
+                <button data-place-exclusion="custom" type="button">Exclude current location</button>
+                <button id="passive-place-clear-exclusions" type="button">Clear exclusions</button>
+                <span id="passive-place-exclusion-count">0 excluded locations</span>
+              </div>
+            </div>
             <form class="entry-form" data-entry-kind="place">
               <input name="title" placeholder="Place name" required />
               <input name="meta" placeholder="Area or rating" />
@@ -5018,6 +5099,12 @@
       const placeHunterQueryLabel = document.getElementById("place-hunter-query-label");
       const placeHunterUpdated = document.getElementById("place-hunter-updated");
       const placeHunterChips = document.querySelectorAll("[data-hunter-query]");
+      const passivePlaceToggle = document.getElementById("passive-place-toggle");
+      const passivePlaceRetry = document.getElementById("passive-place-retry");
+      const passivePlaceStatus = document.getElementById("passive-place-status");
+      const passivePlaceExclusionCount = document.getElementById("passive-place-exclusion-count");
+      const passivePlaceExclusionButtons = document.querySelectorAll("[data-place-exclusion]");
+      const passivePlaceClearExclusions = document.getElementById("passive-place-clear-exclusions");
       const entryForms = document.querySelectorAll(".entry-form");
       const timelineList = document.getElementById("timeline-list");
       const timelineSearchInput = document.getElementById("timeline-search-input");
@@ -5228,6 +5315,10 @@
       let userLocationMarker = null;
       let userAccuracyCircle = null;
       let locationWatchId = null;
+      let passivePlaceWatchId = null;
+      let passivePlaceSettings = null;
+      let lastPassivePlaceSample = null;
+      let lastPassivePlaceSampleAt = 0;
       let hasCenteredLiveMap = false;
       let activePlaceType = "all";
       let placeMarkers = [];
@@ -5876,6 +5967,7 @@
 
       function showLogin() {
         stopAccountStatusWatcher();
+        stopPassivePlaceTracking();
         hideModerationScreen();
         authScreen.classList.remove("hidden");
         userBadge.classList.add("hidden");
@@ -5908,6 +6000,7 @@
         scheduleAiNotifications();
         if (!options.skipWatcher) startAccountStatusWatcher();
         if (!options.skipPresence) startPresenceMonitor();
+        void loadPassivePlaceSettings();
         requestAnimationFrame(recoverBlankUiState);
         setTimeout(forceDashboardVisible, 900);
         setTimeout(forceDashboardVisible, 1800);
@@ -6490,6 +6583,146 @@
           Math.sin(deltaLat / 2) ** 2 +
           Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
         return 2 * earthRadius * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+      }
+
+      function renderPassivePlaceSettings() {
+        if (!passivePlaceSettings) return;
+        const enabled = passivePlaceSettings.enabled === true;
+        passivePlaceToggle?.classList.toggle("active", enabled);
+        if (passivePlaceToggle) passivePlaceToggle.textContent = enabled ? "Tracking on" : "Enable";
+        if (passivePlaceStatus) {
+          passivePlaceStatus.textContent = enabled
+            ? "Tracking significant location changes while NeuroNest is open. Visits are saved only after a real 10-minute stay within 100 meters."
+            : "Off by default. Enable to create real place memories while NeuroNest is open and location permission is granted.";
+        }
+        if (passivePlaceExclusionCount) {
+          const count = passivePlaceSettings.excludedLocations?.length || 0;
+          passivePlaceExclusionCount.textContent = `${count} excluded location${count === 1 ? "" : "s"}`;
+        }
+      }
+
+      async function loadPassivePlaceSettings() {
+        if (!currentUser) return;
+        try {
+          const payload = await api("/api/passive-places/settings");
+          passivePlaceSettings = payload.settings;
+          renderPassivePlaceSettings();
+          if (passivePlaceSettings.enabled) startPassivePlaceTracking();
+          else stopPassivePlaceTracking();
+        } catch (error) {
+          if (passivePlaceStatus) passivePlaceStatus.textContent = friendlyError(error);
+        }
+      }
+
+      function stopPassivePlaceTracking() {
+        if (passivePlaceWatchId !== null && navigator.geolocation) {
+          navigator.geolocation.clearWatch(passivePlaceWatchId);
+        }
+        passivePlaceWatchId = null;
+        lastPassivePlaceSample = null;
+        lastPassivePlaceSampleAt = 0;
+      }
+
+      function startPassivePlaceTracking() {
+        if (!currentUser || !passivePlaceSettings?.enabled || passivePlaceWatchId !== null) return;
+        if (!navigator.geolocation) {
+          if (passivePlaceStatus) passivePlaceStatus.textContent = "This browser does not support location tracking.";
+          return;
+        }
+        passivePlaceWatchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const next = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            currentLocation = next;
+            const moved = distanceMeters(lastPassivePlaceSample, next);
+            const elapsed = Date.now() - lastPassivePlaceSampleAt;
+            if (lastPassivePlaceSample && moved < 75 && elapsed < 4 * 60_000) return;
+            lastPassivePlaceSample = next;
+            lastPassivePlaceSampleAt = Date.now();
+            void sendPassivePlaceSample(position);
+          },
+          (error) => {
+            if (passivePlaceStatus) passivePlaceStatus.textContent = `Location tracking paused: ${error.message || "permission unavailable"}`;
+            stopPassivePlaceTracking();
+          },
+          { enableHighAccuracy: false, maximumAge: 5 * 60_000, timeout: 30_000 },
+        );
+      }
+
+      async function sendPassivePlaceSample(position) {
+        try {
+          const payload = await api("/api/passive-places/samples", {
+            method: "POST",
+            body: JSON.stringify({
+              sample: {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                altitude: position.coords.altitude,
+                speed: position.coords.speed,
+                heading: position.coords.heading,
+                recordedAt: new Date(position.timestamp || Date.now()).toISOString(),
+                source: "browser-geolocation",
+              },
+            }),
+          });
+          if (passivePlaceStatus) {
+            const labels = {
+              "arrival-candidate": "Arrival candidate detected. Waiting for the 10-minute dwell threshold.",
+              dwelling: `Dwell detected: ${payload.dwellMinutes || 0} minutes so far.`,
+              "visit-confirmed-awaiting-departure": "Visit confirmed. It will become a memory when departure is detected.",
+              "visit-completed": payload.metadataError
+                ? "Visit saved with coordinates. Google metadata will retry later."
+                : `Place memory created${payload.visit?.placeName ? ` for ${payload.visit.placeName}` : ""}.`,
+              excluded: `Current location excluded: ${payload.excludedLabel || "private location"}.`,
+              "accuracy-rejected": "Location sample was too inaccurate and was not stored.",
+              "short-stop-discarded": "Short stop discarded. No place memory was created.",
+            };
+            passivePlaceStatus.textContent = labels[payload.status] || "Passive place tracking active.";
+          }
+          if (payload.entry) await loadEntries();
+        } catch (error) {
+          if (passivePlaceStatus) passivePlaceStatus.textContent = `Place capture retrying later: ${friendlyError(error)}`;
+        }
+      }
+
+      async function updatePassivePlaceSettings(patch) {
+        const payload = await api("/api/passive-places/settings", {
+          method: "PATCH",
+          body: JSON.stringify({ settings: patch }),
+        });
+        passivePlaceSettings = payload.settings;
+        renderPassivePlaceSettings();
+        if (passivePlaceSettings.enabled) startPassivePlaceTracking();
+        else stopPassivePlaceTracking();
+      }
+
+      async function setCurrentLocationExclusion(kind) {
+        if (!navigator.geolocation) throw new Error("Location is not available in this browser.");
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            maximumAge: 30_000,
+            timeout: 15_000,
+          });
+        });
+        const existing = (passivePlaceSettings?.excludedLocations || []).filter((item) => item.kind !== kind);
+        const customLabel = kind === "custom" ? window.prompt("Name this private excluded location:", "Private location") : "";
+        if (kind === "custom" && !customLabel) return;
+        existing.push({
+          id: `${kind}-${Date.now()}`,
+          label: customLabel || kind[0].toUpperCase() + kind.slice(1),
+          kind,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          radiusMeters: 150,
+        });
+        const patch = { excludedLocations: existing };
+        if (kind !== "custom") patch[`ignore${kind[0].toUpperCase()}${kind.slice(1)}`] = true;
+        await updatePassivePlaceSettings(patch);
+        if (passivePlaceStatus) passivePlaceStatus.textContent = `${customLabel || kind[0].toUpperCase() + kind.slice(1)} saved as a private excluded location.`;
       }
 
       async function initLiveGoogleMap() {
@@ -9778,6 +10011,7 @@
 
       logoutButton.addEventListener("click", async () => {
         stopAccountStatusWatcher();
+        stopPassivePlaceTracking();
         await api("/api/logout", { method: "POST", body: JSON.stringify({ sessionId: presenceSessionId }) }).catch(() => null);
         presenceSessionId = null;
         currentUser = null;
@@ -9791,6 +10025,7 @@
 
       moderationLogout.addEventListener("click", async () => {
         stopAccountStatusWatcher();
+        stopPassivePlaceTracking();
         await api("/api/logout", { method: "POST" }).catch(() => {});
         currentUser = null;
         hideModerationScreen();
@@ -9978,6 +10213,52 @@
         void initLiveGoogleMap();
       });
 
+      passivePlaceToggle?.addEventListener("click", async () => {
+        try {
+          await updatePassivePlaceSettings({ enabled: !passivePlaceSettings?.enabled });
+        } catch (error) {
+          if (passivePlaceStatus) passivePlaceStatus.textContent = friendlyError(error);
+        }
+      });
+
+      passivePlaceRetry?.addEventListener("click", async () => {
+        try {
+          passivePlaceRetry.disabled = true;
+          const payload = await api("/api/passive-places/retry", { method: "POST", body: "{}" });
+          if (passivePlaceStatus) passivePlaceStatus.textContent = `Metadata retry finished for ${payload.results?.length || 0} visit records.`;
+          await loadEntries();
+        } catch (error) {
+          if (passivePlaceStatus) passivePlaceStatus.textContent = friendlyError(error);
+        } finally {
+          passivePlaceRetry.disabled = false;
+        }
+      });
+
+      passivePlaceExclusionButtons.forEach((button) => {
+        button.addEventListener("click", async () => {
+          try {
+            button.disabled = true;
+            await setCurrentLocationExclusion(button.dataset.placeExclusion);
+          } catch (error) {
+            if (passivePlaceStatus) passivePlaceStatus.textContent = friendlyError(error);
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+
+      passivePlaceClearExclusions?.addEventListener("click", async () => {
+        try {
+          passivePlaceClearExclusions.disabled = true;
+          await updatePassivePlaceSettings({ excludedLocations: [] });
+          if (passivePlaceStatus) passivePlaceStatus.textContent = "Private location exclusions cleared.";
+        } catch (error) {
+          if (passivePlaceStatus) passivePlaceStatus.textContent = friendlyError(error);
+        } finally {
+          passivePlaceClearExclusions.disabled = false;
+        }
+      });
+
       memorySearchButton.addEventListener("click", () => {
         const message = memorySearch.value.trim();
         if (!message) return;
@@ -10030,6 +10311,13 @@
       initMotionSystem();
       initCinematicAiEnhancements();
       updateFocusTimer();
+      window.addEventListener("pagehide", () => {
+        if (!currentUser || !passivePlaceSettings?.enabled || !navigator.sendBeacon) return;
+        navigator.sendBeacon(
+          "/api/passive-places/flush",
+          new Blob([JSON.stringify({ departureTime: new Date().toISOString() })], { type: "application/json" }),
+        );
+      });
       boot();
       setInterval(recoverBlankUiState, 3500);
     </script>

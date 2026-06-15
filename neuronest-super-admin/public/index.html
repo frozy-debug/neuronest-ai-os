@@ -1560,6 +1560,7 @@
         liveWs: null,
         selectedLiveUser: null,
         liveUserDetail: null,
+        placeAnalytics: null,
       };
 
       const navGroups = [
@@ -1581,6 +1582,7 @@
           title: "System Management",
           items: [
             { view: "ai-analytics", label: "AI & Usage Analytics", glyph: "AI" },
+            { view: "place-analytics", label: "Place Analytics", glyph: "PL" },
             { view: "database", label: "Database Explorer", glyph: "DB" },
             { view: "health", label: "System Health", glyph: "SH" },
             { view: "security", label: "Security Center", glyph: "SC" },
@@ -1860,6 +1862,7 @@
           activity: "User Activity",
           "live-monitor": "Live User Monitor",
           "ai-analytics": "AI Analytics",
+          "place-analytics": "Passive Place Analytics",
           database: "Database Explorer",
           health: "System Health",
           security: "Security Center",
@@ -1877,6 +1880,7 @@
         if (state.view === "announcements") return renderAnnouncementsView();
         if (state.view === "health") return renderHealthView();
         if (state.view === "ai-analytics" || state.view === "analytics") return renderAnalyticsView();
+        if (state.view === "place-analytics") return renderPlaceAnalyticsView();
         if (state.view === "activity" || state.view === "logs") return renderActivityView();
         if (state.view === "live-monitor") return renderLiveMonitorView();
         if (state.view === "export") return renderExportView();
@@ -2105,7 +2109,7 @@
 
       async function renderDatabaseView() {
         if (!state.database || state.database.collection !== state.collection) await loadCollection(state.collection);
-        const collections = ["users", "chats", "memories", "timeline", "voice", "places", "screenshots", "activityStream", "fileStorage", "liveMonitoring", "moderationHistory", "embeddings", "vectors", "announcements", "adminLogs"];
+        const collections = ["users", "chats", "memories", "timeline", "voice", "places", "place_memories", "screenshots", "activityStream", "fileStorage", "liveMonitoring", "moderationHistory", "embeddings", "vectors", "announcements", "adminLogs"];
         const columns = state.database?.columns || [];
         const rows = state.database?.rows || [];
         $("#content").innerHTML = `
@@ -2253,6 +2257,45 @@
               </div>
             </section>
           </div>`;
+        animateCounts();
+      }
+
+      async function renderPlaceAnalyticsView() {
+        try {
+          state.placeAnalytics = await api("/api/admin/analytics/places");
+        } catch (error) {
+          showToast(error.message);
+          state.placeAnalytics = {};
+        }
+        const data = state.placeAnalytics || {};
+        const metrics = [
+          { label: "Place Visits", value: data.totalVisits || 0, accent: "cyan", icon: "PV", trend: "Live", trendLabel: "real visits" },
+          { label: "Users With Visits", value: data.uniqueUsers || 0, accent: "purple", icon: "US", trend: "Live", trendLabel: "users" },
+          { label: "Minutes Captured", value: data.totalDurationMinutes || 0, accent: "blue", icon: "TM", trend: "Live", trendLabel: "dwell time" },
+          { label: "Metadata Coverage", value: data.metadataCoverage || 0, accent: "green", icon: "MC", trend: `${data.metadataCoverage || 0}%`, trendLabel: "Google resolved" },
+        ];
+        $("#content").innerHTML = `
+          ${metricCards(metrics)}
+          <div class="panel-grid">
+            <section class="glass">
+              <div class="panel-head"><div class="panel-title"><span class="nav-glyph">TL</span>Top Locations</div></div>
+              <div class="timeline-list">
+                ${(data.topLocations || []).map((item) => `<div class="timeline-item"><b>${escapeHtml(item.label)}</b><span>${formatNumber(item.count)} visits</span></div>`).join("") || `<div class="empty-state">No passive place visits yet.</div>`}
+              </div>
+            </section>
+            <section class="glass">
+              <div class="panel-head"><div class="panel-title"><span class="nav-glyph">CT</span>Location Categories</div></div>
+              <div class="timeline-list">
+                ${(data.categories || []).map((item) => `<div class="timeline-item"><b>${escapeHtml(item.label)}</b><span>${formatNumber(item.count)} visits</span></div>`).join("") || `<div class="empty-state">No category data yet.</div>`}
+              </div>
+            </section>
+          </div>
+          <section class="glass" style="margin-top:14px">
+            <div class="panel-head"><div class="panel-title"><span class="nav-glyph">MV</span>Recent Movement Activity</div><span class="pill">Average ${formatNumber(data.averageDurationMinutes || 0)} min</span></div>
+            <div class="timeline-list">
+              ${(data.recentVisits || []).map((visit) => `<div class="timeline-item"><b>${escapeHtml(visit.placeName || "Coordinate-only visit")}</b><span>${escapeHtml(visit.category || "Unknown category")} - ${formatNumber(visit.durationMinutes || 0)} min - ${escapeHtml(formatRelativeTime(visit.departureTime || visit.createdAt))}</span></div>`).join("") || `<div class="empty-state">No real movement records yet.</div>`}
+            </div>
+          </section>`;
         animateCounts();
       }
 

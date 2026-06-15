@@ -506,6 +506,7 @@ function buildMetrics(db) {
   const activeUsers = moderation.activeUsers;
   const memories = warehouse.memories.length;
   const places = warehouse.places.length;
+  const placeVisits = warehouse.placeMemories.length;
   const voice = warehouse.voiceNotes.length;
   const screenshots = warehouse.screenshots.length;
   const embeddings = countEmbeddings(db);
@@ -522,6 +523,7 @@ function buildMetrics(db) {
     { key: "memories", label: "Total Memories", value: memories || entries.length, accent: "purple", icon: "ME", trend: trendFrom(entries.filter((entry) => isToday(entry.createdAt)).length, entries.length), trendLabel: "from today" },
     { key: "chats", label: "AI Conversations", value: aiChats, accent: "cyan", icon: "AI", trend: trendFrom(chats.filter((chat) => isToday(chat.createdAt)).length, chats.length), trendLabel: "from today" },
     { key: "places", label: "Total Places", value: places, accent: "orange", icon: "PL", trend: trendFrom(places, Math.max(entries.length, 1)), trendLabel: "of memories" },
+    { key: "place-visits", label: "Automatic Place Visits", value: placeVisits, accent: "cyan", icon: "PV", trend: trendFrom(placeVisits, Math.max(places, 1)), trendLabel: "passively captured" },
     { key: "voice", label: "Voice Notes", value: voice, accent: "violet", icon: "VO", trend: trendFrom(voice, Math.max(entries.length, 1)), trendLabel: "of memories" },
     { key: "screenshots", label: "Screenshots", value: screenshots, accent: "pink", icon: "SC", trend: trendFrom(screenshots, Math.max(entries.length, 1)), trendLabel: "of memories" },
     { key: "embeddings", label: "Embeddings", value: embeddings, accent: "cyan", icon: "EM", trend: trendFrom(vectors, Math.max(embeddings, 1)), trendLabel: "vectorized" },
@@ -586,6 +588,36 @@ function buildLanguageBreakdown(db) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
     .map(([label, value]) => ({ label, value, percent: Math.round((value / total) * 1000) / 10 }));
+}
+
+function buildPlaceAnalytics(db) {
+  warehouseDb.normalizeWarehouse(db);
+  const visits = db.warehouse.placeMemories || [];
+  const countBy = (key) => {
+    const counts = new Map();
+    visits.forEach((visit) => {
+      const value = String(visit[key] || "Unknown").trim() || "Unknown";
+      counts.set(value, (counts.get(value) || 0) + 1);
+    });
+    return [...counts.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count);
+  };
+  const totalDurationMinutes = visits.reduce((sum, visit) => sum + Number(visit.durationMinutes || 0), 0);
+  const uniqueUsers = new Set(visits.map((visit) => visit.userId).filter(Boolean)).size;
+  const resolved = visits.filter((visit) => String(visit.metadataStatus || "").startsWith("resolved")).length;
+  return {
+    totalVisits: visits.length,
+    uniqueUsers,
+    totalDurationMinutes,
+    averageDurationMinutes: visits.length ? Math.round(totalDurationMinutes / visits.length) : 0,
+    metadataCoverage: visits.length ? Math.round((resolved / visits.length) * 100) : 0,
+    topLocations: countBy("placeName").slice(0, 12),
+    categories: countBy("category").slice(0, 12),
+    recentVisits: [...visits]
+      .sort((a, b) => asDate(b.departureTime || b.createdAt) - asDate(a.departureTime || a.createdAt))
+      .slice(0, 50),
+  };
 }
 
 function healthItem(name, ok, detail = "") {
@@ -912,6 +944,13 @@ function collectionRows(db, collection) {
       rows: allEntries(db)
         .filter((entry) => textForEntry(entry).includes("place"))
         .slice(0, maxRows),
+    };
+  }
+  if (collection === "place_memories" || collection === "placeMemories") {
+    const rows = adminSyncService.getWarehouseCollection(db, "placeMemories", maxRows);
+    return {
+      columns: ["userId", "placeName", "category", "arrivalTime", "departureTime", "durationMinutes", "metadataStatus"],
+      rows,
     };
   }
   if (collection === "embeddings" || collection === "vectors") {
@@ -1282,6 +1321,11 @@ async function handleApi(req, res, url) {
           predictionUsage: Object.values(db.learningProfiles || {}).length,
           voiceAssistantUsage: countEntriesBy(db, (entry) => textForEntry(entry).includes("voice")),
         });
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/admin/analytics/places") {
+        const { db } = safeReadDb();
+        return sendJson(res, 200, buildPlaceAnalytics(db));
       }
 
       const dbMatch = url.pathname.match(/^\/api\/admin\/database\/([^/]+)$/);
