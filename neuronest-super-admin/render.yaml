@@ -13,6 +13,10 @@ services:
         sync: false
       - key: SUPER_ADMIN_EMAILS
         sync: false
+      - key: ADMIN_EMAIL_LOGIN_ENABLED
+        value: "false"
+      - key: ADMIN_EMAIL_ACCESS_CODE
+        sync: false
       - key: NEURONEST_APP_URL
         sync: false
       - key: NEURONEST_DB_PATH

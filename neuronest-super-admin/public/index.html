@@ -232,6 +232,25 @@
         line-height: 1.6;
       }
 
+      .auth-divider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 16px 0;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .auth-divider::before,
+      .auth-divider::after {
+        content: "";
+        height: 1px;
+        flex: 1;
+        background: rgba(116, 146, 212, 0.18);
+      }
+
       .admin-shell {
         position: relative;
         z-index: 1;
@@ -1438,6 +1457,18 @@
         <h1>Super Admin Control Center</h1>
         <p>Monitor, manage, and protect your NeuroNest ecosystem from a separate secured admin application.</p>
         <div id="googleButton"></div>
+        <div id="emailLogin" class="hidden" style="margin-top: 14px">
+          <div class="auth-divider"><span>or use approved admin email</span></div>
+          <div class="field">
+            <label>Admin email</label>
+            <input id="adminEmail" type="email" autocomplete="username" placeholder="owner@gmail.com" />
+          </div>
+          <div class="field" style="margin-top: 10px">
+            <label>Admin access code</label>
+            <input id="adminAccessCode" type="password" autocomplete="current-password" placeholder="Enter private access code" />
+          </div>
+          <button id="emailLoginBtn" class="primary-btn" style="width: 100%; margin-top: 12px">Enter Admin Control Center</button>
+        </div>
         <div id="devLogin" class="hidden" style="margin-top: 14px">
           <div class="field">
             <label>Local dev admin email</label>
@@ -1641,6 +1672,11 @@
       async function init() {
         state.config = await api("/api/admin/config");
         setupGoogleLogin();
+        $("#emailLogin").classList.toggle("hidden", !state.config.allowEmailLogin);
+        $("#emailLoginBtn").addEventListener("click", emailLogin);
+        $("#adminAccessCode").addEventListener("keydown", (event) => {
+          if (event.key === "Enter") emailLogin();
+        });
         $("#devLogin").classList.toggle("hidden", !state.config.allowDevLogin);
         $("#devLoginBtn").addEventListener("click", devLogin);
         $("#globalSearch").addEventListener("input", debounce((event) => {
@@ -1704,6 +1740,31 @@
           await loadApp();
         } catch (error) {
           $("#authStatus").textContent = error.message;
+        }
+      }
+
+      async function emailLogin() {
+        const button = $("#emailLoginBtn");
+        try {
+          button.disabled = true;
+          button.textContent = "Verifying...";
+          $("#authStatus").textContent = "";
+          const payload = await api("/api/admin/auth/email", {
+            method: "POST",
+            body: JSON.stringify({
+              email: $("#adminEmail").value.trim(),
+              accessCode: $("#adminAccessCode").value,
+              name: "Super Admin",
+            }),
+          });
+          state.admin = payload.admin;
+          $("#adminAccessCode").value = "";
+          await loadApp();
+        } catch (error) {
+          $("#authStatus").textContent = error.message;
+        } finally {
+          button.disabled = false;
+          button.textContent = "Enter Admin Control Center";
         }
       }
 

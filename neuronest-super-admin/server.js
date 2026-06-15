@@ -32,6 +32,7 @@ const allowDevLogin =
   process.env.ALLOW_ADMIN_DEV_LOGIN === "true" &&
   process.env.NODE_ENV !== "production" &&
   !process.env.RENDER;
+const allowEmailLogin = process.env.ADMIN_EMAIL_LOGIN_ENABLED === "true" && Boolean(process.env.ADMIN_EMAIL_ACCESS_CODE);
 const sessions = new Map();
 const rateLimitBuckets = new Map();
 
@@ -90,6 +91,12 @@ function getSuperAdminEmails() {
 
 function isSuperAdminEmail(email) {
   return getSuperAdminEmails().has(String(email || "").trim().toLowerCase());
+}
+
+function isValidAdminAccessCode(value) {
+  const expected = Buffer.from(String(process.env.ADMIN_EMAIL_ACCESS_CODE || ""));
+  const received = Buffer.from(String(value || ""));
+  return expected.length > 0 && expected.length === received.length && crypto.timingSafeEqual(expected, received);
 }
 
 function readBody(req) {
@@ -1065,6 +1072,7 @@ async function handleApi(req, res, url) {
       googleClientId: getGoogleClientId(),
       adminConfigured: getSuperAdminEmails().size > 0,
       allowDevLogin,
+      allowEmailLogin,
       dashboardUrl: normalDashboardUrl,
     });
   }
@@ -1097,6 +1105,30 @@ async function handleApi(req, res, url) {
       const session = createSession({
         googleSub: "local-admin",
         email: body.email,
+        name: body.name || "Super Admin",
+        picture: "",
+      });
+      setAdminCookie(res, session.token);
+      return sendJson(res, 200, { admin: session.admin });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/admin/auth/email") {
+    try {
+      if (!allowEmailLogin) return sendJson(res, 403, { error: "Admin email login is not configured." });
+      if (isRateLimited(`admin-email-login:${ip}`, 8, 15 * 60_000)) {
+        return sendJson(res, 429, { error: "Too many email login attempts. Try again later." });
+      }
+      const body = await readBody(req);
+      if (!isSuperAdminEmail(body.email) || !isValidAdminAccessCode(body.accessCode)) {
+        return sendJson(res, 403, { error: "Invalid approved admin email or access code." });
+      }
+      const email = String(body.email).trim().toLowerCase();
+      const session = createSession({
+        googleSub: `email-admin:${email}`,
+        email,
         name: body.name || "Super Admin",
         picture: "",
       });
