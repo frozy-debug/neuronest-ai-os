@@ -1,16 +1,17 @@
+import { getGenerativeAiStatus, requestChatCompletion } from "./aiProviderService.js";
+
 export function openAiChatReady() {
-  return Boolean(process.env.OPENAI_API_KEY);
+  return getGenerativeAiStatus().aiReady;
 }
 
 export async function generateOpenAiIntelligenceReply({ message, language, memoryContext, intelligenceCore }) {
   if (!openAiChatReady()) {
-    const error = new Error("AI Chat requires OPENAI_API_KEY.");
+    const error = new Error("AI Chat requires GROQ_API_KEY or OPENAI_API_KEY.");
     error.code = "AI_PROVIDER_NOT_CONFIGURED";
     error.statusCode = 503;
     throw error;
   }
 
-  const model = process.env.OPENAI_CHAT_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini";
   const learningProfile = intelligenceCore?.learningProfile || memoryContext?.learningProfile || {};
   const learnedPreferences = learningProfile?.preferences || {};
   const system = [
@@ -62,14 +63,10 @@ export async function generateOpenAiIntelligenceReply({ message, language, memor
       content: String(item.content || "").slice(0, 1800),
     }));
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
+  const { data, provider } = await requestChatCompletion({
+      capability: "AI Chat",
+      kind: "chat",
+      body: {
         temperature: 0.55,
         messages: [
           { role: "system", content: system },
@@ -77,17 +74,9 @@ export async function generateOpenAiIntelligenceReply({ message, language, memor
           ...recentConversation,
           { role: "user", content: message },
         ],
-      }),
+      },
   });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(data.error?.message || "OpenAI chat request failed.");
-    error.code = "AI_PROVIDER_ERROR";
-    error.statusCode = response.status >= 500 ? 502 : response.status;
-    throw error;
-  }
   const reply = data.choices?.[0]?.message?.content?.trim();
-  if (!reply) throw new Error("OpenAI returned an empty chat response.");
+  if (!reply) throw new Error(`${provider} returned an empty chat response.`);
   return reply;
 }

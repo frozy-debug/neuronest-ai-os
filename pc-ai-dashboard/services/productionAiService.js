@@ -1,22 +1,13 @@
-function requireOpenAiKey(capability) {
-  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
-  if (!apiKey) {
-    const error = new Error(`${capability} requires OPENAI_API_KEY.`);
-    error.code = "AI_PROVIDER_NOT_CONFIGURED";
-    error.statusCode = 503;
-    throw error;
-  }
-  return apiKey;
-}
+import { getGenerativeAiStatus, requestChatCompletion, requestTranscription } from "./aiProviderService.js";
 
 function extractJson(text) {
   const raw = String(text || "").trim();
-  if (!raw) throw new Error("OpenAI returned an empty response.");
+  if (!raw) throw new Error("AI provider returned an empty response.");
   try {
     return JSON.parse(raw);
   } catch {
     const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("OpenAI returned an invalid structured response.");
+    if (!match) throw new Error("AI provider returned an invalid structured response.");
     return JSON.parse(match[0]);
   }
 }
@@ -42,9 +33,7 @@ function parseDataUrl(dataUrl, fallbackMimeType = "application/octet-stream") {
 
 export function getProductionAiStatus() {
   return {
-    openaiReady: Boolean(process.env.OPENAI_API_KEY),
-    visionModel: process.env.OPENAI_VISION_MODEL || "gpt-4.1-mini",
-    transcriptionModel: process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe",
+    ...getGenerativeAiStatus(),
     localAiFallbackAllowed: process.env.ALLOW_LOCAL_AI_FALLBACK === "true",
   };
 }
@@ -55,7 +44,6 @@ export async function analyzeScreenshotWithOpenAi({
   fileName = "",
   mimeType = "image/png",
 }) {
-  const apiKey = requireOpenAiKey("Screenshot AI");
   if (!String(imageData || "").trim()) {
     const error = new Error("Screenshot AI requires imageData.");
     error.code = "IMAGE_REQUIRED";
@@ -63,14 +51,10 @@ export async function analyzeScreenshotWithOpenAi({
     throw error;
   }
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_VISION_MODEL || "gpt-4.1-mini",
+  const { data, provider, model } = await requestChatCompletion({
+    capability: "Screenshot AI",
+    kind: "vision",
+    body: {
       response_format: { type: "json_object" },
       temperature: 0.2,
       messages: [
@@ -97,21 +81,13 @@ export async function analyzeScreenshotWithOpenAi({
           ],
         },
       ],
-    }),
+    },
   });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(data.error?.message || "OpenAI screenshot analysis failed.");
-    error.code = "AI_PROVIDER_ERROR";
-    error.statusCode = response.status >= 500 ? 502 : response.status;
-    throw error;
-  }
 
   const result = extractJson(data.choices?.[0]?.message?.content);
   return {
-    provider: "openai",
-    model: data.model || process.env.OPENAI_VISION_MODEL || "gpt-4.1-mini",
+    provider,
+    model,
     title: String(result.title || `Screenshot memory: ${fileName || "image"}`).slice(0, 120),
     description: String(result.description || result.summary || "").slice(0, 1200),
     summary: String(result.summary || result.description || "").slice(0, 500),
@@ -131,7 +107,6 @@ export async function transcribeAudioWithOpenAi({
   mimeType = "audio/webm",
   language = "",
 }) {
-  const apiKey = requireOpenAiKey("Voice transcription");
   if (!String(audioData || "").trim()) {
     const error = new Error("Voice transcription requires audioData.");
     error.code = "AUDIO_REQUIRED";
@@ -141,42 +116,25 @@ export async function transcribeAudioWithOpenAi({
 
   const parsed = parseDataUrl(audioData, mimeType);
   const form = new FormData();
-  form.append("model", process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe");
   form.append("file", new Blob([parsed.bytes], { type: parsed.mimeType }), fileName || "voice-note.webm");
   if (language) form.append("language", language);
 
-  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(data.error?.message || "OpenAI voice transcription failed.");
-    error.code = "AI_PROVIDER_ERROR";
-    error.statusCode = response.status >= 500 ? 502 : response.status;
-    throw error;
-  }
+  const { data, provider, model } = await requestTranscription({ capability: "Voice transcription", form });
 
   const transcript = String(data.text || "").trim();
-  if (!transcript) throw new Error("OpenAI returned an empty voice transcript.");
+  if (!transcript) throw new Error(`${provider} returned an empty voice transcript.`);
   return {
-    provider: "openai",
-    model: process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe",
+    provider,
+    model,
     transcript,
   };
 }
 
 export async function analyzeVoiceTranscriptWithOpenAi({ transcript, title = "Voice note" }) {
-  const apiKey = requireOpenAiKey("Voice memory analysis");
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_TEXT_MODEL || "gpt-4.1-mini",
+  const { data, provider, model } = await requestChatCompletion({
+    capability: "Voice memory analysis",
+    kind: "text",
+    body: {
       response_format: { type: "json_object" },
       temperature: 0.2,
       messages: [
@@ -187,19 +145,12 @@ export async function analyzeVoiceTranscriptWithOpenAi({ transcript, title = "Vo
         },
         { role: "user", content: `Title: ${title}\nTranscript:\n${String(transcript || "").slice(0, 12000)}` },
       ],
-    }),
+    },
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(data.error?.message || "OpenAI voice analysis failed.");
-    error.code = "AI_PROVIDER_ERROR";
-    error.statusCode = response.status >= 500 ? 502 : response.status;
-    throw error;
-  }
   const result = extractJson(data.choices?.[0]?.message?.content);
   return {
-    provider: "openai",
-    model: data.model || process.env.OPENAI_TEXT_MODEL || "gpt-4.1-mini",
+    provider,
+    model,
     title: String(title || "Voice note").slice(0, 120),
     summary: String(result.summary || transcript || "").slice(0, 500),
     tone: String(result.tone || "neutral").slice(0, 80),
@@ -213,8 +164,8 @@ export async function analyzeVoiceTranscriptWithOpenAi({ transcript, title = "Vo
       tone: String(result.tone || "neutral").slice(0, 80),
       sentimentScore: Math.max(0, Math.min(100, Number(result.sentimentScore || 50))),
       topics: normalizeStringList(result.topics, 12),
-      aiProvider: "openai",
-      aiModel: data.model || process.env.OPENAI_TEXT_MODEL || "gpt-4.1-mini",
+      aiProvider: provider,
+      aiModel: model,
     },
   };
 }

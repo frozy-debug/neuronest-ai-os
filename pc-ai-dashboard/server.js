@@ -1393,7 +1393,14 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/health") {
-    return sendJson(res, 200, { ok: true, intelligence: getVectorStatus(), warehouse: adminSyncService.buildSyncSnapshot(readDb()) });
+    return sendJson(res, 200, {
+      ok: true,
+      intelligence: {
+        embeddings: getVectorStatus(),
+        generation: getProductionAiStatus(),
+      },
+      warehouse: adminSyncService.buildSyncSnapshot(readDb()),
+    });
   }
 
   const fileRoute = url.pathname.match(/^\/api\/files\/([^/]+)\/([^/]+)$/);
@@ -2049,8 +2056,8 @@ async function handleApi(req, res, url) {
 
     if (!message) return sendJson(res, 400, { error: "Message is required." });
     if (message.length > 1000) return sendJson(res, 400, { error: "Message is too long." });
-    if (!getProductionAiStatus().openaiReady) {
-      return sendJson(res, 503, { error: "AI Chat requires OPENAI_API_KEY.", code: "AI_PROVIDER_NOT_CONFIGURED" });
+    if (!getProductionAiStatus().aiReady) {
+      return sendJson(res, 503, { error: "AI Chat requires GROQ_API_KEY or OPENAI_API_KEY.", code: "AI_PROVIDER_NOT_CONFIGURED" });
     }
 
     const userMessage = saveChatMessage(session.user.id, "user", message);
@@ -2060,7 +2067,7 @@ async function handleApi(req, res, url) {
       semanticMatches = await searchMemoryVectors({ userId: session.user.id, query: message, memories, limit: 5 });
     } catch (error) {
       recordAiUsage(session.user.id, "semantic-search", "failed", { error: error.message, context: "ai-chat" });
-      return sendJson(res, error.statusCode || 503, { error: error.message, code: error.code || "SEMANTIC_CONTEXT_UNAVAILABLE" });
+      semanticMatches = [];
     }
     const relationships = detectRelationships(memories);
     const timeline = buildTimeline({ memories, relationships, limit: 80 });
@@ -2099,9 +2106,9 @@ async function handleApi(req, res, url) {
     const decisionRecommendation = isDecisionQuestion(message)
       ? buildDecisionRecommendation({ question: message, twin: digitalTwin, memories, relationships })
       : null;
-    let openAiReply;
+    let providerReply;
     try {
-      openAiReply = await generateOpenAiIntelligenceReply({
+      providerReply = await generateOpenAiIntelligenceReply({
       message,
       language: intelligenceCore.language,
       memoryContext: {
@@ -2152,7 +2159,7 @@ async function handleApi(req, res, url) {
       recordAiUsage(session.user.id, "ai-chat", "failed", { error: error.message });
       return sendJson(res, error.statusCode || 502, { error: error.message, code: error.code || "AI_CHAT_FAILED" });
     }
-    const contextualReply = openAiReply;
+    const contextualReply = providerReply;
     const decisionLine = "";
     const reply =
       semanticMatches.length && fusedContext.summary
@@ -2174,7 +2181,8 @@ async function handleApi(req, res, url) {
       }
     }
     recordAiUsage(session.user.id, "ai-chat", "completed", {
-      model: process.env.OPENAI_CHAT_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini",
+      provider: getProductionAiStatus().provider,
+      model: getProductionAiStatus().chatModel,
       semanticMatchCount: semanticMatches.length,
     });
 

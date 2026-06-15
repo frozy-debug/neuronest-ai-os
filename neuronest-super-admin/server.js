@@ -596,10 +596,10 @@ function buildSystemHealth(dbError = null) {
   return [
     healthItem("Server", true, "Admin API online"),
     healthItem("Database", !dbError, dbError ? dbError.message : "Shared data source readable"),
-    healthItem("OpenAI API", Boolean(process.env.OPENAI_API_KEY), process.env.OPENAI_API_KEY ? "Key configured" : "OPENAI_API_KEY missing"),
+    healthItem("Generative AI", Boolean(process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY), process.env.GROQ_API_KEY ? "Groq configured" : process.env.OPENAI_API_KEY ? "OpenAI configured" : "GROQ_API_KEY or OPENAI_API_KEY missing"),
     healthItem("Google Auth", Boolean(getGoogleClientId()), getGoogleClientId() ? "OAuth client configured" : "GOOGLE_CLIENT_ID missing"),
     healthItem("Maps Service", Boolean(process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAP_API_KEY), "Google Maps key indicator"),
-    healthItem("Embedding Service", Boolean(process.env.OPENAI_API_KEY), "Uses OpenAI embeddings"),
+    healthItem("Embedding Service", Boolean(process.env.OPENAI_API_KEY), process.env.OPENAI_API_KEY ? "Uses OpenAI embeddings" : "Optional OpenAI embeddings not configured"),
     healthItem("Vector DB", Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY), process.env.SUPABASE_URL ? "Supabase configured" : `${vectors} warehouse vector records; external vector DB not configured`),
   ];
 }

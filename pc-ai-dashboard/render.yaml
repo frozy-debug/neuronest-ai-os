@@ -17,6 +17,18 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: AI_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_CHAT_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_TEXT_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_VISION_MODEL
+        value: meta-llama/llama-4-scout-17b-16e-instruct
+      - key: GROQ_TRANSCRIPTION_MODEL
+        value: whisper-large-v3-turbo
       - key: OPENAI_EMBEDDING_MODEL
         value: text-embedding-3-small
       - key: SUPABASE_URL
