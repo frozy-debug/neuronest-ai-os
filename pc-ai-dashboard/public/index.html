@@ -2957,6 +2957,138 @@
         filter: drop-shadow(0 0 12px rgba(124, 58, 237, 0.8));
       }
 
+      .relationship-intelligence-panel {
+        position: relative;
+        overflow: hidden;
+        border-color: rgba(36, 198, 255, 0.26);
+        background:
+          radial-gradient(circle at 18% 12%, rgba(36, 198, 255, 0.13), transparent 30%),
+          radial-gradient(circle at 84% 16%, rgba(124, 58, 237, 0.16), transparent 30%),
+          linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(5, 7, 17, 0.82));
+      }
+
+      .relationship-metric-grid,
+      .relationship-dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .relationship-dashboard-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      .relationship-metric,
+      .relationship-person-card,
+      .relationship-insight-card,
+      .relationship-timeline-card {
+        position: relative;
+        overflow: hidden;
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        background: rgba(5, 10, 24, 0.72);
+        box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+      }
+
+      .relationship-metric::before,
+      .relationship-person-card::before,
+      .relationship-insight-card::before,
+      .relationship-timeline-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(120deg, transparent, rgba(36, 198, 255, 0.1), transparent);
+        opacity: 0.72;
+      }
+
+      .relationship-metric > *,
+      .relationship-person-card > *,
+      .relationship-insight-card > *,
+      .relationship-timeline-card > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .relationship-metric strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 24px;
+      }
+
+      .relationship-metric span,
+      .relationship-person-card span,
+      .relationship-insight-card span,
+      .relationship-timeline-card span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .relationship-people-list,
+      .relationship-insight-list,
+      .relationship-reconnect-list,
+      .relationship-timeline-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .relationship-person-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .relationship-person-card h3,
+      .relationship-insight-card h3,
+      .relationship-timeline-card h3 {
+        margin: 0 0 6px;
+        font-size: 15px;
+      }
+
+      .relationship-strength-ring {
+        width: 58px;
+        height: 58px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        color: #fff;
+        font-weight: 800;
+        background:
+          radial-gradient(circle at center, rgba(5, 10, 24, 0.95) 0 54%, transparent 56%),
+          conic-gradient(var(--blue) calc(var(--score) * 1%), rgba(148, 163, 184, 0.16) 0);
+        box-shadow: 0 0 24px rgba(36, 198, 255, 0.18);
+      }
+
+      .relationship-tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 8px;
+      }
+
+      .relationship-tag-row b {
+        padding: 5px 9px;
+        border-radius: 999px;
+        background: rgba(36, 198, 255, 0.09);
+        border: 1px solid rgba(36, 198, 255, 0.16);
+        color: #dbeafe;
+        font-size: 11px;
+      }
+
+      .relationship-intelligence-canvas svg {
+        min-height: 320px;
+      }
+
+      .relationship-empty {
+        padding: 16px;
+        border-radius: 14px;
+        color: var(--muted);
+        border: 1px dashed rgba(148, 163, 184, 0.18);
+        background: rgba(5, 10, 24, 0.42);
+      }
+
       .autonomous-capture-panel {
         border-color: rgba(34, 211, 238, 0.24);
         background:
@@ -3752,7 +3884,9 @@
         .capture-feed,
         .resurfacing-grid,
         .digital-twin-grid,
-        .twin-map-grid {
+        .twin-map-grid,
+        .relationship-metric-grid,
+        .relationship-dashboard-grid {
           grid-template-columns: 1fr;
         }
 
@@ -4127,6 +4261,7 @@
           <button data-view="ai-chat" type="button">AI Chat</button>
           <button data-view="ai-systems" type="button">AI Systems</button>
           <button data-view="digital-twin" type="button">Digital Twin</button>
+          <button data-view="relationships" type="button">Relationships</button>
           <button data-view="mission-control" type="button">Mission Control</button>
           <button data-view="place-hunter" type="button">Place hunter</button>
           <button data-view="timeline" type="button">Timeline</button>
@@ -4557,6 +4692,70 @@
               <span class="muted">Living user model</span>
             </div>
             <div id="digital-twin-feed" class="twin-feed"></div>
+          </section>
+        </div>
+
+        <div class="view" data-view-panel="relationships">
+          <section class="panel hero relationship-intelligence-panel">
+            <div class="section-title">
+              <div>
+                <h2>Relationship Intelligence</h2>
+                <span id="relationship-status" class="muted">Evidence-backed people graph</span>
+              </div>
+              <button id="relationship-rebuild-button" class="chip" type="button">Rebuild Graph</button>
+            </div>
+            <p class="ai-system-status">NeuroNest only creates people relationships from stored memories, chats, places, screenshots, voice transcripts, and timeline evidence.</p>
+            <div id="relationship-overview" class="relationship-metric-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title">
+                  <h2>Top People</h2>
+                  <span class="muted">Strength, mood, recency</span>
+                </div>
+                <div id="relationship-top-people" class="relationship-people-list"></div>
+              </article>
+
+              <article class="ai-system-card">
+                <div class="section-title">
+                  <h2>Social Graph</h2>
+                  <span class="muted">Shared evidence clusters</span>
+                </div>
+                <div class="relationship-canvas relationship-intelligence-canvas">
+                  <svg id="relationship-people-graph" viewBox="0 0 620 320" role="img" aria-label="People relationship graph"></svg>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title">
+                  <h2>AI Insights</h2>
+                  <span class="muted">Evidence required</span>
+                </div>
+                <div id="relationship-insights-list" class="relationship-insight-list"></div>
+              </article>
+
+              <article class="ai-system-card">
+                <div class="section-title">
+                  <h2>Reconnect Suggestions</h2>
+                  <span class="muted">Silence detection</span>
+                </div>
+                <div id="relationship-reconnect-list" class="relationship-reconnect-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Relationship Timeline</h2>
+              <span class="muted">First seen, milestones, silence, reconnections</span>
+            </div>
+            <div id="relationship-timeline-list" class="relationship-timeline-list"></div>
           </section>
         </div>
 
@@ -5169,6 +5368,14 @@
       const memoryResurfacingClusters = document.getElementById("memory-resurfacing-clusters");
       const memoryResurfacingRefresh = document.getElementById("memory-resurfacing-refresh");
       const relationshipGraphElement = document.getElementById("relationship-graph");
+      const relationshipStatus = document.getElementById("relationship-status");
+      const relationshipRebuildButton = document.getElementById("relationship-rebuild-button");
+      const relationshipOverview = document.getElementById("relationship-overview");
+      const relationshipTopPeople = document.getElementById("relationship-top-people");
+      const relationshipPeopleGraph = document.getElementById("relationship-people-graph");
+      const relationshipInsightsList = document.getElementById("relationship-insights-list");
+      const relationshipReconnectList = document.getElementById("relationship-reconnect-list");
+      const relationshipTimelineList = document.getElementById("relationship-timeline-list");
       const memoryScoreGrid = document.getElementById("memory-score-grid");
       const dnaProfileName = document.getElementById("dna-profile-name");
       const dnaHelix = document.getElementById("dna-helix");
@@ -5235,6 +5442,7 @@
         "place-hunter": "Place Hunter",
         voice: "Voice Assistant",
         "digital-twin": "Digital Twin",
+        relationships: "Relationship Intelligence",
         "ai-systems": "AI Systems",
         "mission-control": "Mission Control",
         map: "Map View",
@@ -5330,6 +5538,7 @@
       let notificationsStarted = false;
       let profileIdentityLoaded = false;
       let digitalTwinLoaded = false;
+      let relationshipDashboardLoaded = false;
       let lifeOsLoaded = false;
       let autonomousCaptureEnabled = localStorage.getItem("neuronest.passiveCapture") !== "false";
       let autonomousCaptureReady = false;
@@ -6970,6 +7179,11 @@
           void reportLiveAction("DIGITAL_TWIN", { page: "digital-twin", label: "Digital Twin" });
         }
 
+        if (viewName === "relationships") {
+          void loadRelationshipDashboard();
+          void reportLiveAction("RELATIONSHIP_INTELLIGENCE", { page: "relationships", label: "Relationship Intelligence" });
+        }
+
         if (viewName === "mission-control") {
           void loadLifeOs();
         }
@@ -7095,12 +7309,14 @@
         await api(`/api/entries/${encodeURIComponent(entryId)}`, { method: "DELETE" });
         await loadEntries();
         aiSystemsLoaded = false;
+        relationshipDashboardLoaded = false;
       }
 
       async function restoreEntry(entryId) {
         await api(`/api/entries/${encodeURIComponent(entryId)}/restore`, { method: "POST" });
         await loadEntries();
         aiSystemsLoaded = false;
+        relationshipDashboardLoaded = false;
       }
 
       function renderTimelineFilters() {
@@ -7670,6 +7886,246 @@
         });
       }
 
+      function relationshipEmpty(title, body) {
+        const empty = document.createElement("div");
+        empty.className = "relationship-empty";
+        const strong = document.createElement("strong");
+        strong.textContent = title;
+        const text = document.createElement("p");
+        text.textContent = body;
+        empty.append(strong, text);
+        return empty;
+      }
+
+      function formatRelationshipDate(value) {
+        if (!value) return "No timestamp";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "No timestamp";
+        return date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+      }
+
+      function renderRelationshipOverview(overview = {}) {
+        if (!relationshipOverview) return;
+        const metrics = [
+          ["Total Relationships", overview.totalRelationships || 0, "Evidence-backed people"],
+          ["Core Relationships", overview.coreRelationships || 0, "Strength 80+"],
+          ["Reconnect Candidates", overview.reconnectCandidates || 0, "Important people going quiet"],
+          ["Average Strength", `${overview.averageStrength || 0}%`, "Across detected people"],
+        ];
+        relationshipOverview.innerHTML = "";
+        metrics.forEach(([label, value, body]) => {
+          const card = document.createElement("article");
+          card.className = "relationship-metric";
+          const small = document.createElement("span");
+          small.textContent = label;
+          const strong = document.createElement("strong");
+          strong.textContent = value;
+          const desc = document.createElement("span");
+          desc.textContent = body;
+          card.append(small, strong, desc);
+          relationshipOverview.appendChild(card);
+        });
+      }
+
+      function renderRelationshipPeople(relationships = []) {
+        if (!relationshipTopPeople) return;
+        relationshipTopPeople.innerHTML = "";
+        if (!relationships.length) {
+          relationshipTopPeople.appendChild(relationshipEmpty("No people evidence yet", "Add memories like lunch with Alex, called Sarah, or worked with Priya to build the graph."));
+          return;
+        }
+        relationships.slice(0, 8).forEach((person) => {
+          const card = document.createElement("article");
+          card.className = "relationship-person-card";
+          const copy = document.createElement("div");
+          const title = document.createElement("h3");
+          title.textContent = person.personName || "Unknown person";
+          const meta = document.createElement("span");
+          meta.textContent = `${person.relationshipType || "Unknown"} | ${person.relationshipHealth || "Unknown"} | Last ${formatRelationshipDate(person.lastSeen)}`;
+          const tags = document.createElement("div");
+          tags.className = "relationship-tag-row";
+          ["relationshipStatus", "emotionalImpact", "interactionFrequency"].forEach((key) => {
+            if (!person[key]) return;
+            const tag = document.createElement("b");
+            tag.textContent = person[key];
+            tags.appendChild(tag);
+          });
+          copy.append(title, meta, tags);
+          const ring = document.createElement("div");
+          ring.className = "relationship-strength-ring";
+          ring.style.setProperty("--score", Math.max(0, Math.min(100, person.relationshipStrength || 0)));
+          ring.textContent = person.relationshipStrength || 0;
+          card.append(copy, ring);
+          relationshipTopPeople.appendChild(card);
+        });
+      }
+
+      function renderPeopleGraph(graph = {}) {
+        if (!relationshipPeopleGraph) return;
+        const svgNamespace = "http://www.w3.org/2000/svg";
+        const nodes = graph.nodes || [];
+        const edges = graph.edges || [];
+        relationshipPeopleGraph.innerHTML = "";
+        if (!nodes.length) {
+          const text = document.createElementNS(svgNamespace, "text");
+          text.setAttribute("x", "310");
+          text.setAttribute("y", "160");
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("class", "relationship-label");
+          text.textContent = "No relationship graph yet";
+          relationshipPeopleGraph.appendChild(text);
+          return;
+        }
+
+        edges.forEach((edge, index) => {
+          const source = nodes.find((node) => node.id === edge.source);
+          const target = nodes.find((node) => node.id === edge.target);
+          if (!source || !target) return;
+          const line = document.createElementNS(svgNamespace, "line");
+          line.setAttribute("x1", source.x);
+          line.setAttribute("y1", source.y);
+          line.setAttribute("x2", target.x);
+          line.setAttribute("y2", target.y);
+          line.setAttribute("class", "relationship-link");
+          line.style.opacity = Math.max(0.18, Math.min(0.75, (edge.strength || 40) / 100));
+          line.style.animationDelay = `${index * -0.2}s`;
+          relationshipPeopleGraph.appendChild(line);
+        });
+
+        nodes.forEach((node, index) => {
+          const pulse = document.createElementNS(svgNamespace, "circle");
+          pulse.setAttribute("cx", node.x);
+          pulse.setAttribute("cy", node.y);
+          pulse.setAttribute("r", 18 + Math.round((node.strength || 0) / 12));
+          pulse.setAttribute("class", "relationship-pulse");
+          pulse.setAttribute("opacity", "0.12");
+
+          const circle = document.createElementNS(svgNamespace, "circle");
+          circle.setAttribute("cx", node.x);
+          circle.setAttribute("cy", node.y);
+          circle.setAttribute("r", 12 + Math.round((node.strength || 0) / 18));
+          circle.setAttribute("class", "relationship-node");
+          circle.style.fill = ["#24c6ff", "#7c3aed", "#22c55e", "#f59e0b", "#ec4899"][index % 5];
+
+          const label = document.createElementNS(svgNamespace, "text");
+          label.setAttribute("x", node.x);
+          label.setAttribute("y", node.y + 36);
+          label.setAttribute("class", "relationship-label");
+          label.textContent = String(node.label || "Person").length > 15 ? `${String(node.label).slice(0, 15)}...` : node.label;
+          relationshipPeopleGraph.append(pulse, circle, label);
+        });
+      }
+
+      function renderRelationshipInsights(insights = []) {
+        if (!relationshipInsightsList) return;
+        relationshipInsightsList.innerHTML = "";
+        if (!insights.length) {
+          relationshipInsightsList.appendChild(relationshipEmpty("No insights yet", "Insights appear only when repeated, sentiment-backed, or productivity-backed evidence exists."));
+          return;
+        }
+        insights.slice(0, 8).forEach((insight) => {
+          const card = document.createElement("article");
+          card.className = "relationship-insight-card";
+          const title = document.createElement("h3");
+          title.textContent = insight.insightType || "Relationship insight";
+          const body = document.createElement("p");
+          body.textContent = insight.insightText || "";
+          const meta = document.createElement("span");
+          meta.textContent = `${insight.confidence || 0}% confidence | ${Array.isArray(insight.evidence) ? insight.evidence.length : 0} evidence signals`;
+          card.append(title, body, meta);
+          relationshipInsightsList.appendChild(card);
+        });
+      }
+
+      function renderRelationshipReconnect(reconnect = []) {
+        if (!relationshipReconnectList) return;
+        relationshipReconnectList.innerHTML = "";
+        if (!reconnect.length) {
+          relationshipReconnectList.appendChild(relationshipEmpty("No reconnect candidates", "NeuroNest will surface important people only after enough silence and relationship strength evidence."));
+          return;
+        }
+        reconnect.slice(0, 8).forEach((item) => {
+          const card = document.createElement("article");
+          card.className = "relationship-insight-card";
+          const title = document.createElement("h3");
+          title.textContent = item.personName || "Reconnect";
+          const body = document.createElement("p");
+          body.textContent = item.reason || "This relationship may be worth revisiting.";
+          const meta = document.createElement("span");
+          meta.textContent = `${item.daysSinceInteraction || 0} days silent | ${item.reconnectScore || 0}% reconnect score`;
+          card.append(title, body, meta);
+          relationshipReconnectList.appendChild(card);
+        });
+      }
+
+      function renderRelationshipTimeline(relationships = []) {
+        if (!relationshipTimelineList) return;
+        relationshipTimelineList.innerHTML = "";
+        const items = relationships
+          .slice(0, 8)
+          .flatMap((person) => [
+            { title: `${person.personName} first appeared`, body: person.relationshipType || "Relationship detected", time: person.firstSeen },
+            { title: `${person.personName} latest signal`, body: `${person.interactionCount || 0} total interaction signals`, time: person.lastSeen },
+          ])
+          .filter((item) => item.time)
+          .sort((a, b) => new Date(b.time) - new Date(a.time))
+          .slice(0, 10);
+        if (!items.length) {
+          relationshipTimelineList.appendChild(relationshipEmpty("No relationship timeline yet", "Timeline milestones will appear after relationship evidence is created."));
+          return;
+        }
+        items.forEach((item) => {
+          const card = document.createElement("article");
+          card.className = "relationship-timeline-card";
+          const title = document.createElement("h3");
+          title.textContent = item.title;
+          const body = document.createElement("p");
+          body.textContent = item.body;
+          const time = document.createElement("span");
+          time.textContent = formatRelationshipDate(item.time);
+          card.append(title, body, time);
+          relationshipTimelineList.appendChild(card);
+        });
+      }
+
+      function renderRelationshipDashboard(data = {}) {
+        const relationships = data.relationships || [];
+        const overview = data.overview || {};
+        if (relationshipStatus) relationshipStatus.textContent = relationships.length ? `${relationships.length} evidence-backed people` : "No relationship evidence yet";
+        renderRelationshipOverview(overview);
+        renderRelationshipPeople(data.topPeople?.length ? data.topPeople : relationships);
+        renderPeopleGraph(data.graph || {});
+        renderRelationshipInsights(data.insights || []);
+        renderRelationshipReconnect(data.reconnect || []);
+        renderRelationshipTimeline(relationships);
+        [relationshipOverview, relationshipTopPeople, relationshipInsightsList, relationshipReconnectList, relationshipTimelineList].forEach((element) => {
+          if (element) {
+            installCardLighting(element);
+            animateContainerItems(element);
+          }
+        });
+      }
+
+      async function loadRelationshipDashboard({ force = false } = {}) {
+        if (!currentUser || (relationshipDashboardLoaded && !force)) return;
+        relationshipDashboardLoaded = true;
+        if (relationshipStatus) relationshipStatus.textContent = force ? "Rebuilding relationship intelligence..." : "Loading relationship intelligence...";
+        try {
+          const data = force
+            ? await api("/api/relationships/rebuild", { method: "POST", body: JSON.stringify({}) })
+            : await api("/api/relationships");
+          renderRelationshipDashboard(data);
+        } catch (error) {
+          relationshipDashboardLoaded = false;
+          if (relationshipStatus) relationshipStatus.textContent = "Relationship engine unavailable";
+          [relationshipTopPeople, relationshipInsightsList, relationshipReconnectList].forEach((element) => {
+            if (!element) return;
+            element.innerHTML = "";
+            element.appendChild(relationshipEmpty("Could not load relationships", error.message || "Try again after the server is ready."));
+          });
+        }
+      }
+
       function renderMemoryScores(scoresFromApi = null) {
         if (!memoryScoreGrid) return;
         const scores = scoresFromApi?.length ? scoresFromApi : [
@@ -7968,6 +8424,7 @@
           if (data.captured) {
             if (!options.silent) showAiNotification("Autonomous memory captured", data.message);
             aiSystemsLoaded = false;
+            relationshipDashboardLoaded = false;
             profileIdentityLoaded = false;
             await loadEntries();
             void loadAutonomousCaptureDashboard();
@@ -8617,6 +9074,10 @@
         digitalTwinRefresh?.addEventListener("click", () => {
           digitalTwinLoaded = false;
           void loadDigitalTwin({ force: true });
+        });
+        relationshipRebuildButton?.addEventListener("click", () => {
+          relationshipDashboardLoaded = false;
+          void loadRelationshipDashboard({ force: true });
         });
         snapshotCameraButton?.addEventListener("click", () => screenshotMemoryInput?.click());
         userPicture?.addEventListener("click", (event) => {
@@ -9664,6 +10125,7 @@
 
           speakText(reply, detectVoiceLanguage(reply) || voiceAssistantState.lastLanguage);
           aiSystemsLoaded = false;
+          relationshipDashboardLoaded = false;
           profileIdentityLoaded = false;
           digitalTwinLoaded = false;
           return reply;
@@ -9855,6 +10317,7 @@
               });
               await loadEntries();
               aiSystemsLoaded = false;
+              relationshipDashboardLoaded = false;
               await loadAiSystems();
             }
           }
@@ -9929,6 +10392,7 @@
           showAiNotification("Snapshot memory saved", "OCR, classification, tags, and related memory links were generated.");
           await loadEntries();
           aiSystemsLoaded = false;
+          relationshipDashboardLoaded = false;
         } finally {
           hideSnapshotOverlay();
         }
@@ -10016,6 +10480,7 @@
         presenceSessionId = null;
         currentUser = null;
         aiSystemsLoaded = false;
+        relationshipDashboardLoaded = false;
         profileIdentityLoaded = false;
         closeProfileIdentity();
         renderMessages([]);
@@ -10200,6 +10665,7 @@
             form.reset();
             await loadEntries();
             aiSystemsLoaded = false;
+            relationshipDashboardLoaded = false;
             lifeOsLoaded = false;
           } catch (error) {
             alert(friendlyError(error));

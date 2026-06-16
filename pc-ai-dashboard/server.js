@@ -33,6 +33,12 @@ import { buildLifeOsMissionControl, normalizeGoal } from "./services/lifeOsServi
 import { extractLearningFeatures, rebuildLearningProfile, summarizeLearningProfile, updateLearningProfile } from "./services/learningEngineService.js";
 import { detectLanguage } from "./services/languageIntelligenceService.js";
 import {
+  answerRelationshipQuery,
+  buildRelationshipIntelligence,
+  buildRelationshipTimeline,
+  findRelationshipById,
+} from "./services/relationshipIntelligenceService.js";
+import {
   buildAutomaticPlaceMemoryPayload,
   downloadGooglePlacePhoto,
   finalizePassivePlaceState,
@@ -150,6 +156,41 @@ function persistIntelligenceRecord(userId, collection, record) {
     void productionStore.upsertIntelligence(userId, collection, saved).catch(() => {});
   }
   return saved;
+}
+
+function persistRelationshipIntelligenceSnapshot(userId, snapshot, trigger = "rebuild") {
+  const db = readDb();
+  warehouseDb.normalizeWarehouse(db);
+  const filterOut = (list) => list.filter((item) => item.userId !== userId);
+  db.warehouse.relationshipProfiles = [
+    ...snapshot.relationships.map((item) => ({ ...item, trigger })),
+    ...filterOut(db.warehouse.relationshipProfiles),
+  ].slice(0, 10_000);
+  db.warehouse.relationshipEvents = [
+    ...snapshot.events.map((item) => ({ ...item, trigger })),
+    ...filterOut(db.warehouse.relationshipEvents),
+  ].slice(0, 20_000);
+  db.warehouse.relationshipInsights = [
+    ...snapshot.insights.map((item) => ({ ...item, trigger })),
+    ...filterOut(db.warehouse.relationshipInsights),
+  ].slice(0, 10_000);
+  db.warehouse.relationshipClusters = [
+    ...snapshot.clusters.map((item) => ({ ...item, trigger })),
+    ...filterOut(db.warehouse.relationshipClusters),
+  ].slice(0, 5_000);
+  adminSyncService.syncIntelligenceRecord(db, "insights", userId, {
+    id: `relationship-intelligence_${userId}`,
+    type: "relationship-intelligence",
+    trigger,
+    insights: snapshot.insights.slice(0, 12),
+    evidenceMemoryCount: snapshot.events.length,
+    relationshipCount: snapshot.relationships.length,
+  });
+  writeDb(db);
+  if (productionStore.ready()) {
+    void productionStore.replaceRelationshipIntelligence(userId, snapshot).catch(() => {});
+  }
+  return snapshot;
 }
 
 function recordAiUsage(userId, capability, status = "completed", metadata = {}) {
@@ -814,6 +855,17 @@ async function buildResurfacingResponse(userId, context = {}) {
   return buildMemoryResurfacingFeed({ memories, relationships, context, semanticMatches });
 }
 
+function buildRelationshipIntelligenceForUser(userId, { persist = false, trigger = "read" } = {}) {
+  const db = readDb();
+  const snapshot = buildRelationshipIntelligence({
+    userId,
+    memories: allUnifiedMemories(userId),
+    chats: getChatHistory(userId),
+    places: placeService.getUserPlaceMemories(db, userId, 10_000),
+  });
+  return persist ? persistRelationshipIntelligenceSnapshot(userId, snapshot, trigger) : snapshot;
+}
+
 async function buildIntelligenceCoreResponse(user, context = {}) {
   const memories = allUnifiedMemories(user.id);
   const relationships = detectRelationships(memories);
@@ -845,12 +897,13 @@ async function buildDigitalTwinResponse(user, context = {}) {
   const relationships = detectRelationships(memories);
   const dna = buildMemoryDnaProfile(memories, relationships);
   const intelligenceCore = await buildIntelligenceCoreResponse(user, context);
-  const digitalTwin = buildDigitalTwin({ user, memories, relationships, intelligenceCore, dna });
+  const peopleRelationships = buildRelationshipIntelligenceForUser(user.id);
+  const digitalTwin = buildDigitalTwin({ user, memories, relationships, intelligenceCore, dna, peopleRelationships });
   persistIntelligenceRecord(user.id, "digitalTwins", {
     id: `digital-twin_${user.id}`,
     snapshot: digitalTwin,
     memoryCount: memories.length,
-    relationshipCount: relationships.length,
+    relationshipCount: relationships.length + peopleRelationships.relationships.length,
   });
   return digitalTwin;
 }
@@ -863,6 +916,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
   const predictions = [...buildPredictions(allMemoryRecords(userId)), ...generateProactiveNotifications(memories, relationships)].slice(0, 12);
   const replay = buildMemoryReplay(memories, relationships, "day", "today");
   const insights = generateInsightCards(memories, relationships);
+  const relationshipIntelligence = buildRelationshipIntelligenceForUser(userId, { persist: true, trigger });
 
   persistIntelligenceRecord(userId, "relationships", {
     id: `relationships_${userId}`,
@@ -891,8 +945,15 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
     insights,
     evidenceMemoryCount: memories.length,
   });
+  persistIntelligenceRecord(userId, "insights", {
+    id: `relationship-insights_${userId}`,
+    trigger,
+    insights: relationshipIntelligence.insights.slice(0, 12),
+    evidenceMemoryCount: relationshipIntelligence.events.length,
+    relationshipCount: relationshipIntelligence.relationships.length,
+  });
   await buildDigitalTwinResponse(user, { activity: trigger, trigger });
-  return { relationships, predictions, replay, insights };
+  return { relationships, predictions, replay, insights, relationshipIntelligence };
 }
 
 function buildLearningEngineResponse(user, { rebuild = false, context = {} } = {}) {
@@ -930,7 +991,8 @@ async function buildLifeOsResponse(user, context = {}) {
     activity: context.activity || "mission control",
     focusState: context.focusState || "goal execution",
   });
-  const digitalTwin = buildDigitalTwin({ user, memories, relationships, intelligenceCore, dna });
+  const peopleRelationships = buildRelationshipIntelligenceForUser(user.id);
+  const digitalTwin = buildDigitalTwin({ user, memories, relationships, intelligenceCore, dna, peopleRelationships });
   const userBrainModel = getStoredUserBrainModel(user.id) || buildAndPersistUserBrainModel(user, { trigger: "life-os", activity: context.activity || "mission control" });
   const learningProfile = buildLearningEngineResponse(user, { context: { activity: context.activity || "mission control" } });
   return buildLifeOsMissionControl({
@@ -946,7 +1008,8 @@ function buildAndPersistUserBrainModel(user, context = {}) {
   const memories = allUnifiedMemories(user.id);
   const relationships = detectRelationships(memories);
   const dna = buildMemoryDnaProfile(memories, relationships);
-  const digitalTwin = buildDigitalTwin({ user, memories, relationships, dna });
+  const peopleRelationships = buildRelationshipIntelligenceForUser(user.id);
+  const digitalTwin = buildDigitalTwin({ user, memories, relationships, dna, peopleRelationships });
   const previousModel = getStoredUserBrainModel(user.id);
   const model = buildUserBrainModel({
     user,
@@ -2138,6 +2201,57 @@ async function handleApi(req, res, url) {
     });
   }
 
+  if (req.method === "GET" && url.pathname === "/api/relationships") {
+    const snapshot = buildRelationshipIntelligenceForUser(session.user.id, {
+      persist: url.searchParams.get("persist") === "true",
+      trigger: "relationships-read",
+    });
+    return sendJson(res, 200, snapshot);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/relationships/top") {
+    const snapshot = buildRelationshipIntelligenceForUser(session.user.id);
+    return sendJson(res, 200, { topPeople: snapshot.topPeople, overview: snapshot.overview });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/relationships/graph") {
+    const snapshot = buildRelationshipIntelligenceForUser(session.user.id);
+    return sendJson(res, 200, { graph: snapshot.graph, clusters: snapshot.clusters });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/relationships/insights") {
+    const snapshot = buildRelationshipIntelligenceForUser(session.user.id);
+    return sendJson(res, 200, { insights: snapshot.insights, overview: snapshot.overview });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/relationships/reconnect") {
+    const snapshot = buildRelationshipIntelligenceForUser(session.user.id);
+    return sendJson(res, 200, { reconnect: snapshot.reconnect, overview: snapshot.overview });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/relationships/rebuild") {
+    const snapshot = buildRelationshipIntelligenceForUser(session.user.id, { persist: true, trigger: "manual-rebuild" });
+    recordAiUsage(session.user.id, "relationship-intelligence-rebuild", "completed", {
+      relationshipCount: snapshot.relationships.length,
+      eventCount: snapshot.events.length,
+      insightCount: snapshot.insights.length,
+    });
+    return sendJson(res, 200, snapshot);
+  }
+
+  const relationshipRoute = url.pathname.match(/^\/api\/relationships\/([^/]+)$/);
+  if (req.method === "GET" && relationshipRoute) {
+    const snapshot = buildRelationshipIntelligenceForUser(session.user.id);
+    const id = decodeURIComponent(relationshipRoute[1]);
+    const relationship = findRelationshipById(snapshot, id);
+    if (!relationship) return sendJson(res, 404, { error: "Relationship not found." });
+    return sendJson(res, 200, {
+      relationship,
+      timeline: buildRelationshipTimeline(snapshot, relationship.id),
+      insights: snapshot.insights.filter((insight) => insight.relationshipId === relationship.id),
+    });
+  }
+
   if (req.method === "GET" && url.pathname === "/api/ai/relationships") {
     const memories = allUnifiedMemories(session.user.id);
     const relationships = detectRelationships(memories);
@@ -2315,6 +2429,8 @@ async function handleApi(req, res, url) {
       semanticMatches = [];
     }
     const relationships = detectRelationships(memories);
+    const peopleRelationships = buildRelationshipIntelligenceForUser(session.user.id);
+    const relationshipAnswer = answerRelationshipQuery(message, peopleRelationships);
     const timeline = buildTimeline({ memories, relationships, limit: 80 });
     const insights = generateInsightCards(memories, relationships);
     const patterns = detectLifePatterns(memories, relationships);
@@ -2342,6 +2458,7 @@ async function handleApi(req, res, url) {
       relationships,
       intelligenceCore,
       dna: buildMemoryDnaProfile(memories, relationships),
+      peopleRelationships,
     });
     const userBrainModel = buildAndPersistUserBrainModel(session.user, {
       trigger: "chat-before-reply",
@@ -2363,6 +2480,20 @@ async function handleApi(req, res, url) {
           score: match.score,
         })),
         relationships: relationships.slice(0, 5),
+        peopleRelationships: {
+          overview: peopleRelationships.overview,
+          topPeople: peopleRelationships.topPeople.slice(0, 5).map((person) => ({
+            personName: person.personName,
+            relationshipType: person.relationshipType,
+            strength: person.relationshipStrength,
+            health: person.relationshipHealth,
+            lastSeen: person.lastSeen,
+            emotionalImpact: person.emotionalImpact,
+          })),
+          reconnect: peopleRelationships.reconnect.slice(0, 4),
+          insights: peopleRelationships.insights.slice(0, 5),
+          directAnswer: relationshipAnswer.matched ? relationshipAnswer : null,
+        },
         recentConversation: getChatHistory(session.user.id).slice(-10).map((item) => ({
           role: item.role,
           content: item.content,
@@ -2407,9 +2538,11 @@ async function handleApi(req, res, url) {
     const contextualReply = providerReply;
     const decisionLine = "";
     const reply =
-      semanticMatches.length && fusedContext.summary
-        ? `${contextualReply}${decisionLine} ${fusedContext.summary}`
-        : `${contextualReply}${decisionLine}`;
+      relationshipAnswer.matched && relationshipAnswer.confidence >= 50
+        ? `${contextualReply}${decisionLine} ${relationshipAnswer.answer}`
+        : semanticMatches.length && fusedContext.summary
+          ? `${contextualReply}${decisionLine} ${fusedContext.summary}`
+          : `${contextualReply}${decisionLine}`;
     const assistantMessage = saveChatMessage(session.user.id, "assistant", reply);
 
     const chatDb = readDb();

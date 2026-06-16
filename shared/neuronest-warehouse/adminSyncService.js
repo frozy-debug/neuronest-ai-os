@@ -48,7 +48,20 @@ export function createAdminSyncService({
 
   function syncIntelligenceRecord(db, collection, userId, record = {}) {
     databaseService.normalizeWarehouse(db);
-    const allowed = new Set(["embeddings", "relationships", "digitalTwins", "predictions", "replays", "insights", "aiJobs", "aiUsage"]);
+    const allowed = new Set([
+      "embeddings",
+      "relationships",
+      "relationshipProfiles",
+      "relationshipEvents",
+      "relationshipInsights",
+      "relationshipClusters",
+      "digitalTwins",
+      "predictions",
+      "replays",
+      "insights",
+      "aiJobs",
+      "aiUsage",
+    ]);
     if (!allowed.has(collection) || !userId) return null;
     const now = new Date().toISOString();
     const id = String(record.id || `${collection}_${userId}`);
@@ -152,6 +165,10 @@ export function createAdminSyncService({
       timeline: timelineService.getUserTimeline(db, userId, 50),
       goals: goalService.getUserGoals(db, userId, 50),
       aiUsage: chatService.getUserAiUsage(db, userId, 50),
+      relationshipProfiles: db.warehouse.relationshipProfiles.filter((item) => item.userId === userId).slice(0, 50),
+      relationshipEvents: db.warehouse.relationshipEvents.filter((item) => item.userId === userId).slice(0, 50),
+      relationshipInsights: db.warehouse.relationshipInsights.filter((item) => item.userId === userId).slice(0, 50),
+      relationshipClusters: db.warehouse.relationshipClusters.filter((item) => item.userId === userId).slice(0, 50),
       activityHistory: activityService.getUserActivity(db, userId, 50),
     };
   }
@@ -173,6 +190,10 @@ export function createAdminSyncService({
         activityEvents: db.warehouse.activityStream.length,
         embeddings: db.warehouse.embeddings.length,
         relationships: db.warehouse.relationships.length,
+        relationshipProfiles: db.warehouse.relationshipProfiles.length,
+        relationshipEvents: db.warehouse.relationshipEvents.length,
+        relationshipInsights: db.warehouse.relationshipInsights.length,
+        relationshipClusters: db.warehouse.relationshipClusters.length,
         digitalTwins: db.warehouse.digitalTwins.length,
         predictions: db.warehouse.predictions.length,
         replays: db.warehouse.replays.length,
@@ -201,6 +222,10 @@ export function createAdminSyncService({
       embeddings: warehouse.embeddings,
       vectors: warehouse.embeddings,
       relationships: warehouse.relationships,
+      relationshipProfiles: warehouse.relationshipProfiles,
+      relationshipEvents: warehouse.relationshipEvents,
+      relationshipInsights: warehouse.relationshipInsights,
+      relationshipClusters: warehouse.relationshipClusters,
       digitalTwins: warehouse.digitalTwins,
       predictions: warehouse.predictions,
       replays: warehouse.replays,
@@ -230,6 +255,10 @@ export function createAdminSyncService({
     db.warehouse.fileStorage = filterOut(db.warehouse.fileStorage);
     db.warehouse.embeddings = filterOut(db.warehouse.embeddings);
     db.warehouse.relationships = filterOut(db.warehouse.relationships);
+    db.warehouse.relationshipProfiles = filterOut(db.warehouse.relationshipProfiles);
+    db.warehouse.relationshipEvents = filterOut(db.warehouse.relationshipEvents);
+    db.warehouse.relationshipInsights = filterOut(db.warehouse.relationshipInsights);
+    db.warehouse.relationshipClusters = filterOut(db.warehouse.relationshipClusters);
     db.warehouse.digitalTwins = filterOut(db.warehouse.digitalTwins);
     db.warehouse.predictions = filterOut(db.warehouse.predictions);
     db.warehouse.replays = filterOut(db.warehouse.replays);

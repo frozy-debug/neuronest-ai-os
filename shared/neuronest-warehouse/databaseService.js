@@ -24,6 +24,10 @@ export function createEmptyWarehouse() {
     fileStorage: [],
     embeddings: [],
     relationships: [],
+    relationshipProfiles: [],
+    relationshipEvents: [],
+    relationshipInsights: [],
+    relationshipClusters: [],
     digitalTwins: [],
     predictions: [],
     replays: [],
@@ -52,6 +56,10 @@ export function normalizeWarehouse(db) {
   warehouse.fileStorage ||= [];
   warehouse.embeddings ||= [];
   warehouse.relationships ||= [];
+  warehouse.relationshipProfiles ||= [];
+  warehouse.relationshipEvents ||= [];
+  warehouse.relationshipInsights ||= [];
+  warehouse.relationshipClusters ||= [];
   warehouse.digitalTwins ||= [];
   warehouse.predictions ||= [];
   warehouse.replays ||= [];

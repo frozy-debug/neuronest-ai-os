@@ -513,6 +513,7 @@ function buildMetrics(db) {
   const vectors = countVectors(db);
   const aiChats = warehouse.aiChats.length;
   const aiRequests = warehouse.aiUsage.length;
+  const relationshipProfiles = warehouse.relationshipProfiles.length;
 
   return [
     { key: "users", label: "Total Users", value: db.users.length, accent: "blue", icon: "US", trend: trendFrom(todayUsers, db.users.length), trendLabel: "new today" },
@@ -524,6 +525,7 @@ function buildMetrics(db) {
     { key: "chats", label: "AI Conversations", value: aiChats, accent: "cyan", icon: "AI", trend: trendFrom(chats.filter((chat) => isToday(chat.createdAt)).length, chats.length), trendLabel: "from today" },
     { key: "places", label: "Total Places", value: places, accent: "orange", icon: "PL", trend: trendFrom(places, Math.max(entries.length, 1)), trendLabel: "of memories" },
     { key: "place-visits", label: "Automatic Place Visits", value: placeVisits, accent: "cyan", icon: "PV", trend: trendFrom(placeVisits, Math.max(places, 1)), trendLabel: "passively captured" },
+    { key: "relationships", label: "People Relationships", value: relationshipProfiles, accent: "green", icon: "RI", trend: trendFrom(warehouse.relationshipEvents.length, Math.max(relationshipProfiles, 1)), trendLabel: "evidence signals" },
     { key: "voice", label: "Voice Notes", value: voice, accent: "violet", icon: "VO", trend: trendFrom(voice, Math.max(entries.length, 1)), trendLabel: "of memories" },
     { key: "screenshots", label: "Screenshots", value: screenshots, accent: "pink", icon: "SC", trend: trendFrom(screenshots, Math.max(entries.length, 1)), trendLabel: "of memories" },
     { key: "embeddings", label: "Embeddings", value: embeddings, accent: "cyan", icon: "EM", trend: trendFrom(vectors, Math.max(embeddings, 1)), trendLabel: "vectorized" },
@@ -617,6 +619,53 @@ function buildPlaceAnalytics(db) {
     recentVisits: [...visits]
       .sort((a, b) => asDate(b.departureTime || b.createdAt) - asDate(a.departureTime || a.createdAt))
       .slice(0, 50),
+  };
+}
+
+function buildRelationshipAnalytics(db) {
+  warehouseDb.normalizeWarehouse(db);
+  const warehouse = db.warehouse;
+  const relationships = warehouse.relationshipProfiles || [];
+  const events = warehouse.relationshipEvents || [];
+  const insights = warehouse.relationshipInsights || [];
+  const clusters = warehouse.relationshipClusters || [];
+  const totalStrength = relationships.reduce((sum, item) => sum + Number(item.relationshipStrength || 0), 0);
+  const reconnect = relationships.filter((item) => Number(item.reconnectScore || 0) >= 45);
+  const health = relationships.reduce((acc, item) => {
+    const key = item.relationshipHealth || "Unknown";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const relationshipGrowth = relationships.filter((item) => withinDays(item.firstSeen || item.createdAt, 7)).length;
+  const strongestRelationships = [...relationships]
+    .sort((a, b) => Number(b.relationshipStrength || 0) - Number(a.relationshipStrength || 0))
+    .slice(0, 12)
+    .map((item) => ({
+      id: item.id,
+      userId: item.userId,
+      personName: item.personName,
+      relationshipType: item.relationshipType,
+      relationshipStrength: item.relationshipStrength,
+      relationshipHealth: item.relationshipHealth,
+      lastSeen: item.lastSeen,
+      interactionCount: item.interactionCount,
+    }));
+  return {
+    totalRelationships: relationships.length,
+    totalEvents: events.length,
+    totalInsights: insights.length,
+    totalClusters: clusters.length,
+    strongestRelationships,
+    averageStrength: relationships.length ? Math.round(totalStrength / relationships.length) : 0,
+    relationshipGrowth,
+    reconnectCandidates: reconnect
+      .sort((a, b) => Number(b.reconnectScore || 0) - Number(a.reconnectScore || 0))
+      .slice(0, 12),
+    health,
+    recentInsights: [...insights]
+      .sort((a, b) => asDate(b.createdAt) - asDate(a.createdAt))
+      .slice(0, 20),
+    clusters: [...clusters].sort((a, b) => Number(b.confidence || 0) - Number(a.confidence || 0)).slice(0, 16),
   };
 }
 
@@ -957,6 +1006,34 @@ function collectionRows(db, collection) {
     const rows = adminSyncService.getWarehouseCollection(db, collection, maxRows);
     return {
       columns: ["userId", "memoryId", "provider", "model", "dimensions", "updatedAt"],
+      rows,
+    };
+  }
+  if (collection === "relationship_profiles" || collection === "relationshipProfiles" || collection === "people_relationships") {
+    const rows = adminSyncService.getWarehouseCollection(db, "relationshipProfiles", maxRows);
+    return {
+      columns: ["userId", "personName", "relationshipType", "relationshipStrength", "relationshipHealth", "lastSeen", "interactionCount"],
+      rows,
+    };
+  }
+  if (collection === "relationship_events" || collection === "relationshipEvents") {
+    const rows = adminSyncService.getWarehouseCollection(db, "relationshipEvents", maxRows);
+    return {
+      columns: ["userId", "relationshipId", "sourceType", "interactionType", "sentiment", "timestamp"],
+      rows,
+    };
+  }
+  if (collection === "relationship_insights" || collection === "relationshipInsights") {
+    const rows = adminSyncService.getWarehouseCollection(db, "relationshipInsights", maxRows);
+    return {
+      columns: ["userId", "relationshipId", "insightType", "insightText", "confidence", "createdAt"],
+      rows,
+    };
+  }
+  if (collection === "relationship_clusters" || collection === "relationshipClusters") {
+    const rows = adminSyncService.getWarehouseCollection(db, "relationshipClusters", maxRows);
+    return {
+      columns: ["userId", "clusterName", "members", "confidence", "createdAt"],
       rows,
     };
   }
@@ -1326,6 +1403,11 @@ async function handleApi(req, res, url) {
       if (req.method === "GET" && url.pathname === "/api/admin/analytics/places") {
         const { db } = safeReadDb();
         return sendJson(res, 200, buildPlaceAnalytics(db));
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/admin/analytics/relationships") {
+        const { db } = safeReadDb();
+        return sendJson(res, 200, buildRelationshipAnalytics(db));
       }
 
       const dbMatch = url.pathname.match(/^\/api\/admin\/database\/([^/]+)$/);

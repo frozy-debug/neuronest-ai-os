@@ -229,7 +229,7 @@ export function buildDecisionRecommendation({ question = "", twin, memories = []
   };
 }
 
-export function buildDigitalTwin({ user, memories = [], relationships = [], intelligenceCore = null, dna = null }) {
+export function buildDigitalTwin({ user, memories = [], relationships = [], intelligenceCore = null, dna = null, peopleRelationships = null }) {
   const strengths = buildStrengthMap(memories);
   const weaknesses = buildWeaknessMap(memories);
   const goals = buildGoals(memories, relationships);
@@ -239,6 +239,26 @@ export function buildDigitalTwin({ user, memories = [], relationships = [], inte
   const decisionHistory = buildDecisionHistory(memories);
   const graph = buildPersonalKnowledgeGraph({ user, memories, relationships, dna });
   const movementProfile = buildMovementProfile(memories);
+  const peopleProfiles = peopleRelationships?.relationships || [];
+  const topPeople = peopleProfiles.slice(0, 8).map((person) => ({
+    id: person.id,
+    name: person.personName,
+    type: person.relationshipType,
+    strength: person.relationshipStrength,
+    health: person.relationshipHealth,
+    lastSeen: person.lastSeen,
+    emotionalImpact: person.emotionalImpact,
+  }));
+  const moodInfluencers = [...peopleProfiles]
+    .filter((person) => person.emotionalImpact?.happiness || person.emotionalImpact?.stress)
+    .sort((a, b) => (b.emotionalImpact.happiness + b.emotionalImpact.stress) - (a.emotionalImpact.happiness + a.emotionalImpact.stress))
+    .slice(0, 6)
+    .map((person) => ({
+      name: person.personName,
+      positive: person.emotionalImpact.happiness,
+      stress: person.emotionalImpact.stress,
+      confidence: Math.min(98, 45 + person.interactionCount * 8),
+    }));
   const understanding = intelligenceCore?.understandingLevel || {
     level: memories.length ? clamp(memories.length * 2 + relationships.length * 1.6 + habits.length * 5 + goals.length * 4) : 0,
     breakdown: {},
@@ -256,7 +276,7 @@ export function buildDigitalTwin({ user, memories = [], relationships = [], inte
       overall: understanding.level,
       label: `NeuroNest Understanding Level ${understanding.level}%`,
       memoriesAnalyzed: memories.length,
-      relationshipsDiscovered: relationships.length,
+      relationshipsDiscovered: relationships.length + peopleProfiles.length,
       habitsLearned: habits.length,
       goalsIdentified: goals.length,
     },
@@ -268,6 +288,22 @@ export function buildDigitalTwin({ user, memories = [], relationships = [], inte
     goalAlignment,
     decisionHistory,
     movementProfile,
+    relationshipIntelligence: {
+      totalPeople: peopleProfiles.length,
+      coreRelationships: peopleRelationships?.overview?.coreRelationships || 0,
+      reconnectCandidates: peopleRelationships?.reconnect || [],
+      topPeople,
+      moodInfluencers,
+      productivityInfluencers: (peopleRelationships?.insights || [])
+        .filter((insight) => insight.insightType === "productivity-impact")
+        .slice(0, 6),
+      relationshipHealth: {
+        excellent: peopleProfiles.filter((person) => person.relationshipHealth === "Excellent").length,
+        healthy: peopleProfiles.filter((person) => person.relationshipHealth === "Healthy").length,
+        needsAttention: peopleProfiles.filter((person) => person.relationshipHealth === "Needs Attention").length,
+        weak: peopleProfiles.filter((person) => person.relationshipHealth === "Weak").length,
+      },
+    },
     knowledgeGraph: {
       ...graph,
       connections: {

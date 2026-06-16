@@ -1561,6 +1561,7 @@
         selectedLiveUser: null,
         liveUserDetail: null,
         placeAnalytics: null,
+        relationshipAnalytics: null,
       };
 
       const navGroups = [
@@ -1583,6 +1584,7 @@
           items: [
             { view: "ai-analytics", label: "AI & Usage Analytics", glyph: "AI" },
             { view: "place-analytics", label: "Place Analytics", glyph: "PL" },
+            { view: "relationship-analytics", label: "Relationship Analytics", glyph: "RI" },
             { view: "database", label: "Database Explorer", glyph: "DB" },
             { view: "health", label: "System Health", glyph: "SH" },
             { view: "security", label: "Security Center", glyph: "SC" },
@@ -1863,6 +1865,7 @@
           "live-monitor": "Live User Monitor",
           "ai-analytics": "AI Analytics",
           "place-analytics": "Passive Place Analytics",
+          "relationship-analytics": "Relationship Analytics",
           database: "Database Explorer",
           health: "System Health",
           security: "Security Center",
@@ -1881,6 +1884,7 @@
         if (state.view === "health") return renderHealthView();
         if (state.view === "ai-analytics" || state.view === "analytics") return renderAnalyticsView();
         if (state.view === "place-analytics") return renderPlaceAnalyticsView();
+        if (state.view === "relationship-analytics") return renderRelationshipAnalyticsView();
         if (state.view === "activity" || state.view === "logs") return renderActivityView();
         if (state.view === "live-monitor") return renderLiveMonitorView();
         if (state.view === "export") return renderExportView();
@@ -2109,7 +2113,7 @@
 
       async function renderDatabaseView() {
         if (!state.database || state.database.collection !== state.collection) await loadCollection(state.collection);
-        const collections = ["users", "chats", "memories", "timeline", "voice", "places", "place_memories", "screenshots", "activityStream", "fileStorage", "liveMonitoring", "moderationHistory", "embeddings", "vectors", "announcements", "adminLogs"];
+        const collections = ["users", "chats", "memories", "timeline", "voice", "places", "place_memories", "relationship_profiles", "relationship_events", "relationship_insights", "relationship_clusters", "screenshots", "activityStream", "fileStorage", "liveMonitoring", "moderationHistory", "embeddings", "vectors", "announcements", "adminLogs"];
         const columns = state.database?.columns || [];
         const rows = state.database?.rows || [];
         $("#content").innerHTML = `
@@ -2296,6 +2300,53 @@
               ${(data.recentVisits || []).map((visit) => `<div class="timeline-item"><b>${escapeHtml(visit.placeName || "Coordinate-only visit")}</b><span>${escapeHtml(visit.category || "Unknown category")} - ${formatNumber(visit.durationMinutes || 0)} min - ${escapeHtml(formatRelativeTime(visit.departureTime || visit.createdAt))}</span></div>`).join("") || `<div class="empty-state">No real movement records yet.</div>`}
             </div>
           </section>`;
+        animateCounts();
+      }
+
+      async function renderRelationshipAnalyticsView() {
+        try {
+          state.relationshipAnalytics = await api("/api/admin/analytics/relationships");
+        } catch (error) {
+          showToast(error.message);
+          state.relationshipAnalytics = {};
+        }
+        const data = state.relationshipAnalytics || {};
+        const metrics = [
+          { label: "Relationships", value: data.totalRelationships || 0, accent: "cyan", icon: "RI", trend: "Live", trendLabel: "people profiles" },
+          { label: "Evidence Events", value: data.totalEvents || 0, accent: "purple", icon: "EV", trend: "Live", trendLabel: "memory signals" },
+          { label: "Average Strength", value: data.averageStrength || 0, accent: "blue", icon: "ST", trend: `${data.averageStrength || 0}%`, trendLabel: "mean score" },
+          { label: "Reconnect Candidates", value: (data.reconnectCandidates || []).length, accent: "orange", icon: "RC", trend: "Live", trendLabel: "needs attention" },
+        ];
+        $("#content").innerHTML = `
+          ${metricCards(metrics)}
+          <div class="panel-grid">
+            <section class="glass">
+              <div class="panel-head"><div class="panel-title"><span class="nav-glyph">TP</span>Strongest Relationships</div></div>
+              <div class="timeline-list">
+                ${(data.strongestRelationships || []).map((item) => `<div class="timeline-item"><b>${escapeHtml(item.personName || "Unknown")}</b><span>${escapeHtml(item.relationshipType || "Unknown")} - ${formatNumber(item.relationshipStrength || 0)} strength - ${escapeHtml(item.relationshipHealth || "Unknown")}</span></div>`).join("") || `<div class="empty-state">No relationship profiles yet.</div>`}
+              </div>
+            </section>
+            <section class="glass">
+              <div class="panel-head"><div class="panel-title"><span class="nav-glyph">RC</span>Reconnect Candidates</div></div>
+              <div class="timeline-list">
+                ${(data.reconnectCandidates || []).map((item) => `<div class="timeline-item"><b>${escapeHtml(item.personName || "Unknown")}</b><span>${formatNumber(item.reconnectScore || 0)} reconnect score - last seen ${escapeHtml(item.lastSeen ? formatRelativeTime(item.lastSeen) : "unknown")}</span></div>`).join("") || `<div class="empty-state">No reconnect candidates yet.</div>`}
+              </div>
+            </section>
+          </div>
+          <div class="panel-grid" style="margin-top:14px">
+            <section class="glass">
+              <div class="panel-head"><div class="panel-title"><span class="nav-glyph">IN</span>Relationship Insights</div><span class="pill">${formatNumber(data.totalInsights || 0)} insights</span></div>
+              <div class="timeline-list">
+                ${(data.recentInsights || []).map((item) => `<div class="timeline-item"><b>${escapeHtml(item.insightType || "Insight")}</b><span>${formatNumber(item.confidence || 0)}% confidence</span><p style="color:var(--muted)">${escapeHtml(item.insightText || "")}</p></div>`).join("") || `<div class="empty-state">No evidence-backed insights yet.</div>`}
+              </div>
+            </section>
+            <section class="glass">
+              <div class="panel-head"><div class="panel-title"><span class="nav-glyph">CL</span>Social Clusters</div><span class="pill">${formatNumber(data.totalClusters || 0)} clusters</span></div>
+              <div class="timeline-list">
+                ${(data.clusters || []).map((item) => `<div class="timeline-item"><b>${escapeHtml(item.clusterName || "Cluster")}</b><span>${formatNumber(item.confidence || 0)}% confidence - ${formatNumber((item.members || []).length)} members</span></div>`).join("") || `<div class="empty-state">No social graph clusters yet.</div>`}
+              </div>
+            </section>
+          </div>`;
         animateCounts();
       }
 

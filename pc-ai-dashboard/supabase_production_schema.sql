@@ -142,6 +142,67 @@ create index if not exists place_memories_user_departure_idx on public.place_mem
 create index if not exists place_memories_user_place_idx on public.place_memories(user_id, place_id);
 create index if not exists place_memories_user_category_idx on public.place_memories(user_id, category);
 
+create table if not exists public.relationships (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  person_name text not null,
+  relationship_type text not null default 'Unknown',
+  first_seen timestamptz,
+  last_seen timestamptz,
+  interaction_count integer not null default 0,
+  interaction_frequency numeric not null default 0,
+  relationship_strength numeric not null default 0,
+  positive_score numeric not null default 0,
+  negative_score numeric not null default 0,
+  emotional_impact jsonb not null default '{}'::jsonb,
+  trust_score numeric not null default 0,
+  importance_score numeric not null default 0,
+  reconnect_score numeric not null default 0,
+  relationship_status text not null default 'Weak',
+  data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.relationship_events (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  relationship_id text references public.relationships(id) on delete cascade,
+  source_type text not null,
+  source_id text,
+  interaction_type text not null default 'mention',
+  sentiment text not null default 'neutral',
+  timestamp timestamptz not null,
+  metadata jsonb not null default '{}'::jsonb
+);
+
+create table if not exists public.relationship_insights (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  relationship_id text references public.relationships(id) on delete cascade,
+  insight_type text not null,
+  insight_text text not null,
+  confidence numeric not null default 0,
+  evidence jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.relationship_clusters (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  cluster_name text not null,
+  members jsonb not null default '[]'::jsonb,
+  confidence numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists relationships_user_strength_idx on public.relationships(user_id, relationship_strength desc);
+create index if not exists relationships_user_last_seen_idx on public.relationships(user_id, last_seen desc);
+create index if not exists relationship_events_user_timestamp_idx on public.relationship_events(user_id, timestamp desc);
+create index if not exists relationship_events_relationship_idx on public.relationship_events(relationship_id, timestamp desc);
+create index if not exists relationship_insights_user_confidence_idx on public.relationship_insights(user_id, confidence desc);
+create index if not exists relationship_clusters_user_confidence_idx on public.relationship_clusters(user_id, confidence desc);
+
 create table if not exists public.goals (
   id text primary key,
   user_id text not null references public.neuronest_users(id) on delete cascade,
@@ -213,6 +274,10 @@ alter table public.media_records enable row level security;
 alter table public.ai_chats enable row level security;
 alter table public.timeline_events enable row level security;
 alter table public.place_memories enable row level security;
+alter table public.relationships enable row level security;
+alter table public.relationship_events enable row level security;
+alter table public.relationship_insights enable row level security;
+alter table public.relationship_clusters enable row level security;
 alter table public.goals enable row level security;
 alter table public.intelligence_records enable row level security;
 alter table public.ai_usage enable row level security;

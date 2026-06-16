@@ -48,6 +48,26 @@ export function createSupabaseProductionStore() {
     });
   }
 
+  async function bulkUpsert(table, records = []) {
+    if (!records.length) return [];
+    return rest(`${table}?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify(records),
+    });
+  }
+
+  async function deleteUserRows(table, userId) {
+    if (!ready() || !userId) return null;
+    return rest(`${table}?user_id=eq.${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+  }
+
   async function uploadMedia(userId, memoryId, filePayload) {
     if (!ready() || !filePayload?.dataUrl) return null;
     const parsed = dataUrlBytes(filePayload.dataUrl);
@@ -235,6 +255,72 @@ export function createSupabaseProductionStore() {
     });
   }
 
+  async function replaceRelationshipIntelligence(userId, snapshot = {}) {
+    if (!ready() || !userId) return null;
+    const profiles = (snapshot.relationships || []).map((item) => ({
+      id: item.id,
+      user_id: userId,
+      person_name: item.personName,
+      relationship_type: item.relationshipType || "Unknown",
+      first_seen: item.firstSeen || item.createdAt || new Date().toISOString(),
+      last_seen: item.lastSeen || item.updatedAt || new Date().toISOString(),
+      interaction_count: Number(item.interactionCount || 0),
+      interaction_frequency: Number(item.interactionFrequency || 0),
+      relationship_strength: Number(item.relationshipStrength || 0),
+      positive_score: Number(item.positiveScore || 0),
+      negative_score: Number(item.negativeScore || 0),
+      emotional_impact: item.emotionalImpact || {},
+      trust_score: Number(item.trustScore || 0),
+      importance_score: Number(item.importanceScore || 0),
+      reconnect_score: Number(item.reconnectScore || 0),
+      relationship_status: item.relationshipStatus || "Weak",
+      data: item,
+      created_at: item.createdAt || new Date().toISOString(),
+      updated_at: item.updatedAt || new Date().toISOString(),
+    }));
+    const events = (snapshot.events || []).map((event) => ({
+      id: event.id,
+      user_id: userId,
+      relationship_id: profiles.find((profile) => profile.data?.personName === event.personName)?.id || null,
+      source_type: event.sourceType || "memory",
+      source_id: event.sourceId || null,
+      interaction_type: event.interactionType || "mention",
+      sentiment: event.sentiment || "neutral",
+      timestamp: event.timestamp || new Date().toISOString(),
+      metadata: { ...(event.metadata || {}), personName: event.personName, sourceTitle: event.sourceTitle },
+    }));
+    const insights = (snapshot.insights || []).map((insight) => ({
+      id: insight.id,
+      user_id: userId,
+      relationship_id: insight.relationshipId || null,
+      insight_type: insight.insightType || "relationship",
+      insight_text: insight.insightText || "",
+      confidence: Number(insight.confidence || 0),
+      evidence: insight.evidence || [],
+      created_at: insight.createdAt || new Date().toISOString(),
+    }));
+    const clusters = (snapshot.clusters || []).map((cluster) => ({
+      id: cluster.id,
+      user_id: userId,
+      cluster_name: cluster.clusterName,
+      members: cluster.members || [],
+      confidence: Number(cluster.confidence || 0),
+      created_at: cluster.createdAt || new Date().toISOString(),
+    }));
+
+    await Promise.all([
+      deleteUserRows("relationship_events", userId),
+      deleteUserRows("relationship_insights", userId),
+      deleteUserRows("relationship_clusters", userId),
+      deleteUserRows("relationships", userId),
+    ]);
+    await bulkUpsert("relationships", profiles);
+    await bulkUpsert("relationship_events", events);
+    await bulkUpsert("relationship_insights", insights);
+    await bulkUpsert("relationship_clusters", clusters);
+    return { relationships: profiles.length, events: events.length, insights: insights.length, clusters: clusters.length };
+  }
+
   async function hydrateAdminDb(db) {
     if (!ready()) return { skipped: true };
     const optionalRest = async (path) => {
@@ -244,7 +330,7 @@ export function createSupabaseProductionStore() {
         return [];
       }
     };
-    const [users, memories, chats, goals, media, intelligence, usage, embeddings, placeMemories] = await Promise.all([
+    const [users, memories, chats, goals, media, intelligence, usage, embeddings, placeMemories, relationshipProfiles, relationshipEvents, relationshipInsights, relationshipClusters] = await Promise.all([
       rest("neuronest_users?select=*&limit=5000"),
       rest("memories?select=*&order=created_at.desc&limit=5000"),
       rest("ai_chats?select=*&order=created_at.desc&limit=5000"),
@@ -254,6 +340,10 @@ export function createSupabaseProductionStore() {
       rest("ai_usage?select=*&order=created_at.desc&limit=5000"),
       rest("memory_vectors?select=id,memory_id,user_id,type,provider,model,created_at,updated_at&order=updated_at.desc&limit=5000"),
       optionalRest("place_memories?select=*&order=departure_time.desc&limit=5000"),
+      optionalRest("relationships?select=*&order=updated_at.desc&limit=5000"),
+      optionalRest("relationship_events?select=*&order=timestamp.desc&limit=5000"),
+      optionalRest("relationship_insights?select=*&order=created_at.desc&limit=5000"),
+      optionalRest("relationship_clusters?select=*&order=created_at.desc&limit=5000"),
     ]);
 
     db.users = users.map((user) => ({
@@ -328,6 +418,58 @@ export function createSupabaseProductionStore() {
       updatedAt: item.updated_at,
     }));
     warehouse.relationships = [];
+    warehouse.relationshipProfiles = relationshipProfiles.map((item) => ({
+      ...(item.data || {}),
+      id: item.id,
+      userId: item.user_id,
+      personName: item.person_name,
+      relationshipType: item.relationship_type,
+      firstSeen: item.first_seen,
+      lastSeen: item.last_seen,
+      interactionCount: item.interaction_count,
+      interactionFrequency: item.interaction_frequency,
+      relationshipStrength: item.relationship_strength,
+      positiveScore: item.positive_score,
+      negativeScore: item.negative_score,
+      emotionalImpact: item.emotional_impact || {},
+      trustScore: item.trust_score,
+      importanceScore: item.importance_score,
+      reconnectScore: item.reconnect_score,
+      relationshipStatus: item.relationship_status,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    }));
+    warehouse.relationshipEvents = relationshipEvents.map((item) => ({
+      id: item.id,
+      userId: item.user_id,
+      relationshipId: item.relationship_id,
+      sourceType: item.source_type,
+      sourceId: item.source_id,
+      interactionType: item.interaction_type,
+      sentiment: item.sentiment,
+      timestamp: item.timestamp,
+      metadata: item.metadata || {},
+      personName: item.metadata?.personName || "",
+      sourceTitle: item.metadata?.sourceTitle || "",
+    }));
+    warehouse.relationshipInsights = relationshipInsights.map((item) => ({
+      id: item.id,
+      userId: item.user_id,
+      relationshipId: item.relationship_id,
+      insightType: item.insight_type,
+      insightText: item.insight_text,
+      confidence: item.confidence,
+      evidence: item.evidence || [],
+      createdAt: item.created_at,
+    }));
+    warehouse.relationshipClusters = relationshipClusters.map((item) => ({
+      id: item.id,
+      userId: item.user_id,
+      clusterName: item.cluster_name,
+      members: item.members || [],
+      confidence: item.confidence,
+      createdAt: item.created_at,
+    }));
     warehouse.digitalTwins = [];
     warehouse.predictions = [];
     warehouse.replays = [];
@@ -434,6 +576,7 @@ export function createSupabaseProductionStore() {
     upsertChat,
     upsertGoal,
     upsertIntelligence,
+    replaceRelationshipIntelligence,
     hydrateAdminDb,
   };
 }
