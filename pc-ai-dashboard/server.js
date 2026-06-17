@@ -73,6 +73,7 @@ const { adminSyncService, databaseService: warehouseDb, moderationService, liveM
 const accountSyncClients = new Map();
 let accountWatchTimer = null;
 let lastAccountDbSignature = "";
+let productionSyncTimer = null;
 const sessions = new Map();
 const rateLimitBuckets = new Map();
 
@@ -1441,6 +1442,37 @@ function startAccountDbWatcher() {
   });
 }
 
+function shouldSyncFromProductionStore() {
+  return productionStore.ready() && (
+    process.env.NEURONEST_SYNC_FROM_SUPABASE === "true" ||
+    Boolean(process.env.RENDER) ||
+    process.env.NODE_ENV === "production"
+  );
+}
+
+async function syncProductionSource() {
+  if (!shouldSyncFromProductionStore()) return;
+  try {
+    const db = readDb();
+    await productionStore.hydrateAdminDb(db);
+    writeDb(db);
+    console.log("Supabase production source hydrated into main NeuroNest warehouse.");
+  } catch (error) {
+    console.error(`Supabase production sync failed: ${error.message}`);
+  }
+}
+
+function startProductionSync() {
+  if (!shouldSyncFromProductionStore()) return;
+  void syncProductionSource();
+  const intervalMs = Number(process.env.NEURONEST_PRODUCTION_SYNC_MS || 0);
+  if (intervalMs > 0) {
+    clearInterval(productionSyncTimer);
+    productionSyncTimer = setInterval(() => void syncProductionSource(), intervalMs);
+    productionSyncTimer.unref?.();
+  }
+}
+
 function enforceAuthenticatedAccess(req, res, session) {
   if (!session?.user?.id) {
     sendJson(res, 401, { error: "Please login first." });
@@ -2774,6 +2806,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`NeuroNest backend running at http://localhost:${PORT}`);
   startAccountDbWatcher();
+  startProductionSync();
   if (!getGoogleClientId()) {
     console.log("Google login is not configured. Add GOOGLE_CLIENT_ID to .env.");
   }
