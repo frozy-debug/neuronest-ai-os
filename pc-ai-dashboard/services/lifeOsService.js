@@ -124,7 +124,7 @@ export function normalizeGoal(goal = {}) {
   };
 }
 
-export function buildLifeOsMissionControl({ goals = [], memories = [], relationships = [], digitalTwin = null, userBrainModel = null } = {}) {
+export function buildLifeOsMissionControl({ goals = [], memories = [], relationships = [], digitalTwin = null, userBrainModel = null, futurePredictions = null } = {}) {
   const activeGoals = goals.map(normalizeGoal).filter((goal) => goal.status !== "completed");
   const enrichedGoals = activeGoals.map((goal, index) => {
     const alignment = alignmentForGoal(goal, memories);
@@ -164,6 +164,10 @@ export function buildLifeOsMissionControl({ goals = [], memories = [], relations
     ? clamp(recentProductiveMemories * 8 + (userBrainModel?.goalCommitmentScore || 0) * 0.16, 0, 98)
     : 0;
   const riskFactors = enrichedGoals.flatMap((goal) => goal.risks.map((risk) => ({ ...risk, goalId: goal.id, goalTitle: goal.title })));
+  const forecastRows = futurePredictions?.predictions || [];
+  const highRiskForecasts = forecastRows.filter((prediction) => ["High", "Critical"].includes(prediction.riskLevel));
+  const topOpportunity = forecastRows.find((prediction) => prediction.type === "opportunity");
+  const nextFocus = forecastRows.find((prediction) => prediction.type === "productivity");
   const activeMissions = enrichedGoals.slice(0, 4).map((goal) => ({
     title: goal.title,
     body: goal.milestones.find((item) => item.status !== "complete")?.title || "Review and lock the next useful move.",
@@ -182,6 +186,9 @@ export function buildLifeOsMissionControl({ goals = [], memories = [], relations
       goalCount: enrichedGoals.length,
       activeMissionCount: dailyMissions.length,
       accountabilityRiskCount: riskFactors.length,
+      activePredictionCount: forecastRows.length,
+      highRiskPredictionCount: highRiskForecasts.length,
+      averagePredictionConfidence: futurePredictions?.overview?.averageConfidence || 0,
     },
     goals: enrichedGoals,
     activeMissions,
@@ -201,7 +208,21 @@ export function buildLifeOsMissionControl({ goals = [], memories = [], relations
           : "Momentum is warming up. Start with a constrained task and save a progress note after.",
         confidence: clamp(productivityMomentum + 6, 52, 92),
       },
-    ] : [],
+      topOpportunity
+        ? {
+            title: topOpportunity.title,
+            body: topOpportunity.recommendation || topOpportunity.summary,
+            confidence: topOpportunity.confidence,
+          }
+        : null,
+      nextFocus
+        ? {
+            title: nextFocus.title,
+            body: nextFocus.recommendation || nextFocus.summary,
+            confidence: nextFocus.confidence,
+          }
+        : null,
+    ].filter(Boolean) : [],
     weeklyReview: {
       progress: `${progressScore}% average goal progress`,
       wins: memories.filter((memory) => /done|fixed|built|launch|complete|saved|tested/.test(textOf(memory))).slice(0, 4).map((memory) => memory.title),

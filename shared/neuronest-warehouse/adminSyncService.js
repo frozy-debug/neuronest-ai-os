@@ -57,6 +57,9 @@ export function createAdminSyncService({
       "relationshipClusters",
       "digitalTwins",
       "predictions",
+      "futurePredictions",
+      "predictionModels",
+      "predictionHistory",
       "replays",
       "insights",
       "aiJobs",
@@ -169,6 +172,9 @@ export function createAdminSyncService({
       relationshipEvents: db.warehouse.relationshipEvents.filter((item) => item.userId === userId).slice(0, 50),
       relationshipInsights: db.warehouse.relationshipInsights.filter((item) => item.userId === userId).slice(0, 50),
       relationshipClusters: db.warehouse.relationshipClusters.filter((item) => item.userId === userId).slice(0, 50),
+      futurePredictions: db.warehouse.futurePredictions.filter((item) => item.userId === userId).slice(0, 50),
+      predictionModels: db.warehouse.predictionModels.filter((item) => item.userId === userId).slice(0, 50),
+      predictionHistory: db.warehouse.predictionHistory.filter((item) => item.userId === userId).slice(0, 50),
       activityHistory: activityService.getUserActivity(db, userId, 50),
     };
   }
@@ -196,6 +202,9 @@ export function createAdminSyncService({
         relationshipClusters: db.warehouse.relationshipClusters.length,
         digitalTwins: db.warehouse.digitalTwins.length,
         predictions: db.warehouse.predictions.length,
+        futurePredictions: db.warehouse.futurePredictions.length,
+        predictionModels: db.warehouse.predictionModels.length,
+        predictionHistory: db.warehouse.predictionHistory.length,
         replays: db.warehouse.replays.length,
         insights: db.warehouse.insights.length,
         aiJobs: db.warehouse.aiJobs.length,
@@ -228,6 +237,9 @@ export function createAdminSyncService({
       relationshipClusters: warehouse.relationshipClusters,
       digitalTwins: warehouse.digitalTwins,
       predictions: warehouse.predictions,
+      futurePredictions: warehouse.futurePredictions,
+      predictionModels: warehouse.predictionModels,
+      predictionHistory: warehouse.predictionHistory,
       replays: warehouse.replays,
       insights: warehouse.insights,
       aiJobs: warehouse.aiJobs,
@@ -261,6 +273,9 @@ export function createAdminSyncService({
     db.warehouse.relationshipClusters = filterOut(db.warehouse.relationshipClusters);
     db.warehouse.digitalTwins = filterOut(db.warehouse.digitalTwins);
     db.warehouse.predictions = filterOut(db.warehouse.predictions);
+    db.warehouse.futurePredictions = filterOut(db.warehouse.futurePredictions);
+    db.warehouse.predictionModels = filterOut(db.warehouse.predictionModels);
+    db.warehouse.predictionHistory = filterOut(db.warehouse.predictionHistory);
     db.warehouse.replays = filterOut(db.warehouse.replays);
     db.warehouse.insights = filterOut(db.warehouse.insights);
     db.warehouse.aiJobs = filterOut(db.warehouse.aiJobs);

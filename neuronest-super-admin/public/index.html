@@ -1562,6 +1562,7 @@
         liveUserDetail: null,
         placeAnalytics: null,
         relationshipAnalytics: null,
+        predictionAnalytics: null,
       };
 
       const navGroups = [
@@ -1585,6 +1586,7 @@
             { view: "ai-analytics", label: "AI & Usage Analytics", glyph: "AI" },
             { view: "place-analytics", label: "Place Analytics", glyph: "PL" },
             { view: "relationship-analytics", label: "Relationship Analytics", glyph: "RI" },
+            { view: "prediction-analytics", label: "Prediction Analytics", glyph: "FP" },
             { view: "database", label: "Database Explorer", glyph: "DB" },
             { view: "health", label: "System Health", glyph: "SH" },
             { view: "security", label: "Security Center", glyph: "SC" },
@@ -1866,6 +1868,7 @@
           "ai-analytics": "AI Analytics",
           "place-analytics": "Passive Place Analytics",
           "relationship-analytics": "Relationship Analytics",
+          "prediction-analytics": "Prediction Analytics",
           database: "Database Explorer",
           health: "System Health",
           security: "Security Center",
@@ -1885,6 +1888,7 @@
         if (state.view === "ai-analytics" || state.view === "analytics") return renderAnalyticsView();
         if (state.view === "place-analytics") return renderPlaceAnalyticsView();
         if (state.view === "relationship-analytics") return renderRelationshipAnalyticsView();
+        if (state.view === "prediction-analytics") return renderPredictionAnalyticsView();
         if (state.view === "activity" || state.view === "logs") return renderActivityView();
         if (state.view === "live-monitor") return renderLiveMonitorView();
         if (state.view === "export") return renderExportView();
@@ -2113,7 +2117,7 @@
 
       async function renderDatabaseView() {
         if (!state.database || state.database.collection !== state.collection) await loadCollection(state.collection);
-        const collections = ["users", "chats", "memories", "timeline", "voice", "places", "place_memories", "relationship_profiles", "relationship_events", "relationship_insights", "relationship_clusters", "screenshots", "activityStream", "fileStorage", "liveMonitoring", "moderationHistory", "embeddings", "vectors", "announcements", "adminLogs"];
+        const collections = ["users", "chats", "memories", "timeline", "voice", "places", "place_memories", "relationship_profiles", "relationship_events", "relationship_insights", "relationship_clusters", "future_predictions", "prediction_models", "prediction_history", "screenshots", "activityStream", "fileStorage", "liveMonitoring", "moderationHistory", "embeddings", "vectors", "announcements", "adminLogs"];
         const columns = state.database?.columns || [];
         const rows = state.database?.rows || [];
         $("#content").innerHTML = `
@@ -2347,6 +2351,61 @@
               </div>
             </section>
           </div>`;
+        animateCounts();
+      }
+
+      async function renderPredictionAnalyticsView() {
+        try {
+          state.predictionAnalytics = await api("/api/admin/analytics/predictions");
+        } catch (error) {
+          showToast(error.message);
+          state.predictionAnalytics = {};
+        }
+        const data = state.predictionAnalytics || {};
+        const metrics = [
+          { label: "Predictions", value: data.totalPredictions || 0, accent: "blue", icon: "FP", trend: "Live", trendLabel: "forecast records" },
+          { label: "Models", value: data.totalModels || 0, accent: "purple", icon: "PM", trend: "Live", trendLabel: "type models" },
+          { label: "Avg Confidence", value: data.averageConfidence || 0, accent: "cyan", icon: "CF", trend: `${data.averageConfidence || 0}%`, trendLabel: "mean confidence" },
+          { label: "Accuracy", value: data.accuracy || 0, accent: "green", icon: "AC", trend: `${data.totalHistory || 0}`, trendLabel: "evaluated outcomes" },
+        ];
+        const byType = Object.entries(data.byType || {});
+        const risk = Object.entries(data.riskDistribution || {});
+        $("#content").innerHTML = `
+          ${metricCards(metrics)}
+          <div class="panel-grid">
+            <section class="glass">
+              <div class="panel-head"><div class="panel-title"><span class="nav-glyph">TP</span>Prediction Types</div></div>
+              <div class="timeline-list">
+                ${byType.map(([type, count]) => `<div class="timeline-item"><b>${escapeHtml(type)}</b><span>${formatNumber(count)} forecast records</span></div>`).join("") || `<div class="empty-state">No prediction records yet.</div>`}
+              </div>
+            </section>
+            <section class="glass">
+              <div class="panel-head"><div class="panel-title"><span class="nav-glyph">RK</span>Risk Distribution</div></div>
+              <div class="timeline-list">
+                ${risk.map(([level, count]) => `<div class="timeline-item"><b>${escapeHtml(level)}</b><span>${formatNumber(count)} predictions</span></div>`).join("") || `<div class="empty-state">No risk records yet.</div>`}
+              </div>
+            </section>
+          </div>
+          <div class="panel-grid" style="margin-top:14px">
+            <section class="glass">
+              <div class="panel-head"><div class="panel-title"><span class="nav-glyph">RC</span>Recent Predictions</div><span class="pill">${formatNumber(data.totalPredictions || 0)} total</span></div>
+              <div class="timeline-list">
+                ${(data.recentPredictions || []).map((item) => `<div class="timeline-item"><b>${escapeHtml(item.title || "Prediction")}</b><span>${escapeHtml(item.type || "unknown")} - ${formatNumber(item.confidence || 0)}% confidence - ${formatNumber(item.evidenceCount || 0)} evidence</span><p style="color:var(--muted)">${escapeHtml(item.summary || "")}</p></div>`).join("") || `<div class="empty-state">No evidence-backed future predictions yet.</div>`}
+              </div>
+            </section>
+            <section class="glass">
+              <div class="panel-head"><div class="panel-title"><span class="nav-glyph">MD</span>Prediction Models</div><span class="pill">${formatNumber(data.totalModels || 0)} models</span></div>
+              <div class="timeline-list">
+                ${(data.topModels || []).map((item) => `<div class="timeline-item"><b>${escapeHtml(item.modelType || "model")}</b><span>${formatNumber(item.averageConfidence || 0)}% confidence - ${formatNumber(item.evidenceCount || 0)} evidence - ${formatNumber(item.predictionCount || 0)} predictions</span></div>`).join("") || `<div class="empty-state">No prediction models yet.</div>`}
+              </div>
+            </section>
+          </div>
+          <section class="glass" style="margin-top:14px">
+            <div class="panel-head"><div class="panel-title"><span class="nav-glyph">AH</span>Accuracy History</div><span class="pill">${formatNumber(data.totalHistory || 0)} evaluated</span></div>
+            <div class="timeline-list">
+              ${(data.recentHistory || []).map((item) => `<div class="timeline-item"><b>${escapeHtml(item.predictionType || "prediction")}</b><span>${escapeHtml(item.outcome || "unknown")} - ${item.success ? "supported" : "not supported"} - ${formatNumber(item.confidence || 0)}% original confidence</span></div>`).join("") || `<div class="empty-state">No prediction outcomes have matured yet.</div>`}
+            </div>
+          </section>`;
         animateCounts();
       }
 

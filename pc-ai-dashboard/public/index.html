@@ -4263,6 +4263,7 @@
           <button data-view="digital-twin" type="button">Digital Twin</button>
           <button data-view="relationships" type="button">Relationships</button>
           <button data-view="mission-control" type="button">Mission Control</button>
+          <button data-view="future-intelligence" type="button">Future Intelligence</button>
           <button data-view="place-hunter" type="button">Place hunter</button>
           <button data-view="timeline" type="button">Timeline</button>
           <button data-view="memories" type="button">Memories</button>
@@ -4833,6 +4834,68 @@
           </section>
         </div>
 
+        <div class="view" data-view-panel="future-intelligence">
+          <section class="panel hero relationship-intelligence-panel">
+            <div class="section-title">
+              <div>
+                <h2>Future Intelligence</h2>
+                <span id="future-status" class="muted">Evidence-backed prediction engine</span>
+              </div>
+              <button id="future-rebuild-button" class="chip" type="button">Rebuild Forecasts</button>
+            </div>
+            <p class="ai-system-status">NeuroNest only predicts from real goals, memories, places, chats, relationship signals, timeline events, and learning patterns. Empty accounts generate no predictions.</p>
+            <div id="future-overview" class="relationship-metric-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Goal Forecasts</h2><span class="muted">Completion and abandonment risk</span></div>
+                <div id="future-goals" class="relationship-insight-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Habit Forecasts</h2><span class="muted">Forming, stable, breaking</span></div>
+                <div id="future-habits" class="relationship-insight-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Productivity & Mood</h2><span class="muted">Focus windows and emotional trend</span></div>
+                <div id="future-productivity" class="relationship-insight-list"></div>
+                <div id="future-mood" class="relationship-insight-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Burnout Risk</h2><span class="muted">Stress, workload, recovery</span></div>
+                <div id="future-burnout" class="relationship-insight-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Relationship Forecasts</h2><span class="muted">Growing and fading people signals</span></div>
+                <div id="future-relationships" class="relationship-insight-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Opportunity Engine</h2><span class="muted">Emerging interests and high-growth areas</span></div>
+                <div id="future-opportunities" class="relationship-insight-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Prediction Accuracy</h2>
+              <span class="muted">Calibration from matured forecasts</span>
+            </div>
+            <div id="future-accuracy" class="relationship-timeline-list"></div>
+          </section>
+        </div>
+
         <div class="view" data-view-panel="memories">
           <section class="panel hero">
             <div class="section-title">
@@ -5376,6 +5439,17 @@
       const relationshipInsightsList = document.getElementById("relationship-insights-list");
       const relationshipReconnectList = document.getElementById("relationship-reconnect-list");
       const relationshipTimelineList = document.getElementById("relationship-timeline-list");
+      const futureStatus = document.getElementById("future-status");
+      const futureRebuildButton = document.getElementById("future-rebuild-button");
+      const futureOverview = document.getElementById("future-overview");
+      const futureGoals = document.getElementById("future-goals");
+      const futureHabits = document.getElementById("future-habits");
+      const futureProductivity = document.getElementById("future-productivity");
+      const futureRelationships = document.getElementById("future-relationships");
+      const futureMood = document.getElementById("future-mood");
+      const futureBurnout = document.getElementById("future-burnout");
+      const futureOpportunities = document.getElementById("future-opportunities");
+      const futureAccuracy = document.getElementById("future-accuracy");
       const memoryScoreGrid = document.getElementById("memory-score-grid");
       const dnaProfileName = document.getElementById("dna-profile-name");
       const dnaHelix = document.getElementById("dna-helix");
@@ -5443,6 +5517,7 @@
         voice: "Voice Assistant",
         "digital-twin": "Digital Twin",
         relationships: "Relationship Intelligence",
+        "future-intelligence": "Future Intelligence",
         "ai-systems": "AI Systems",
         "mission-control": "Mission Control",
         map: "Map View",
@@ -5540,6 +5615,7 @@
       let digitalTwinLoaded = false;
       let relationshipDashboardLoaded = false;
       let lifeOsLoaded = false;
+      let futurePredictionsLoaded = false;
       let autonomousCaptureEnabled = localStorage.getItem("neuronest.passiveCapture") !== "false";
       let autonomousCaptureReady = false;
       let lastAutonomousCaptureSignature = "";
@@ -7188,6 +7264,11 @@
           void loadLifeOs();
         }
 
+        if (viewName === "future-intelligence") {
+          void loadFuturePredictions();
+          void reportLiveAction("FUTURE_INTELLIGENCE", { page: "future-intelligence", label: "Future Intelligence" });
+        }
+
         if (viewName === "timeline") {
           renderTimelineFilters();
           void loadSmartTimeline({ reset: true });
@@ -7310,6 +7391,7 @@
         await loadEntries();
         aiSystemsLoaded = false;
         relationshipDashboardLoaded = false;
+        futurePredictionsLoaded = false;
       }
 
       async function restoreEntry(entryId) {
@@ -7317,6 +7399,7 @@
         await loadEntries();
         aiSystemsLoaded = false;
         relationshipDashboardLoaded = false;
+        futurePredictionsLoaded = false;
       }
 
       function renderTimelineFilters() {
@@ -8122,6 +8205,116 @@
             if (!element) return;
             element.innerHTML = "";
             element.appendChild(relationshipEmpty("Could not load relationships", error.message || "Try again after the server is ready."));
+          });
+        }
+      }
+
+      function renderFutureOverview(overview = {}, accuracy = {}) {
+        if (!futureOverview) return;
+        const metrics = [
+          ["Active Predictions", overview.activePredictions || 0, "Evidence-backed forecasts"],
+          ["Average Confidence", `${overview.averageConfidence || 0}%`, "Across active predictions"],
+          ["High Risk", overview.highRiskPredictions || 0, "Requires attention"],
+          ["Accuracy", `${accuracy.accuracy || overview.predictionAccuracy || 0}%`, accuracy.reliability || overview.reliability || "insufficient history"],
+        ];
+        futureOverview.innerHTML = "";
+        metrics.forEach(([label, value, body]) => {
+          const card = document.createElement("article");
+          card.className = "relationship-metric";
+          const small = document.createElement("span");
+          small.textContent = label;
+          const strong = document.createElement("strong");
+          strong.textContent = value;
+          const desc = document.createElement("span");
+          desc.textContent = body;
+          card.append(small, strong, desc);
+          futureOverview.appendChild(card);
+        });
+      }
+
+      function renderFuturePredictionCards(container, predictions = [], emptyTitle, emptyBody) {
+        if (!container) return;
+        container.innerHTML = "";
+        if (!predictions.length) {
+          container.appendChild(relationshipEmpty(emptyTitle, emptyBody));
+          return;
+        }
+        predictions.slice(0, 8).forEach((prediction) => {
+          const card = document.createElement("article");
+          card.className = "relationship-insight-card";
+          const title = document.createElement("h3");
+          title.textContent = prediction.title || "Future prediction";
+          const body = document.createElement("p");
+          body.textContent = prediction.summary || prediction.recommendation || "Evidence-backed prediction.";
+          const meta = document.createElement("span");
+          meta.textContent = `${prediction.confidence || 0}% confidence | ${prediction.evidenceCount || 0} evidence | ${prediction.riskLevel || "Low"} risk`;
+          const reason = document.createElement("p");
+          reason.className = "ai-system-status";
+          reason.textContent = prediction.reasoning || prediction.recommendation || "";
+          card.append(title, body, meta);
+          if (reason.textContent) card.appendChild(reason);
+          container.appendChild(card);
+        });
+      }
+
+      function renderFutureAccuracy(history = [], accuracy = {}) {
+        if (!futureAccuracy) return;
+        futureAccuracy.innerHTML = "";
+        if (!history.length) {
+          futureAccuracy.appendChild(relationshipEmpty("No matured predictions yet", `${accuracy.reliability || "Accuracy appears after predictions reach their valid-until window and real outcome evidence exists."}`));
+          return;
+        }
+        history.slice(0, 10).forEach((item) => {
+          const card = document.createElement("article");
+          card.className = "relationship-timeline-card";
+          const title = document.createElement("h3");
+          title.textContent = item.predictionType || "Prediction outcome";
+          const body = document.createElement("p");
+          body.textContent = `${item.outcome || "unknown"} - ${item.success ? "supported by later evidence" : "not supported yet"}`;
+          const time = document.createElement("span");
+          time.textContent = formatRelationshipDate(item.evaluatedAt);
+          card.append(title, body, time);
+          futureAccuracy.appendChild(card);
+        });
+      }
+
+      function renderFutureDashboard(data = {}) {
+        const byType = data.byType || {};
+        const predictions = data.predictions || [];
+        if (futureStatus) futureStatus.textContent = predictions.length ? `${predictions.length} active evidence-backed predictions` : "No prediction evidence yet";
+        renderFutureOverview(data.overview || {}, data.accuracy || {});
+        renderFuturePredictionCards(futureGoals, byType.goals || [], "No goal forecast yet", "Add goals and related activity memories before NeuroNest predicts completion probability.");
+        renderFuturePredictionCards(futureHabits, byType.habits || [], "No habit forecast yet", "Habit forecasts need repeated real activity signals.");
+        renderFuturePredictionCards(futureProductivity, byType.productivity || [], "No productivity forecast yet", "Productivity windows require at least three productive memory signals.");
+        renderFuturePredictionCards(futureMood, byType.mood || [], "No mood forecast yet", "Mood forecasts require emotional memories, journals, or voice sentiment.");
+        renderFuturePredictionCards(futureBurnout, byType.burnout || [], "No burnout signal yet", "Burnout detection needs workload, stress, or recovery evidence.");
+        renderFuturePredictionCards(futureRelationships, byType.relationships || [], "No relationship forecast yet", "Relationship forecasts appear after people have repeated evidence-backed interactions.");
+        renderFuturePredictionCards(futureOpportunities, byType.opportunities || [], "No opportunity forecast yet", "Opportunities appear when interests and goals show repeated growth signals.");
+        renderFutureAccuracy(data.history || [], data.accuracy || {});
+        [futureOverview, futureGoals, futureHabits, futureProductivity, futureMood, futureBurnout, futureRelationships, futureOpportunities, futureAccuracy].forEach((element) => {
+          if (element) {
+            installCardLighting(element);
+            animateContainerItems(element);
+          }
+        });
+      }
+
+      async function loadFuturePredictions({ force = false } = {}) {
+        if (!currentUser || (futurePredictionsLoaded && !force)) return;
+        futurePredictionsLoaded = true;
+        if (futureStatus) futureStatus.textContent = force ? "Rebuilding future predictions..." : "Loading future predictions...";
+        try {
+          const data = force
+            ? await api("/api/predictions/rebuild", { method: "POST", body: JSON.stringify({}) })
+            : await api("/api/predictions");
+          renderFutureDashboard(data);
+        } catch (error) {
+          futurePredictionsLoaded = false;
+          if (futureStatus) futureStatus.textContent = "Future Prediction Engine unavailable";
+          [futureGoals, futureHabits, futureProductivity, futureBurnout, futureOpportunities].forEach((element) => {
+            if (!element) return;
+            element.innerHTML = "";
+            element.appendChild(relationshipEmpty("Could not load predictions", error.message || "Try again after the server is ready."));
           });
         }
       }
@@ -9667,6 +9860,8 @@
         form.reset();
         renderLifeOs(data.lifeOs);
         lifeOsLoaded = true;
+        futurePredictionsLoaded = false;
+        if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         showAiNotification("Life OS goal created", `${data.goal.title} is now tracked by Mission Control.`);
       }
 
@@ -9677,6 +9872,8 @@
         });
         renderLifeOs(data.lifeOs);
         lifeOsLoaded = true;
+        futurePredictionsLoaded = false;
+        if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         showAiNotification("Goal updated", `${data.goal.title} is now ${data.goal.progress}% complete.`);
       }
 
@@ -9929,7 +10126,14 @@
           ...(journal.prompts || []).map((prompt) => ({ title: prompt, body: "Reflection prompt", strength: 58 })),
         ]);
 
-        renderAiWidgets(predictionStage, predictions.predictions || []);
+        renderAiWidgets(
+          predictionStage,
+          (predictions.predictions || []).map((prediction) => ({
+            title: prediction.title,
+            body: prediction.summary || prediction.reasoning,
+            strength: prediction.confidence || prediction.predictionScore || 0,
+          })),
+        );
       }
 
       async function loadAiSystems() {
@@ -10393,6 +10597,7 @@
           await loadEntries();
           aiSystemsLoaded = false;
           relationshipDashboardLoaded = false;
+          futurePredictionsLoaded = false;
         } finally {
           hideSnapshotOverlay();
         }
@@ -10527,7 +10732,9 @@
           loadingBubble.closest(".chat-row")?.classList.remove("loading");
           await typeInto(loadingBubble, assistantMessage?.content || "Done.", 10);
           lifeOsLoaded = false;
+          futurePredictionsLoaded = false;
           if (activeView === "mission-control") void loadLifeOs({ force: true });
+          if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         } catch (error) {
           loadingBubble.textContent = friendlyError(error);
           loadingBubble.classList.remove("chat-loading");
@@ -10624,6 +10831,11 @@
         void loadLifeOs({ force: true });
       });
 
+      futureRebuildButton?.addEventListener("click", () => {
+        futurePredictionsLoaded = false;
+        void loadFuturePredictions({ force: true });
+      });
+
       lifeGoalForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
         const submitButton = lifeGoalForm.querySelector("button[type='submit']");
@@ -10667,6 +10879,7 @@
             aiSystemsLoaded = false;
             relationshipDashboardLoaded = false;
             lifeOsLoaded = false;
+            futurePredictionsLoaded = false;
           } catch (error) {
             alert(friendlyError(error));
           } finally {

@@ -321,6 +321,59 @@ export function createSupabaseProductionStore() {
     return { relationships: profiles.length, events: events.length, insights: insights.length, clusters: clusters.length };
   }
 
+  async function replaceFuturePredictions(userId, snapshot = {}) {
+    if (!ready() || !userId) return null;
+    const predictions = (snapshot.predictions || []).map((item) => ({
+      id: item.id,
+      user_id: userId,
+      type: item.type || "prediction",
+      title: item.title || "Prediction",
+      summary: item.summary || "",
+      confidence: Number(item.confidence || 0),
+      evidence: item.evidence || [],
+      evidence_count: Number(item.evidenceCount || (item.evidence || []).length || 0),
+      prediction_score: Number(item.predictionScore || item.score || 0),
+      risk_level: item.riskLevel || "Low",
+      status: item.status || "active",
+      generated_at: item.generatedAt || snapshot.generatedAt || new Date().toISOString(),
+      valid_until: item.validUntil || null,
+      data: item,
+    }));
+    const models = (snapshot.models || []).map((model) => ({
+      id: model.id,
+      user_id: userId,
+      model_type: model.modelType || model.type || "prediction",
+      evidence_count: Number(model.evidenceCount || 0),
+      prediction_count: Number(model.predictionCount || 0),
+      average_confidence: Number(model.averageConfidence || 0),
+      average_score: Number(model.averageScore || 0),
+      updated_at: model.updatedAt || snapshot.generatedAt || new Date().toISOString(),
+      data: model,
+    }));
+    const history = (snapshot.history || []).map((item) => ({
+      id: item.id,
+      user_id: userId,
+      prediction_id: item.predictionId || null,
+      prediction_type: item.predictionType || "prediction",
+      outcome: item.outcome || "unknown",
+      success: Boolean(item.success),
+      confidence: Number(item.confidence || 0),
+      evidence: item.evidence || [],
+      evaluated_at: item.evaluatedAt || snapshot.generatedAt || new Date().toISOString(),
+      data: item,
+    }));
+
+    await Promise.all([
+      deleteUserRows("prediction_history", userId),
+      deleteUserRows("prediction_models", userId),
+      deleteUserRows("predictions", userId),
+    ]);
+    await bulkUpsert("predictions", predictions);
+    await bulkUpsert("prediction_models", models);
+    await bulkUpsert("prediction_history", history);
+    return { predictions: predictions.length, models: models.length, history: history.length };
+  }
+
   async function hydrateAdminDb(db) {
     if (!ready()) return { skipped: true };
     const optionalRest = async (path) => {
@@ -330,7 +383,7 @@ export function createSupabaseProductionStore() {
         return [];
       }
     };
-    const [users, memories, chats, goals, media, intelligence, usage, embeddings, placeMemories, relationshipProfiles, relationshipEvents, relationshipInsights, relationshipClusters] = await Promise.all([
+    const [users, memories, chats, goals, media, intelligence, usage, embeddings, placeMemories, relationshipProfiles, relationshipEvents, relationshipInsights, relationshipClusters, futurePredictions, predictionModels, predictionHistory] = await Promise.all([
       rest("neuronest_users?select=*&limit=5000"),
       rest("memories?select=*&order=created_at.desc&limit=5000"),
       rest("ai_chats?select=*&order=created_at.desc&limit=5000"),
@@ -344,6 +397,9 @@ export function createSupabaseProductionStore() {
       optionalRest("relationship_events?select=*&order=timestamp.desc&limit=5000"),
       optionalRest("relationship_insights?select=*&order=created_at.desc&limit=5000"),
       optionalRest("relationship_clusters?select=*&order=created_at.desc&limit=5000"),
+      optionalRest("predictions?select=*&order=generated_at.desc&limit=5000"),
+      optionalRest("prediction_models?select=*&order=updated_at.desc&limit=5000"),
+      optionalRest("prediction_history?select=*&order=evaluated_at.desc&limit=5000"),
     ]);
 
     db.users = users.map((user) => ({
@@ -472,6 +528,45 @@ export function createSupabaseProductionStore() {
     }));
     warehouse.digitalTwins = [];
     warehouse.predictions = [];
+    warehouse.futurePredictions = futurePredictions.map((item) => ({
+      ...(item.data || {}),
+      id: item.id,
+      userId: item.user_id,
+      type: item.type,
+      title: item.title,
+      summary: item.summary,
+      confidence: item.confidence,
+      evidence: item.evidence || [],
+      evidenceCount: item.evidence_count,
+      predictionScore: item.prediction_score,
+      riskLevel: item.risk_level,
+      status: item.status,
+      generatedAt: item.generated_at,
+      validUntil: item.valid_until,
+    }));
+    warehouse.predictionModels = predictionModels.map((item) => ({
+      ...(item.data || {}),
+      id: item.id,
+      userId: item.user_id,
+      modelType: item.model_type,
+      evidenceCount: item.evidence_count,
+      predictionCount: item.prediction_count,
+      averageConfidence: item.average_confidence,
+      averageScore: item.average_score,
+      updatedAt: item.updated_at,
+    }));
+    warehouse.predictionHistory = predictionHistory.map((item) => ({
+      ...(item.data || {}),
+      id: item.id,
+      userId: item.user_id,
+      predictionId: item.prediction_id,
+      predictionType: item.prediction_type,
+      outcome: item.outcome,
+      success: item.success,
+      confidence: item.confidence,
+      evidence: item.evidence || [],
+      evaluatedAt: item.evaluated_at,
+    }));
     warehouse.replays = [];
     warehouse.insights = [];
     warehouse.aiJobs ||= [];
@@ -577,6 +672,7 @@ export function createSupabaseProductionStore() {
     upsertGoal,
     upsertIntelligence,
     replaceRelationshipIntelligence,
+    replaceFuturePredictions,
     hydrateAdminDb,
   };
 }

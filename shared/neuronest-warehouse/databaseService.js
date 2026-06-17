@@ -30,6 +30,9 @@ export function createEmptyWarehouse() {
     relationshipClusters: [],
     digitalTwins: [],
     predictions: [],
+    futurePredictions: [],
+    predictionModels: [],
+    predictionHistory: [],
     replays: [],
     insights: [],
     aiJobs: [],
@@ -62,6 +65,9 @@ export function normalizeWarehouse(db) {
   warehouse.relationshipClusters ||= [];
   warehouse.digitalTwins ||= [];
   warehouse.predictions ||= [];
+  warehouse.futurePredictions ||= [];
+  warehouse.predictionModels ||= [];
+  warehouse.predictionHistory ||= [];
   warehouse.replays ||= [];
   warehouse.insights ||= [];
   warehouse.aiJobs ||= [];

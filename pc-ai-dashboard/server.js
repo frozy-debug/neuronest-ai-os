@@ -38,6 +38,7 @@ import {
   buildRelationshipTimeline,
   findRelationshipById,
 } from "./services/relationshipIntelligenceService.js";
+import { answerPredictionQuery, buildFuturePredictionEngine } from "./services/futurePredictionEngineService.js";
 import {
   buildAutomaticPlaceMemoryPayload,
   downloadGooglePlacePhoto,
@@ -189,6 +190,41 @@ function persistRelationshipIntelligenceSnapshot(userId, snapshot, trigger = "re
   writeDb(db);
   if (productionStore.ready()) {
     void productionStore.replaceRelationshipIntelligence(userId, snapshot).catch(() => {});
+  }
+  return snapshot;
+}
+
+function persistFuturePredictionSnapshot(userId, snapshot, trigger = "rebuild") {
+  const db = readDb();
+  warehouseDb.normalizeWarehouse(db);
+  const filterOut = (list) => list.filter((item) => item.userId !== userId);
+  db.warehouse.futurePredictions = [
+    ...(snapshot.predictions || []).map((item) => ({ ...item, trigger })),
+    ...filterOut(db.warehouse.futurePredictions),
+  ].slice(0, 10_000);
+  db.warehouse.predictionModels = [
+    ...(snapshot.models || []).map((item) => ({ ...item, trigger })),
+    ...filterOut(db.warehouse.predictionModels),
+  ].slice(0, 2_500);
+  db.warehouse.predictionHistory = [
+    ...(snapshot.history || []).map((item) => ({ ...item, trigger })),
+    ...filterOut(db.warehouse.predictionHistory),
+  ].slice(0, 10_000);
+  adminSyncService.syncIntelligenceRecord(db, "predictions", userId, {
+    id: `future-predictions_${userId}`,
+    type: "future-predictions",
+    trigger,
+    version: snapshot.version,
+    generatedAt: snapshot.generatedAt,
+    overview: snapshot.overview,
+    predictions: (snapshot.predictions || []).slice(0, 24),
+    accuracy: snapshot.accuracy,
+    evidencePolicy: snapshot.evidencePolicy,
+    evidenceMemoryCount: (snapshot.predictions || []).reduce((sum, item) => sum + Number(item.evidenceCount || 0), 0),
+  });
+  writeDb(db);
+  if (productionStore.ready()) {
+    void productionStore.replaceFuturePredictions(userId, snapshot).catch(() => {});
   }
   return snapshot;
 }
@@ -866,6 +902,24 @@ function buildRelationshipIntelligenceForUser(userId, { persist = false, trigger
   return persist ? persistRelationshipIntelligenceSnapshot(userId, snapshot, trigger) : snapshot;
 }
 
+function buildFuturePredictionsForUser(userId, { persist = false, trigger = "read" } = {}) {
+  const db = readDb();
+  warehouseDb.normalizeWarehouse(db);
+  const relationshipIntelligence = buildRelationshipIntelligenceForUser(userId);
+  const snapshot = buildFuturePredictionEngine({
+    userId,
+    memories: allUnifiedMemories(userId),
+    records: allMemoryRecords(userId),
+    chats: getChatHistory(userId),
+    places: placeService.getUserPlaceMemories(db, userId, 10_000),
+    goals: getLifeGoals(userId),
+    relationshipIntelligence,
+    learningProfile: getLearningProfile(userId),
+    previousPredictions: db.warehouse.futurePredictions.filter((item) => item.userId === userId),
+  });
+  return persist ? persistFuturePredictionSnapshot(userId, snapshot, trigger) : snapshot;
+}
+
 async function buildIntelligenceCoreResponse(user, context = {}) {
   const memories = allUnifiedMemories(user.id);
   const relationships = detectRelationships(memories);
@@ -898,7 +952,8 @@ async function buildDigitalTwinResponse(user, context = {}) {
   const dna = buildMemoryDnaProfile(memories, relationships);
   const intelligenceCore = await buildIntelligenceCoreResponse(user, context);
   const peopleRelationships = buildRelationshipIntelligenceForUser(user.id);
-  const digitalTwin = buildDigitalTwin({ user, memories, relationships, intelligenceCore, dna, peopleRelationships });
+  const futurePredictions = buildFuturePredictionsForUser(user.id);
+  const digitalTwin = buildDigitalTwin({ user, memories, relationships, intelligenceCore, dna, peopleRelationships, futurePredictions });
   persistIntelligenceRecord(user.id, "digitalTwins", {
     id: `digital-twin_${user.id}`,
     snapshot: digitalTwin,
@@ -913,10 +968,11 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
   if (!user) return null;
   const memories = allUnifiedMemories(userId);
   const relationships = detectRelationships(memories);
-  const predictions = [...buildPredictions(allMemoryRecords(userId)), ...generateProactiveNotifications(memories, relationships)].slice(0, 12);
   const replay = buildMemoryReplay(memories, relationships, "day", "today");
   const insights = generateInsightCards(memories, relationships);
   const relationshipIntelligence = buildRelationshipIntelligenceForUser(userId, { persist: true, trigger });
+  const futurePredictions = buildFuturePredictionsForUser(userId, { persist: true, trigger });
+  const predictions = futurePredictions.predictions.slice(0, 12);
 
   persistIntelligenceRecord(userId, "relationships", {
     id: `relationships_${userId}`,
@@ -953,7 +1009,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
     relationshipCount: relationshipIntelligence.relationships.length,
   });
   await buildDigitalTwinResponse(user, { activity: trigger, trigger });
-  return { relationships, predictions, replay, insights, relationshipIntelligence };
+  return { relationships, predictions, replay, insights, relationshipIntelligence, futurePredictions };
 }
 
 function buildLearningEngineResponse(user, { rebuild = false, context = {} } = {}) {
@@ -992,7 +1048,8 @@ async function buildLifeOsResponse(user, context = {}) {
     focusState: context.focusState || "goal execution",
   });
   const peopleRelationships = buildRelationshipIntelligenceForUser(user.id);
-  const digitalTwin = buildDigitalTwin({ user, memories, relationships, intelligenceCore, dna, peopleRelationships });
+  const futurePredictions = buildFuturePredictionsForUser(user.id);
+  const digitalTwin = buildDigitalTwin({ user, memories, relationships, intelligenceCore, dna, peopleRelationships, futurePredictions });
   const userBrainModel = getStoredUserBrainModel(user.id) || buildAndPersistUserBrainModel(user, { trigger: "life-os", activity: context.activity || "mission control" });
   const learningProfile = buildLearningEngineResponse(user, { context: { activity: context.activity || "mission control" } });
   return buildLifeOsMissionControl({
@@ -1001,6 +1058,7 @@ async function buildLifeOsResponse(user, context = {}) {
     relationships,
     digitalTwin,
     userBrainModel: { ...summarizeUserBrainModel(userBrainModel), learningProfile },
+    futurePredictions,
   });
 }
 
@@ -1009,7 +1067,8 @@ function buildAndPersistUserBrainModel(user, context = {}) {
   const relationships = detectRelationships(memories);
   const dna = buildMemoryDnaProfile(memories, relationships);
   const peopleRelationships = buildRelationshipIntelligenceForUser(user.id);
-  const digitalTwin = buildDigitalTwin({ user, memories, relationships, dna, peopleRelationships });
+  const futurePredictions = buildFuturePredictionsForUser(user.id);
+  const digitalTwin = buildDigitalTwin({ user, memories, relationships, dna, peopleRelationships, futurePredictions });
   const previousModel = getStoredUserBrainModel(user.id);
   const model = buildUserBrainModel({
     user,
@@ -2145,17 +2204,54 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/ai/predictions") {
-    const memories = allUnifiedMemories(session.user.id);
-    const relationships = detectRelationships(memories);
-    const response = {
-      predictions: [...buildPredictions(allMemoryRecords(session.user.id)), ...generateProactiveNotifications(memories, relationships)].slice(0, 6),
-    };
-    persistIntelligenceRecord(session.user.id, "predictions", {
-      id: `predictions_${session.user.id}`,
-      ...response,
-      evidenceMemoryCount: memories.length,
+    const snapshot = buildFuturePredictionsForUser(session.user.id, {
+      persist: url.searchParams.get("persist") === "true",
+      trigger: "ai-systems-read",
     });
-    return sendJson(res, 200, response);
+    return sendJson(res, 200, {
+      predictions: snapshot.predictions.slice(0, 8),
+      overview: snapshot.overview,
+      accuracy: snapshot.accuracy,
+      evidencePolicy: snapshot.evidencePolicy,
+    });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/predictions") {
+    const snapshot = buildFuturePredictionsForUser(session.user.id, {
+      persist: url.searchParams.get("persist") === "true",
+      trigger: "predictions-read",
+    });
+    return sendJson(res, 200, snapshot);
+  }
+
+  const predictionTypeRoutes = {
+    "/api/predictions/goals": "goals",
+    "/api/predictions/habits": "habits",
+    "/api/predictions/productivity": "productivity",
+    "/api/predictions/relationships": "relationships",
+    "/api/predictions/mood": "mood",
+    "/api/predictions/burnout": "burnout",
+    "/api/predictions/opportunities": "opportunities",
+  };
+  if (req.method === "GET" && predictionTypeRoutes[url.pathname]) {
+    const snapshot = buildFuturePredictionsForUser(session.user.id);
+    const key = predictionTypeRoutes[url.pathname];
+    return sendJson(res, 200, {
+      type: key,
+      predictions: snapshot.byType?.[key] || [],
+      overview: snapshot.overview,
+      evidencePolicy: snapshot.evidencePolicy,
+    });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/predictions/rebuild") {
+    const snapshot = buildFuturePredictionsForUser(session.user.id, { persist: true, trigger: "manual-rebuild" });
+    recordAiUsage(session.user.id, "future-prediction-rebuild", "completed", {
+      predictionCount: snapshot.predictions.length,
+      averageConfidence: snapshot.overview.averageConfidence,
+      historyCount: snapshot.history.length,
+    });
+    return sendJson(res, 200, snapshot);
   }
 
   if (req.method === "POST" && url.pathname === "/api/ai/search") {
@@ -2431,6 +2527,8 @@ async function handleApi(req, res, url) {
     const relationships = detectRelationships(memories);
     const peopleRelationships = buildRelationshipIntelligenceForUser(session.user.id);
     const relationshipAnswer = answerRelationshipQuery(message, peopleRelationships);
+    const futurePredictions = buildFuturePredictionsForUser(session.user.id);
+    const predictionAnswer = answerPredictionQuery(message, futurePredictions);
     const timeline = buildTimeline({ memories, relationships, limit: 80 });
     const insights = generateInsightCards(memories, relationships);
     const patterns = detectLifePatterns(memories, relationships);
@@ -2459,6 +2557,7 @@ async function handleApi(req, res, url) {
       intelligenceCore,
       dna: buildMemoryDnaProfile(memories, relationships),
       peopleRelationships,
+      futurePredictions,
     });
     const userBrainModel = buildAndPersistUserBrainModel(session.user, {
       trigger: "chat-before-reply",
@@ -2493,6 +2592,20 @@ async function handleApi(req, res, url) {
           reconnect: peopleRelationships.reconnect.slice(0, 4),
           insights: peopleRelationships.insights.slice(0, 5),
           directAnswer: relationshipAnswer.matched ? relationshipAnswer : null,
+        },
+        futurePredictions: {
+          overview: futurePredictions.overview,
+          topPredictions: futurePredictions.predictions.slice(0, 8).map((prediction) => ({
+            type: prediction.type,
+            title: prediction.title,
+            summary: prediction.summary,
+            confidence: prediction.confidence,
+            riskLevel: prediction.riskLevel,
+            evidenceCount: prediction.evidenceCount,
+            reasoning: prediction.reasoning,
+          })),
+          directAnswer: predictionAnswer.matched ? predictionAnswer : null,
+          evidencePolicy: futurePredictions.evidencePolicy,
         },
         recentConversation: getChatHistory(session.user.id).slice(-10).map((item) => ({
           role: item.role,
@@ -2538,7 +2651,9 @@ async function handleApi(req, res, url) {
     const contextualReply = providerReply;
     const decisionLine = "";
     const reply =
-      relationshipAnswer.matched && relationshipAnswer.confidence >= 50
+      predictionAnswer.matched && predictionAnswer.confidence >= 50
+        ? `${contextualReply}${decisionLine} ${predictionAnswer.answer}`
+        : relationshipAnswer.matched && relationshipAnswer.confidence >= 50
         ? `${contextualReply}${decisionLine} ${relationshipAnswer.answer}`
         : semanticMatches.length && fusedContext.summary
           ? `${contextualReply}${decisionLine} ${fusedContext.summary}`

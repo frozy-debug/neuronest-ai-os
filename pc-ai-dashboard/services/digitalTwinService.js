@@ -229,7 +229,7 @@ export function buildDecisionRecommendation({ question = "", twin, memories = []
   };
 }
 
-export function buildDigitalTwin({ user, memories = [], relationships = [], intelligenceCore = null, dna = null, peopleRelationships = null }) {
+export function buildDigitalTwin({ user, memories = [], relationships = [], intelligenceCore = null, dna = null, peopleRelationships = null, futurePredictions = null }) {
   const strengths = buildStrengthMap(memories);
   const weaknesses = buildWeaknessMap(memories);
   const goals = buildGoals(memories, relationships);
@@ -259,6 +259,7 @@ export function buildDigitalTwin({ user, memories = [], relationships = [], inte
       stress: person.emotionalImpact.stress,
       confidence: Math.min(98, 45 + person.interactionCount * 8),
     }));
+  const forecastRows = futurePredictions?.predictions || [];
   const understanding = intelligenceCore?.understandingLevel || {
     level: memories.length ? clamp(memories.length * 2 + relationships.length * 1.6 + habits.length * 5 + goals.length * 4) : 0,
     breakdown: {},
@@ -303,6 +304,27 @@ export function buildDigitalTwin({ user, memories = [], relationships = [], inte
         needsAttention: peopleProfiles.filter((person) => person.relationshipHealth === "Needs Attention").length,
         weak: peopleProfiles.filter((person) => person.relationshipHealth === "Weak").length,
       },
+    },
+    futureIntelligence: {
+      overview: futurePredictions?.overview || {
+        activePredictions: 0,
+        highRiskPredictions: 0,
+        averageConfidence: 0,
+        predictionAccuracy: 0,
+        reliability: "insufficient history",
+      },
+      topPredictions: forecastRows.slice(0, 6).map((prediction) => ({
+        id: prediction.id,
+        type: prediction.type,
+        title: prediction.title,
+        confidence: prediction.confidence,
+        riskLevel: prediction.riskLevel,
+        evidenceCount: prediction.evidenceCount,
+      })),
+      burnoutRisk: forecastRows.find((prediction) => prediction.type === "burnout") || null,
+      nextFocusWindow: forecastRows.find((prediction) => prediction.type === "productivity") || null,
+      opportunities: forecastRows.filter((prediction) => prediction.type === "opportunity").slice(0, 4),
+      evidencePolicy: futurePredictions?.evidencePolicy || "No predictions are generated without real user evidence.",
     },
     knowledgeGraph: {
       ...graph,

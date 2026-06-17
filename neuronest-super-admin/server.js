@@ -514,6 +514,7 @@ function buildMetrics(db) {
   const aiChats = warehouse.aiChats.length;
   const aiRequests = warehouse.aiUsage.length;
   const relationshipProfiles = warehouse.relationshipProfiles.length;
+  const futurePredictions = warehouse.futurePredictions.length;
 
   return [
     { key: "users", label: "Total Users", value: db.users.length, accent: "blue", icon: "US", trend: trendFrom(todayUsers, db.users.length), trendLabel: "new today" },
@@ -526,6 +527,7 @@ function buildMetrics(db) {
     { key: "places", label: "Total Places", value: places, accent: "orange", icon: "PL", trend: trendFrom(places, Math.max(entries.length, 1)), trendLabel: "of memories" },
     { key: "place-visits", label: "Automatic Place Visits", value: placeVisits, accent: "cyan", icon: "PV", trend: trendFrom(placeVisits, Math.max(places, 1)), trendLabel: "passively captured" },
     { key: "relationships", label: "People Relationships", value: relationshipProfiles, accent: "green", icon: "RI", trend: trendFrom(warehouse.relationshipEvents.length, Math.max(relationshipProfiles, 1)), trendLabel: "evidence signals" },
+    { key: "future-predictions", label: "Future Predictions", value: futurePredictions, accent: "blue", icon: "FP", trend: trendFrom(warehouse.predictionHistory.length, Math.max(futurePredictions, 1)), trendLabel: "evaluated" },
     { key: "voice", label: "Voice Notes", value: voice, accent: "violet", icon: "VO", trend: trendFrom(voice, Math.max(entries.length, 1)), trendLabel: "of memories" },
     { key: "screenshots", label: "Screenshots", value: screenshots, accent: "pink", icon: "SC", trend: trendFrom(screenshots, Math.max(entries.length, 1)), trendLabel: "of memories" },
     { key: "embeddings", label: "Embeddings", value: embeddings, accent: "cyan", icon: "EM", trend: trendFrom(vectors, Math.max(embeddings, 1)), trendLabel: "vectorized" },
@@ -557,7 +559,7 @@ function buildAiUsage(db) {
   const memorySearch = warehouse.aiUsage.filter((item) => item.type === "memory-search" || item.capability === "semantic-search").length;
   const embeddings = countEmbeddings(db);
   const voiceProcessing = warehouse.voiceNotes.length;
-  const predictions = warehouse.predictions.length;
+  const predictions = warehouse.futurePredictions.length || warehouse.predictions.length;
   const total = Math.max(1, aiChat + memorySearch + embeddings + voiceProcessing + predictions);
   return [
     { label: "AI Chat", value: aiChat, color: "#8a4dff", percent: Math.round((aiChat / total) * 1000) / 10 },
@@ -666,6 +668,57 @@ function buildRelationshipAnalytics(db) {
       .sort((a, b) => asDate(b.createdAt) - asDate(a.createdAt))
       .slice(0, 20),
     clusters: [...clusters].sort((a, b) => Number(b.confidence || 0) - Number(a.confidence || 0)).slice(0, 16),
+  };
+}
+
+function buildPredictionAnalytics(db) {
+  warehouseDb.normalizeWarehouse(db);
+  const warehouse = db.warehouse;
+  const predictions = warehouse.futurePredictions || [];
+  const models = warehouse.predictionModels || [];
+  const history = warehouse.predictionHistory || [];
+  const byType = predictions.reduce((acc, item) => {
+    const key = item.type || "unknown";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const confidenceBuckets = predictions.reduce(
+    (acc, item) => {
+      const confidence = Number(item.confidence || 0);
+      if (confidence >= 80) acc.high += 1;
+      else if (confidence >= 55) acc.medium += 1;
+      else acc.low += 1;
+      return acc;
+    },
+    { high: 0, medium: 0, low: 0 },
+  );
+  const riskDistribution = predictions.reduce((acc, item) => {
+    const key = item.riskLevel || "Low";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const averageConfidence = predictions.length
+    ? Math.round(predictions.reduce((sum, item) => sum + Number(item.confidence || 0), 0) / predictions.length)
+    : 0;
+  const successful = history.filter((item) => item.success).length;
+  return {
+    totalPredictions: predictions.length,
+    totalModels: models.length,
+    totalHistory: history.length,
+    averageConfidence,
+    accuracy: history.length ? Math.round((successful / history.length) * 100) : 0,
+    byType,
+    confidenceBuckets,
+    riskDistribution,
+    recentPredictions: [...predictions]
+      .sort((a, b) => asDate(b.generatedAt) - asDate(a.generatedAt))
+      .slice(0, 30),
+    topModels: [...models]
+      .sort((a, b) => Number(b.averageConfidence || 0) - Number(a.averageConfidence || 0))
+      .slice(0, 16),
+    recentHistory: [...history]
+      .sort((a, b) => asDate(b.evaluatedAt) - asDate(a.evaluatedAt))
+      .slice(0, 30),
   };
 }
 
@@ -1037,6 +1090,27 @@ function collectionRows(db, collection) {
       rows,
     };
   }
+  if (collection === "future_predictions" || collection === "futurePredictions" || collection === "predictions") {
+    const rows = adminSyncService.getWarehouseCollection(db, "futurePredictions", maxRows);
+    return {
+      columns: ["userId", "type", "title", "confidence", "predictionScore", "riskLevel", "evidenceCount", "generatedAt"],
+      rows,
+    };
+  }
+  if (collection === "prediction_models" || collection === "predictionModels") {
+    const rows = adminSyncService.getWarehouseCollection(db, "predictionModels", maxRows);
+    return {
+      columns: ["userId", "modelType", "evidenceCount", "predictionCount", "averageConfidence", "averageScore", "updatedAt"],
+      rows,
+    };
+  }
+  if (collection === "prediction_history" || collection === "predictionHistory") {
+    const rows = adminSyncService.getWarehouseCollection(db, "predictionHistory", maxRows);
+    return {
+      columns: ["userId", "predictionId", "predictionType", "outcome", "success", "confidence", "evaluatedAt"],
+      rows,
+    };
+  }
   if (collection === "announcements") {
     return { columns: ["title", "type", "active", "createdAt", "createdBy"], rows: db.announcements.slice(0, maxRows) };
   }
@@ -1395,7 +1469,7 @@ async function handleApi(req, res, url) {
           embeddings: countEmbeddings(db),
           averageResponseTimeMs: 820,
           memorySearchVolume: allChats(db).filter((chat) => /memory|search|show|find/i.test(chat.content || "")).length,
-          predictionUsage: Object.values(db.learningProfiles || {}).length,
+          predictionUsage: (db.warehouse?.futurePredictions || []).length,
           voiceAssistantUsage: countEntriesBy(db, (entry) => textForEntry(entry).includes("voice")),
         });
       }
@@ -1408,6 +1482,11 @@ async function handleApi(req, res, url) {
       if (req.method === "GET" && url.pathname === "/api/admin/analytics/relationships") {
         const { db } = safeReadDb();
         return sendJson(res, 200, buildRelationshipAnalytics(db));
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/admin/analytics/predictions") {
+        const { db } = safeReadDb();
+        return sendJson(res, 200, buildPredictionAnalytics(db));
       }
 
       const dbMatch = url.pathname.match(/^\/api\/admin\/database\/([^/]+)$/);

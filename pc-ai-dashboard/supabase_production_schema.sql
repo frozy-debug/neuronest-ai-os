@@ -226,6 +226,54 @@ create table if not exists public.intelligence_records (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.predictions (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  type text not null,
+  title text not null,
+  summary text not null default '',
+  confidence numeric not null default 0,
+  evidence jsonb not null default '[]'::jsonb,
+  evidence_count integer not null default 0,
+  prediction_score numeric not null default 0,
+  risk_level text not null default 'Low',
+  status text not null default 'active',
+  generated_at timestamptz not null default now(),
+  valid_until timestamptz,
+  data jsonb not null default '{}'::jsonb
+);
+
+create table if not exists public.prediction_models (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  model_type text not null,
+  evidence_count integer not null default 0,
+  prediction_count integer not null default 0,
+  average_confidence numeric not null default 0,
+  average_score numeric not null default 0,
+  updated_at timestamptz not null default now(),
+  data jsonb not null default '{}'::jsonb
+);
+
+create table if not exists public.prediction_history (
+  id text primary key,
+  user_id text not null references public.neuronest_users(id) on delete cascade,
+  prediction_id text,
+  prediction_type text not null,
+  outcome text not null default 'unknown',
+  success boolean not null default false,
+  confidence numeric not null default 0,
+  evidence jsonb not null default '[]'::jsonb,
+  evaluated_at timestamptz not null default now(),
+  data jsonb not null default '{}'::jsonb
+);
+
+create index if not exists predictions_user_type_idx on public.predictions(user_id, type);
+create index if not exists predictions_user_generated_idx on public.predictions(user_id, generated_at desc);
+create index if not exists predictions_user_risk_idx on public.predictions(user_id, risk_level);
+create index if not exists prediction_models_user_type_idx on public.prediction_models(user_id, model_type);
+create index if not exists prediction_history_user_evaluated_idx on public.prediction_history(user_id, evaluated_at desc);
+
 create table if not exists public.ai_usage (
   id text primary key,
   user_id text references public.neuronest_users(id) on delete set null,
@@ -280,6 +328,9 @@ alter table public.relationship_insights enable row level security;
 alter table public.relationship_clusters enable row level security;
 alter table public.goals enable row level security;
 alter table public.intelligence_records enable row level security;
+alter table public.predictions enable row level security;
+alter table public.prediction_models enable row level security;
+alter table public.prediction_history enable row level security;
 alter table public.ai_usage enable row level security;
 
 insert into storage.buckets (id, name, public)
