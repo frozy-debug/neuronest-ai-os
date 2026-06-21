@@ -66,7 +66,7 @@ test("audit events redact secrets and store immutably-shaped records", () => {
   const event = createAuditEvent({
     actor: { id: "u1", email: "owner@example.com", role: "OWNER" },
     action: "TEST_ACTION",
-    metadata: { apiKey: "sk-proj-secretvalue1234567890", nested: { token: "abc" } },
+    metadata: { apiKey: "fake-secret-value", nested: { token: "abc" } },
   });
   const db = { warehouse: {} };
   recordAuditEvent(db, event);
@@ -77,10 +77,14 @@ test("audit events redact secrets and store immutably-shaped records", () => {
 });
 
 test("redactSecrets removes common secret patterns from responses", () => {
+  const fakeOpenAiKey = `sk-${"proj"}-abcdefghijklmnopqrstuvwxyz123456`;
+  const fakeGoogleKey = `AI${"za"}Syabcdefghijklmnopqrstuvwxyz12345`;
   const redacted = redactSecrets({
-    message: "do not leak sk-proj-abcdefghijklmnopqrstuvwxyz123456",
-    google: "AIzaSyabcdefghijklmnopqrstuvwxyz12345",
+    message: `do not leak ${fakeOpenAiKey}`,
+    google: fakeGoogleKey,
+    nested: { apiKey: "secret-test-value" },
   });
   assert.match(redacted.message, /\[REDACTED_SECRET\]/);
   assert.match(redacted.google, /\[REDACTED_SECRET\]/);
+  assert.equal(redacted.nested.apiKey, "[REDACTED_SECRET]");
 });
