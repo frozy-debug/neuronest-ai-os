@@ -61,6 +61,7 @@ export function createAdminSyncService({
       "predictionModels",
       "predictionHistory",
       "autonomousIntelligence",
+      "chiefOfStaff",
       "replays",
       "insights",
       "aiJobs",
@@ -177,6 +178,7 @@ export function createAdminSyncService({
       predictionModels: db.warehouse.predictionModels.filter((item) => item.userId === userId).slice(0, 50),
       predictionHistory: db.warehouse.predictionHistory.filter((item) => item.userId === userId).slice(0, 50),
       autonomousIntelligence: db.warehouse.autonomousIntelligence.filter((item) => item.userId === userId).slice(0, 20),
+      chiefOfStaff: db.warehouse.chiefOfStaff.filter((item) => item.userId === userId).slice(0, 20),
       activityHistory: activityService.getUserActivity(db, userId, 50),
     };
   }
@@ -208,6 +210,7 @@ export function createAdminSyncService({
         predictionModels: db.warehouse.predictionModels.length,
         predictionHistory: db.warehouse.predictionHistory.length,
         autonomousIntelligence: db.warehouse.autonomousIntelligence.length,
+        chiefOfStaff: db.warehouse.chiefOfStaff.length,
         securityAuditLogs: db.warehouse.securityAuditLogs.length,
         replays: db.warehouse.replays.length,
         insights: db.warehouse.insights.length,
@@ -245,6 +248,7 @@ export function createAdminSyncService({
       predictionModels: warehouse.predictionModels,
       predictionHistory: warehouse.predictionHistory,
       autonomousIntelligence: warehouse.autonomousIntelligence,
+      chiefOfStaff: warehouse.chiefOfStaff,
       securityAuditLogs: warehouse.securityAuditLogs,
       replays: warehouse.replays,
       insights: warehouse.insights,
@@ -283,6 +287,7 @@ export function createAdminSyncService({
     db.warehouse.predictionModels = filterOut(db.warehouse.predictionModels);
     db.warehouse.predictionHistory = filterOut(db.warehouse.predictionHistory);
     db.warehouse.autonomousIntelligence = filterOut(db.warehouse.autonomousIntelligence);
+    db.warehouse.chiefOfStaff = filterOut(db.warehouse.chiefOfStaff);
     db.warehouse.replays = filterOut(db.warehouse.replays);
     db.warehouse.insights = filterOut(db.warehouse.insights);
     db.warehouse.aiJobs = filterOut(db.warehouse.aiJobs);

@@ -227,6 +227,7 @@ export function createSupabaseProductionStore() {
       relationships: "relationship-graph",
       predictions: "prediction",
       autonomousIntelligence: "insight",
+      chiefOfStaff: "insight",
       replays: "replay",
       insights: "insight",
     };
@@ -689,7 +690,11 @@ export function createSupabaseProductionStore() {
     };
     for (const item of intelligence) {
       const data = item.data || {};
-      const collection = data.type === "autonomous-intelligence" ? "autonomousIntelligence" : collectionMap[item.type];
+      const collection = data.type === "autonomous-intelligence"
+        ? "autonomousIntelligence"
+        : data.type === "ai-chief-of-staff"
+          ? "chiefOfStaff"
+          : collectionMap[item.type];
       if (collection) warehouse[collection].push({ ...data, id: item.id, userId: item.user_id, createdAt: item.created_at, updatedAt: item.updated_at });
     }
     warehouse.lastSyncAt = new Date().toISOString();

@@ -4263,6 +4263,7 @@
           <button data-view="digital-twin" type="button">Digital Twin</button>
           <button data-view="relationships" type="button">Relationships</button>
           <button data-view="mission-control" type="button">Mission Control</button>
+          <button data-view="chief-of-staff" type="button">AI Chief of Staff</button>
           <button data-view="future-intelligence" type="button">Future Intelligence</button>
           <button data-view="place-hunter" type="button">Place hunter</button>
           <button data-view="timeline" type="button">Timeline</button>
@@ -4869,6 +4870,62 @@
                 <div id="autonomous-core-decisions" class="ai-widget-list"></div>
               </article>
             </div>
+          </section>
+        </div>
+
+        <div class="view" data-view-panel="chief-of-staff">
+          <section class="panel hero mission-control">
+            <div class="section-title">
+              <div>
+                <h2>AI Chief of Staff</h2>
+                <span id="chief-status" class="muted">Goal execution command center</span>
+              </div>
+              <button id="chief-refresh" class="chip" type="button">Rebuild Plan</button>
+            </div>
+            <p class="ai-system-status">NeuroNest plans only from real Life OS goals and user activity evidence. No goals means no generated tasks.</p>
+            <div id="chief-overview" class="mission-stat-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Active Goals</h2>
+              <span class="muted">Roadmaps, probability, completion dates</span>
+            </div>
+            <div id="chief-active-goals" class="mission-goal-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Priority Tasks</h2><span class="muted">Daily, weekly, monthly execution</span></div>
+                <div id="chief-priority-tasks" class="mission-task-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Next Actions</h2><span class="muted">Most important moves</span></div>
+                <div id="chief-next-actions" class="mission-task-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Risks</h2><span class="muted">Delays, blockers, abandonment risk</span></div>
+                <div id="chief-risks" class="relationship-insight-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Weekly Focus</h2><span class="muted">Execution direction</span></div>
+                <div id="chief-weekly-focus" class="relationship-insight-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Recommendations</h2>
+              <span class="muted">Evidence-backed coaching</span>
+            </div>
+            <div id="chief-recommendations" class="mission-recommendations"></div>
           </section>
         </div>
 
@@ -5544,6 +5601,15 @@
       const autonomousCoreFuture = document.getElementById("autonomous-core-future");
       const autonomousCoreStories = document.getElementById("autonomous-core-stories");
       const autonomousCoreDecisions = document.getElementById("autonomous-core-decisions");
+      const chiefStatus = document.getElementById("chief-status");
+      const chiefRefresh = document.getElementById("chief-refresh");
+      const chiefOverview = document.getElementById("chief-overview");
+      const chiefActiveGoals = document.getElementById("chief-active-goals");
+      const chiefPriorityTasks = document.getElementById("chief-priority-tasks");
+      const chiefNextActions = document.getElementById("chief-next-actions");
+      const chiefRisks = document.getElementById("chief-risks");
+      const chiefWeeklyFocus = document.getElementById("chief-weekly-focus");
+      const chiefRecommendations = document.getElementById("chief-recommendations");
       const aiAvatarSrc = "/assets/neuronest-ai-avatar.png";
 
       let appConfig = {};
@@ -5565,6 +5631,7 @@
         "future-intelligence": "Future Intelligence",
         "ai-systems": "AI Systems",
         "mission-control": "Mission Control",
+        "chief-of-staff": "AI Chief of Staff",
         map: "Map View",
         places: "Places",
         profile: "Profile Hub",
@@ -5660,6 +5727,7 @@
       let digitalTwinLoaded = false;
       let relationshipDashboardLoaded = false;
       let lifeOsLoaded = false;
+      let chiefOfStaffLoaded = false;
       let futurePredictionsLoaded = false;
       let autonomousCaptureEnabled = localStorage.getItem("neuronest.passiveCapture") !== "false";
       let autonomousCaptureReady = false;
@@ -7307,6 +7375,11 @@
 
         if (viewName === "mission-control") {
           void loadLifeOs();
+        }
+
+        if (viewName === "chief-of-staff") {
+          void loadChiefOfStaff();
+          void reportLiveAction("AI_CHIEF_OF_STAFF", { page: "chief-of-staff", label: "AI Chief of Staff" });
         }
 
         if (viewName === "future-intelligence") {
@@ -10029,6 +10102,188 @@
         renderAutonomousCoreV3(life.autonomousIntelligence);
       }
 
+      function renderChiefTaskList(container, tasks = [], emptyTitle = "No tasks yet", emptyBody = "Add a Life OS goal first. NeuroNest will not invent work without a real goal.") {
+        if (!container) return;
+        container.innerHTML = "";
+        if (!tasks.length) {
+          const task = document.createElement("article");
+          task.className = "mission-task";
+          const strong = document.createElement("strong");
+          strong.textContent = emptyTitle;
+          const body = document.createElement("p");
+          body.textContent = emptyBody;
+          task.append(strong, body);
+          container.appendChild(task);
+          animateContainerItems(container);
+          return;
+        }
+        tasks.forEach((item, index) => {
+          const task = document.createElement("article");
+          task.className = "mission-task";
+          const strong = document.createElement("strong");
+          strong.textContent = item.rank ? `${item.rank}. ${item.title}` : `${index + 1}. ${item.title}`;
+          const body = document.createElement("p");
+          body.textContent = item.reasoning || item.reason || `${item.goalTitle || "Goal"} execution task.`;
+          const meta = document.createElement("div");
+          meta.className = "mission-task-meta";
+          [
+            item.goalTitle || "",
+            item.cadence || "",
+            item.priority || "",
+            item.estimatedMinutes ? `${item.estimatedMinutes} min` : "",
+            item.confidence ? `${item.confidence}% confidence` : item.importanceScore ? `${item.importanceScore}% importance` : "",
+          ].filter(Boolean).forEach((label) => {
+            const chip = document.createElement("span");
+            chip.className = "badge";
+            chip.textContent = label;
+            meta.appendChild(chip);
+          });
+          task.append(strong, body, meta);
+          container.appendChild(task);
+        });
+        animateContainerItems(container);
+      }
+
+      function renderChiefOfStaff(data = null) {
+        const chief = data || {
+          empty: true,
+          overview: {},
+          activeGoals: [],
+          goalHealth: [],
+          priorityTasks: [],
+          risks: [],
+          nextActions: [],
+          weeklyFocus: [],
+          recommendations: [],
+          progressTracking: {},
+        };
+        if (chiefStatus) {
+          chiefStatus.textContent = chief.empty ? "Waiting for Life OS goals" : `${chief.overview?.activeGoals || 0} active goals under execution`;
+        }
+        if (chiefOverview) {
+          chiefOverview.innerHTML = "";
+          const overview = chief.overview || {};
+          [
+            ["Active Goals", overview.activeGoals || 0, "Real Life OS goals currently being executed."],
+            ["Priority Tasks", overview.priorityTaskCount || 0, "Daily, weekly, and monthly tasks generated from goals."],
+            ["Risks", overview.riskCount || 0, "Low activity, stalled milestones, blockers, or missed deadlines."],
+            ["Goal Health", `${overview.averageGoalHealth || 0}%`, "Average execution health across active goals."],
+            ["Success", `${overview.averageSuccessProbability || 0}%`, "Evidence-backed completion probability."],
+            ["Momentum", `${overview.productivityMomentum || 0}%`, "Recent progress and activity strength."],
+          ].forEach(([label, value, body]) => {
+            const card = document.createElement("article");
+            card.className = "mission-card";
+            const strong = document.createElement("strong");
+            strong.textContent = value;
+            const small = document.createElement("small");
+            small.textContent = label;
+            const text = document.createElement("p");
+            text.textContent = body;
+            card.append(strong, small, text);
+            chiefOverview.appendChild(card);
+          });
+          animateContainerItems(chiefOverview);
+        }
+
+        if (chiefActiveGoals) {
+          chiefActiveGoals.innerHTML = "";
+          if (!(chief.activeGoals || []).length) {
+            const card = document.createElement("article");
+            card.className = "goal-card";
+            const strong = document.createElement("strong");
+            strong.textContent = "No active goals yet";
+            const body = document.createElement("p");
+            body.textContent = "Create a Life OS goal, then Chief of Staff will generate roadmaps, tasks, health, and risks from that real goal.";
+            card.append(strong, body);
+            chiefActiveGoals.appendChild(card);
+          }
+          (chief.activeGoals || []).slice(0, 6).forEach((goal) => {
+            const card = document.createElement("article");
+            card.className = "goal-card";
+            const header = document.createElement("div");
+            header.className = "goal-card-header";
+            const titleBlock = document.createElement("div");
+            const strong = document.createElement("strong");
+            strong.textContent = goal.title;
+            const small = document.createElement("small");
+            small.textContent = `${goal.successProbability || 0}% success | ${goal.estimatedCompletionDate || "date learning"} | ${goal.health?.riskLevel || "Low"} risk`;
+            titleBlock.append(strong, small);
+            const badge = document.createElement("span");
+            badge.className = "badge";
+            badge.textContent = goal.status || "active";
+            header.append(titleBlock, badge);
+            const progress = document.createElement("div");
+            progress.className = "goal-progress";
+            const fill = document.createElement("span");
+            fill.style.setProperty("--value", `${goal.progress || 0}%`);
+            progress.appendChild(fill);
+            const body = document.createElement("p");
+            body.textContent = (goal.roadmap || []).map((phase) => `${phase.phase}: ${phase.status}`).join(" | ") || goal.description || "Roadmap is forming.";
+            card.append(header, progress, body);
+            chiefActiveGoals.appendChild(card);
+          });
+          animateContainerItems(chiefActiveGoals);
+        }
+
+        renderChiefTaskList(chiefPriorityTasks, chief.priorityTasks || [], "No priority tasks", "Create an active goal to generate execution tasks.");
+        renderChiefTaskList(chiefNextActions, chief.nextActions || [], "No next actions", "Chief of Staff is waiting for active goals.");
+
+        renderWidgetList(chiefRisks, (chief.risks || []).slice(0, 8).map((risk) => ({
+          title: `${risk.severity || "medium"} risk: ${risk.goalTitle}`,
+          body: `${risk.title}. ${risk.body}`,
+          meta: `${risk.confidence || 0}% confidence`,
+        })), "No execution risks detected", "When momentum drops or deadlines slip, risks will appear here.");
+
+        renderWidgetList(chiefWeeklyFocus, (chief.weeklyFocus || []).slice(0, 8).map((focus) => ({
+          title: focus.title,
+          body: `${focus.focus} ${focus.target}`,
+          meta: `${focus.riskLevel || "Low"} risk`,
+        })), "No weekly focus yet", "Weekly focus appears after you add active goals.");
+
+        if (chiefRecommendations) {
+          chiefRecommendations.innerHTML = "";
+          if (!(chief.recommendations || []).length) {
+            const card = document.createElement("article");
+            card.className = "mission-card";
+            const strong = document.createElement("strong");
+            strong.textContent = "Recommendations waiting";
+            const body = document.createElement("p");
+            body.textContent = "NeuroNest needs a real goal before it recommends execution moves.";
+            card.append(strong, body);
+            chiefRecommendations.appendChild(card);
+          }
+          (chief.recommendations || []).forEach((item) => {
+            const card = document.createElement("article");
+            card.className = "mission-card";
+            const strong = document.createElement("strong");
+            strong.textContent = item.title;
+            const body = document.createElement("p");
+            body.textContent = item.body;
+            const small = document.createElement("small");
+            small.textContent = `${item.confidence || 0}% confidence`;
+            card.append(strong, body, small);
+            chiefRecommendations.appendChild(card);
+          });
+          animateContainerItems(chiefRecommendations);
+        }
+      }
+
+      async function loadChiefOfStaff({ force = false } = {}) {
+        if (!force && chiefOfStaffLoaded) return;
+        renderChiefOfStaff();
+        if (!currentUser) return;
+        try {
+          const data = await api(force ? "/api/ai/chief-of-staff/rebuild" : "/api/ai/chief-of-staff", force ? { method: "POST", body: JSON.stringify({ trigger: "dashboard-rebuild" }) } : {});
+          renderChiefOfStaff(data);
+          chiefOfStaffLoaded = true;
+          if (data.risks?.length) {
+            showAiNotification("Chief of Staff risk", data.risks[0].body);
+          }
+        } catch {
+          // Keep the honest empty state visible.
+        }
+      }
+
       async function loadLifeOs({ force = false } = {}) {
         if (!force && lifeOsLoaded) return;
         renderLifeOs();
@@ -10059,7 +10314,9 @@
         form.reset();
         renderLifeOs(data.lifeOs);
         lifeOsLoaded = true;
+        chiefOfStaffLoaded = false;
         futurePredictionsLoaded = false;
+        if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
         if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         showAiNotification("Life OS goal created", `${data.goal.title} is now tracked by Mission Control.`);
       }
@@ -10071,7 +10328,9 @@
         });
         renderLifeOs(data.lifeOs);
         lifeOsLoaded = true;
+        chiefOfStaffLoaded = false;
         futurePredictionsLoaded = false;
+        if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
         if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         showAiNotification("Goal updated", `${data.goal.title} is now ${data.goal.progress}% complete.`);
       }
@@ -10931,8 +11190,10 @@
           loadingBubble.closest(".chat-row")?.classList.remove("loading");
           await typeInto(loadingBubble, assistantMessage?.content || "Done.", 10);
           lifeOsLoaded = false;
+          chiefOfStaffLoaded = false;
           futurePredictionsLoaded = false;
           if (activeView === "mission-control") void loadLifeOs({ force: true });
+          if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
           if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         } catch (error) {
           loadingBubble.textContent = friendlyError(error);
@@ -11030,6 +11291,11 @@
         void loadLifeOs({ force: true });
       });
 
+      chiefRefresh?.addEventListener("click", () => {
+        chiefOfStaffLoaded = false;
+        void loadChiefOfStaff({ force: true });
+      });
+
       futureRebuildButton?.addEventListener("click", () => {
         futurePredictionsLoaded = false;
         void loadFuturePredictions({ force: true });
@@ -11078,6 +11344,7 @@
             aiSystemsLoaded = false;
             relationshipDashboardLoaded = false;
             lifeOsLoaded = false;
+            chiefOfStaffLoaded = false;
             futurePredictionsLoaded = false;
           } catch (error) {
             alert(friendlyError(error));

@@ -24,6 +24,7 @@ import {
   buildAutonomousIntelligenceCoreV3,
   buildMemoryTimeMachine,
 } from "./services/autonomousIntelligenceCoreV3Service.js";
+import { answerChiefOfStaffQuery, buildAiChiefOfStaff } from "./services/aiChiefOfStaffService.js";
 import { buildLanguageAwareAssistantReply, localizedFallback } from "./services/languageIntelligenceService.js";
 import { generateOpenAiIntelligenceReply } from "./services/openAiIntelligenceService.js";
 import {
@@ -1021,6 +1022,42 @@ function buildAutonomousIntelligenceCoreV3ForUser(user, { persist = false, trigg
   });
 }
 
+function buildAiChiefOfStaffForUser(user, { persist = false, trigger = "read" } = {}) {
+  const db = readDb();
+  warehouseDb.normalizeWarehouse(db);
+  const futurePredictions = buildFuturePredictionsForUser(user.id);
+  const snapshot = buildAiChiefOfStaff({
+    user,
+    goals: getLifeGoals(user.id),
+    memories: allUnifiedMemories(user.id),
+    records: allMemoryRecords(user.id),
+    chats: getChatHistory(user.id),
+    places: placeService.getUserPlaceMemories(db, user.id, 10_000),
+    futurePredictions,
+    learningProfile: getLearningProfile(user.id),
+  });
+  if (!persist) return snapshot;
+  return persistIntelligenceRecord(user.id, "chiefOfStaff", {
+    id: `ai-chief-of-staff_${user.id}`,
+    type: "ai-chief-of-staff",
+    trigger,
+    version: snapshot.version,
+    generatedAt: snapshot.generatedAt,
+    empty: snapshot.empty,
+    overview: snapshot.overview,
+    activeGoals: snapshot.activeGoals.slice(0, 20),
+    goalHealth: snapshot.goalHealth.slice(0, 20),
+    priorityTasks: snapshot.priorityTasks.slice(0, 30),
+    risks: snapshot.risks.slice(0, 30),
+    nextActions: snapshot.nextActions.slice(0, 12),
+    weeklyFocus: snapshot.weeklyFocus.slice(0, 12),
+    recommendations: snapshot.recommendations.slice(0, 12),
+    progressTracking: snapshot.progressTracking,
+    evidencePolicy: snapshot.evidencePolicy,
+    evidenceMemoryCount: snapshot.goalHealth.reduce((sum, goal) => sum + Number(goal.relatedSignalCount || 0), 0),
+  });
+}
+
 async function buildIntelligenceCoreResponse(user, context = {}) {
   const memories = allUnifiedMemories(user.id);
   const relationships = detectRelationships(memories);
@@ -1074,6 +1111,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
   const relationshipIntelligence = buildRelationshipIntelligenceForUser(userId, { persist: true, trigger });
   const futurePredictions = buildFuturePredictionsForUser(userId, { persist: true, trigger });
   const autonomousIntelligence = buildAutonomousIntelligenceCoreV3ForUser(user, { persist: true, trigger });
+  const chiefOfStaff = buildAiChiefOfStaffForUser(user, { persist: true, trigger });
   const predictions = futurePredictions.predictions.slice(0, 12);
 
   persistIntelligenceRecord(userId, "relationships", {
@@ -1111,7 +1149,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
     relationshipCount: relationshipIntelligence.relationships.length,
   });
   await buildDigitalTwinResponse(user, { activity: trigger, trigger });
-  return { relationships, predictions, replay, insights, relationshipIntelligence, futurePredictions, autonomousIntelligence };
+  return { relationships, predictions, replay, insights, relationshipIntelligence, futurePredictions, autonomousIntelligence, chiefOfStaff };
 }
 
 function buildLearningEngineResponse(user, { rebuild = false, context = {} } = {}) {
@@ -2206,11 +2244,26 @@ async function handleApi(req, res, url) {
     }));
   }
 
+  if (req.method === "GET" && url.pathname === "/api/ai/chief-of-staff") {
+    return sendJson(res, 200, buildAiChiefOfStaffForUser(session.user));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/ai/chief-of-staff/rebuild") {
+    const body = await readBody(req);
+    const snapshot = buildAiChiefOfStaffForUser(session.user);
+    const persisted = buildAiChiefOfStaffForUser(session.user, {
+      persist: true,
+      trigger: body.trigger || "manual-rebuild",
+    });
+    return sendJson(res, 200, { ...snapshot, persisted });
+  }
+
   if (req.method === "POST" && url.pathname === "/api/ai/life-os/goals") {
     try {
       const body = await readBody(req);
       const goal = createLifeGoal(session.user.id, body);
       refreshUserBrainModelForUserId(session.user.id, { trigger: "life-goal-created", activity: goal.title });
+      buildAiChiefOfStaffForUser(session.user, { persist: true, trigger: "life-goal-created" });
       return sendJson(res, 201, { goal, lifeOs: await buildLifeOsResponse(session.user, { activity: goal.title }) });
     } catch (error) {
       return sendJson(res, 400, { error: error.message });
@@ -2224,6 +2277,7 @@ async function handleApi(req, res, url) {
       const goal = updateLifeGoal(session.user.id, decodeURIComponent(lifeGoalRoute[1]), body);
       if (!goal) return sendJson(res, 404, { error: "Goal not found." });
       refreshUserBrainModelForUserId(session.user.id, { trigger: "life-goal-updated", activity: goal.title });
+      buildAiChiefOfStaffForUser(session.user, { persist: true, trigger: "life-goal-updated" });
       return sendJson(res, 200, { goal, lifeOs: await buildLifeOsResponse(session.user, { activity: goal.title }) });
     } catch (error) {
       return sendJson(res, 400, { error: error.message });
@@ -2781,6 +2835,8 @@ async function handleApi(req, res, url) {
     const predictionAnswer = answerPredictionQuery(message, futurePredictions);
     const autonomousIntelligence = buildAutonomousIntelligenceCoreV3ForUser(session.user, { query: message });
     const autonomousAnswer = answerAutonomousIntelligenceQuery(message, autonomousIntelligence);
+    const chiefOfStaff = buildAiChiefOfStaffForUser(session.user);
+    const chiefAnswer = answerChiefOfStaffQuery(message, chiefOfStaff);
     const timeline = buildTimeline({ memories, relationships, limit: 80 });
     const insights = generateInsightCards(memories, relationships);
     const patterns = detectLifePatterns(memories, relationships);
@@ -2881,6 +2937,37 @@ async function handleApi(req, res, url) {
           directAnswer: autonomousAnswer.matched ? autonomousAnswer : null,
           evidencePolicy: autonomousIntelligence.evidencePolicy,
         },
+        chiefOfStaff: {
+          overview: chiefOfStaff.overview,
+          goalHealth: chiefOfStaff.goalHealth.slice(0, 6).map((goal) => ({
+            title: goal.title,
+            progress: goal.progress,
+            successProbability: goal.successProbability,
+            riskLevel: goal.riskLevel,
+            momentumScore: goal.momentumScore,
+            confidence: goal.confidence,
+          })),
+          priorityTasks: chiefOfStaff.priorityTasks.slice(0, 8).map((task) => ({
+            title: task.title,
+            goalTitle: task.goalTitle,
+            cadence: task.cadence,
+            priority: task.priority,
+            estimatedMinutes: task.estimatedMinutes,
+            importanceScore: task.importanceScore,
+            goalImpact: task.goalImpact,
+          })),
+          risks: chiefOfStaff.risks.slice(0, 6).map((risk) => ({
+            title: risk.title,
+            goalTitle: risk.goalTitle,
+            body: risk.body,
+            severity: risk.severity,
+            confidence: risk.confidence,
+          })),
+          nextActions: chiefOfStaff.nextActions.slice(0, 5),
+          weeklyFocus: chiefOfStaff.weeklyFocus.slice(0, 5),
+          directAnswer: chiefAnswer.matched ? chiefAnswer : null,
+          evidencePolicy: chiefOfStaff.evidencePolicy,
+        },
         recentConversation: getChatHistory(session.user.id).slice(-10).map((item) => ({
           role: item.role,
           content: item.content,
@@ -2925,7 +3012,9 @@ async function handleApi(req, res, url) {
     const contextualReply = providerReply;
     const decisionLine = "";
     const reply =
-      autonomousAnswer.matched && autonomousAnswer.confidence >= 50
+      chiefAnswer.matched && chiefAnswer.confidence >= 40
+        ? `${contextualReply}${decisionLine} ${chiefAnswer.answer}`
+        : autonomousAnswer.matched && autonomousAnswer.confidence >= 50
         ? `${contextualReply}${decisionLine} ${autonomousAnswer.answer}`
         : predictionAnswer.matched && predictionAnswer.confidence >= 50
         ? `${contextualReply}${decisionLine} ${predictionAnswer.answer}`
