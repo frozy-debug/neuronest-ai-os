@@ -9,13 +9,19 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: SUPER_ADMIN_EMAILS
         sync: false
+      - key: OWNER_EMAILS
+        sync: false
       - key: ADMIN_EMAIL_LOGIN_ENABLED
-        value: "false"
+        value: "true"
       - key: ADMIN_EMAIL_ACCESS_CODE
+        sync: false
+      - key: NEURONEST_ADMIN_URL
         sync: false
       - key: NEURONEST_APP_URL
         sync: false
@@ -35,3 +41,5 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: SUPABASE_MEDIA_BUCKET
+        value: neuronest-media

@@ -11,6 +11,12 @@ services:
         value: production
       - key: SESSION_SECRET
         generateValue: true
+      - key: SESSION_MAX_AGE_MS
+        value: "604800000"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: MAX_UPLOAD_BYTES
+        value: "25000000"
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_MAPS_API_KEY
@@ -37,5 +43,7 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: SUPABASE_MEDIA_BUCKET
+        value: neuronest-media
       - key: RATE_LIMIT_PER_MINUTE
         value: "120"
