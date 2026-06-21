@@ -19,6 +19,11 @@ import { buildProfileIdentity } from "./services/profileIdentityService.js";
 import { buildAutonomousCaptureDashboard, runAutonomousCapture } from "./services/passiveCaptureEngine.js";
 import { buildMemoryResurfacingFeed } from "./services/memoryResurfacingEngine.js";
 import { buildIntelligenceCore } from "./services/intelligenceCoreService.js";
+import {
+  answerAutonomousIntelligenceQuery,
+  buildAutonomousIntelligenceCoreV3,
+  buildMemoryTimeMachine,
+} from "./services/autonomousIntelligenceCoreV3Service.js";
 import { buildLanguageAwareAssistantReply, localizedFallback } from "./services/languageIntelligenceService.js";
 import { generateOpenAiIntelligenceReply } from "./services/openAiIntelligenceService.js";
 import {
@@ -975,6 +980,47 @@ function buildFuturePredictionsForUser(userId, { persist = false, trigger = "rea
   return persist ? persistFuturePredictionSnapshot(userId, snapshot, trigger) : snapshot;
 }
 
+function buildAutonomousIntelligenceCoreV3ForUser(user, { persist = false, trigger = "read", query = "" } = {}) {
+  const db = readDb();
+  warehouseDb.normalizeWarehouse(db);
+  const relationshipIntelligence = buildRelationshipIntelligenceForUser(user.id);
+  const futurePredictions = buildFuturePredictionsForUser(user.id);
+  const snapshot = buildAutonomousIntelligenceCoreV3({
+    user,
+    memories: allUnifiedMemories(user.id),
+    records: allMemoryRecords(user.id),
+    chats: getChatHistory(user.id),
+    places: placeService.getUserPlaceMemories(db, user.id, 10_000),
+    goals: getLifeGoals(user.id),
+    relationshipIntelligence,
+    futurePredictions,
+    learningProfile: getLearningProfile(user.id),
+    query,
+  });
+  if (!persist) return snapshot;
+  return persistIntelligenceRecord(user.id, "autonomousIntelligence", {
+    id: `autonomous-intelligence_${user.id}`,
+    type: "autonomous-intelligence",
+    trigger,
+    version: snapshot.version,
+    generatedAt: snapshot.generatedAt,
+    overview: snapshot.overview,
+    understandingScore: snapshot.understandingScore,
+    empty: snapshot.empty,
+    knowledgeGraph: snapshot.knowledgeGraph,
+    decisions: snapshot.decisions.slice(0, 24),
+    lifeStories: snapshot.lifeStories,
+    futureSelf: snapshot.futureSelf,
+    chiefOfStaff: snapshot.chiefOfStaff.slice(0, 8),
+    opportunities: snapshot.opportunities.slice(0, 12),
+    behaviorProfile: snapshot.behaviorProfile,
+    digitalTwinV3: snapshot.digitalTwinV3,
+    selfImprovement: snapshot.selfImprovement,
+    evidencePolicy: snapshot.evidencePolicy,
+    evidenceMemoryCount: snapshot.overview?.evidenceCount || 0,
+  });
+}
+
 async function buildIntelligenceCoreResponse(user, context = {}) {
   const memories = allUnifiedMemories(user.id);
   const relationships = detectRelationships(memories);
@@ -1027,6 +1073,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
   const insights = generateInsightCards(memories, relationships);
   const relationshipIntelligence = buildRelationshipIntelligenceForUser(userId, { persist: true, trigger });
   const futurePredictions = buildFuturePredictionsForUser(userId, { persist: true, trigger });
+  const autonomousIntelligence = buildAutonomousIntelligenceCoreV3ForUser(user, { persist: true, trigger });
   const predictions = futurePredictions.predictions.slice(0, 12);
 
   persistIntelligenceRecord(userId, "relationships", {
@@ -1064,7 +1111,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
     relationshipCount: relationshipIntelligence.relationships.length,
   });
   await buildDigitalTwinResponse(user, { activity: trigger, trigger });
-  return { relationships, predictions, replay, insights, relationshipIntelligence, futurePredictions };
+  return { relationships, predictions, replay, insights, relationshipIntelligence, futurePredictions, autonomousIntelligence };
 }
 
 function buildLearningEngineResponse(user, { rebuild = false, context = {} } = {}) {
@@ -1107,6 +1154,9 @@ async function buildLifeOsResponse(user, context = {}) {
   const digitalTwin = buildDigitalTwin({ user, memories, relationships, intelligenceCore, dna, peopleRelationships, futurePredictions });
   const userBrainModel = getStoredUserBrainModel(user.id) || buildAndPersistUserBrainModel(user, { trigger: "life-os", activity: context.activity || "mission control" });
   const learningProfile = buildLearningEngineResponse(user, { context: { activity: context.activity || "mission control" } });
+  const autonomousIntelligence = buildAutonomousIntelligenceCoreV3ForUser(user, {
+    query: context.query || context.activity || "mission control",
+  });
   return buildLifeOsMissionControl({
     goals: getLifeGoals(user.id),
     memories,
@@ -1114,6 +1164,7 @@ async function buildLifeOsResponse(user, context = {}) {
     digitalTwin,
     userBrainModel: { ...summarizeUserBrainModel(userBrainModel), learningProfile },
     futurePredictions,
+    autonomousIntelligence,
   });
 }
 
@@ -2107,6 +2158,33 @@ async function handleApi(req, res, url) {
     }));
   }
 
+  if (req.method === "GET" && url.pathname === "/api/ai/autonomous-core-v3") {
+    return sendJson(res, 200, buildAutonomousIntelligenceCoreV3ForUser(session.user, {
+      query: url.searchParams.get("query") || "",
+    }));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/ai/autonomous-core-v3/rebuild") {
+    const body = await readBody(req);
+    const snapshot = buildAutonomousIntelligenceCoreV3ForUser(session.user, {
+      query: body.query || body.activity || "",
+    });
+    const persisted = buildAutonomousIntelligenceCoreV3ForUser(session.user, {
+      persist: true,
+      trigger: body.trigger || "manual-rebuild",
+      query: body.query || body.activity || "",
+    });
+    return sendJson(res, 200, { ...snapshot, persisted });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/ai/time-machine") {
+    const body = await readBody(req);
+    const snapshot = buildAutonomousIntelligenceCoreV3ForUser(session.user, {
+      query: body.query || "",
+    });
+    return sendJson(res, 200, buildMemoryTimeMachine(snapshot, body.query || ""));
+  }
+
   if (req.method === "GET" && url.pathname === "/api/ai/digital-twin") {
     return sendJson(res, 200, await buildDigitalTwinResponse(session.user, {
       query: url.searchParams.get("query") || "",
@@ -2701,6 +2779,8 @@ async function handleApi(req, res, url) {
     const relationshipAnswer = answerRelationshipQuery(message, peopleRelationships);
     const futurePredictions = buildFuturePredictionsForUser(session.user.id);
     const predictionAnswer = answerPredictionQuery(message, futurePredictions);
+    const autonomousIntelligence = buildAutonomousIntelligenceCoreV3ForUser(session.user, { query: message });
+    const autonomousAnswer = answerAutonomousIntelligenceQuery(message, autonomousIntelligence);
     const timeline = buildTimeline({ memories, relationships, limit: 80 });
     const insights = generateInsightCards(memories, relationships);
     const patterns = detectLifePatterns(memories, relationships);
@@ -2779,6 +2859,28 @@ async function handleApi(req, res, url) {
           directAnswer: predictionAnswer.matched ? predictionAnswer : null,
           evidencePolicy: futurePredictions.evidencePolicy,
         },
+        autonomousIntelligence: {
+          overview: autonomousIntelligence.overview,
+          understandingScore: autonomousIntelligence.understandingScore,
+          identity: autonomousIntelligence.digitalTwinV3,
+          knowledgeGraphStats: autonomousIntelligence.knowledgeGraph?.stats,
+          topOpportunities: (autonomousIntelligence.opportunities || []).slice(0, 5).map((item) => ({
+            title: item.title,
+            recommendation: item.recommendation,
+            confidence: item.confidence,
+            evidenceCount: item.evidence?.length || 0,
+          })),
+          decisions: (autonomousIntelligence.decisions || []).slice(0, 5).map((item) => ({
+            decision: item.decision,
+            status: item.status,
+            qualityScore: item.qualityScore,
+            confidence: item.confidence,
+          })),
+          lifeStory: autonomousIntelligence.lifeStories?.monthly?.[0] || autonomousIntelligence.lifeStories?.weekly?.[0] || null,
+          futureSelf: autonomousIntelligence.futureSelf,
+          directAnswer: autonomousAnswer.matched ? autonomousAnswer : null,
+          evidencePolicy: autonomousIntelligence.evidencePolicy,
+        },
         recentConversation: getChatHistory(session.user.id).slice(-10).map((item) => ({
           role: item.role,
           content: item.content,
@@ -2823,7 +2925,9 @@ async function handleApi(req, res, url) {
     const contextualReply = providerReply;
     const decisionLine = "";
     const reply =
-      predictionAnswer.matched && predictionAnswer.confidence >= 50
+      autonomousAnswer.matched && autonomousAnswer.confidence >= 50
+        ? `${contextualReply}${decisionLine} ${autonomousAnswer.answer}`
+        : predictionAnswer.matched && predictionAnswer.confidence >= 50
         ? `${contextualReply}${decisionLine} ${predictionAnswer.answer}`
         : relationshipAnswer.matched && relationshipAnswer.confidence >= 50
         ? `${contextualReply}${decisionLine} ${relationshipAnswer.answer}`

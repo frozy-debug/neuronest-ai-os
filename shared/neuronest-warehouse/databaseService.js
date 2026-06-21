@@ -34,6 +34,7 @@ export function createEmptyWarehouse() {
     futurePredictions: [],
     predictionModels: [],
     predictionHistory: [],
+    autonomousIntelligence: [],
     securityAuditLogs: [],
     replays: [],
     insights: [],
@@ -70,6 +71,7 @@ export function normalizeWarehouse(db) {
   warehouse.futurePredictions ||= [];
   warehouse.predictionModels ||= [];
   warehouse.predictionHistory ||= [];
+  warehouse.autonomousIntelligence ||= [];
   warehouse.securityAuditLogs ||= [];
   warehouse.replays ||= [];
   warehouse.insights ||= [];

@@ -124,7 +124,7 @@ export function normalizeGoal(goal = {}) {
   };
 }
 
-export function buildLifeOsMissionControl({ goals = [], memories = [], relationships = [], digitalTwin = null, userBrainModel = null, futurePredictions = null } = {}) {
+export function buildLifeOsMissionControl({ goals = [], memories = [], relationships = [], digitalTwin = null, userBrainModel = null, futurePredictions = null, autonomousIntelligence = null } = {}) {
   const activeGoals = goals.map(normalizeGoal).filter((goal) => goal.status !== "completed");
   const enrichedGoals = activeGoals.map((goal, index) => {
     const alignment = alignmentForGoal(goal, memories);
@@ -250,5 +250,26 @@ export function buildLifeOsMissionControl({ goals = [], memories = [], relations
         body: `${averageAlignment}% alignment based on goals, memories, routines, and recent activity.`,
       },
     ] : [],
+    autonomousIntelligence: autonomousIntelligence ? {
+      version: autonomousIntelligence.version,
+      generatedAt: autonomousIntelligence.generatedAt,
+      empty: Boolean(autonomousIntelligence.empty),
+      understandingScore: autonomousIntelligence.understandingScore || 0,
+      overview: autonomousIntelligence.overview || {},
+      identity: autonomousIntelligence.digitalTwinV3 || {},
+      knowledgeGraph: {
+        stats: autonomousIntelligence.knowledgeGraph?.stats || {},
+        nodes: (autonomousIntelligence.knowledgeGraph?.nodes || []).slice(0, 24),
+        edges: (autonomousIntelligence.knowledgeGraph?.edges || []).slice(0, 30),
+      },
+      decisions: (autonomousIntelligence.decisions || []).slice(0, 6),
+      lifeStories: autonomousIntelligence.lifeStories || { daily: [], weekly: [], monthly: [], yearly: [] },
+      futureSelf: autonomousIntelligence.futureSelf || { horizons: [] },
+      chiefOfStaff: (autonomousIntelligence.chiefOfStaff || []).slice(0, 6),
+      opportunities: (autonomousIntelligence.opportunities || []).slice(0, 8),
+      behaviorProfile: autonomousIntelligence.behaviorProfile || {},
+      selfImprovement: autonomousIntelligence.selfImprovement || {},
+      evidencePolicy: autonomousIntelligence.evidencePolicy,
+    } : null,
   };
 }

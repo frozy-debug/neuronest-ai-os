@@ -4832,6 +4832,44 @@
             </div>
             <div id="weekly-life-review" class="mission-review-grid"></div>
           </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Autonomous Core V3</h2>
+              <span class="muted">Identity, graph, decisions, stories, Future Me</span>
+            </div>
+            <div id="autonomous-core-overview" class="mission-stat-grid"></div>
+            <div class="mission-hero-grid">
+              <article class="ai-system-card">
+                <h3>Digital Twin V3</h3>
+                <div id="autonomous-core-identity" class="ai-widget-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <h3>Knowledge Graph</h3>
+                <div id="autonomous-core-graph" class="ai-widget-list"></div>
+              </article>
+            </div>
+            <div class="mission-hero-grid">
+              <article class="ai-system-card">
+                <h3>Chief of Staff</h3>
+                <div id="autonomous-core-chief" class="mission-task-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <h3>Future Me</h3>
+                <div id="autonomous-core-future" class="ai-widget-list"></div>
+              </article>
+            </div>
+            <div class="mission-hero-grid">
+              <article class="ai-system-card">
+                <h3>Life Story</h3>
+                <div id="autonomous-core-stories" class="ai-widget-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <h3>Decisions & Opportunities</h3>
+                <div id="autonomous-core-decisions" class="ai-widget-list"></div>
+              </article>
+            </div>
+          </section>
         </div>
 
         <div class="view" data-view-panel="future-intelligence">
@@ -5499,6 +5537,13 @@
       const lifeRecommendations = document.getElementById("life-recommendations");
       const lifeProjects = document.getElementById("life-projects");
       const weeklyLifeReview = document.getElementById("weekly-life-review");
+      const autonomousCoreOverview = document.getElementById("autonomous-core-overview");
+      const autonomousCoreIdentity = document.getElementById("autonomous-core-identity");
+      const autonomousCoreGraph = document.getElementById("autonomous-core-graph");
+      const autonomousCoreChief = document.getElementById("autonomous-core-chief");
+      const autonomousCoreFuture = document.getElementById("autonomous-core-future");
+      const autonomousCoreStories = document.getElementById("autonomous-core-stories");
+      const autonomousCoreDecisions = document.getElementById("autonomous-core-decisions");
       const aiAvatarSrc = "/assets/neuronest-ai-avatar.png";
 
       let appConfig = {};
@@ -9607,6 +9652,158 @@
         }
       }
 
+      function renderWidgetList(container, items = [], emptyTitle = "No evidence yet", emptyBody = "NeuroNest will fill this from real memories, goals, chats, places, and timeline activity.") {
+        if (!container) return;
+        container.innerHTML = "";
+        const rows = items.filter(Boolean);
+        if (!rows.length) {
+          const widget = document.createElement("div");
+          widget.className = "ai-widget";
+          const strong = document.createElement("strong");
+          strong.textContent = emptyTitle;
+          const small = document.createElement("small");
+          small.textContent = emptyBody;
+          widget.append(strong, small);
+          container.appendChild(widget);
+          animateContainerItems(container);
+          return;
+        }
+        rows.forEach((item) => {
+          const widget = document.createElement("div");
+          widget.className = "ai-widget";
+          const strong = document.createElement("strong");
+          strong.textContent = item.title || item.label || "Autonomous signal";
+          const small = document.createElement("small");
+          small.textContent = item.body || item.summary || item.recommendation || item.reason || "";
+          widget.append(strong, small);
+          if (item.meta) {
+            const meta = document.createElement("small");
+            meta.textContent = item.meta;
+            widget.appendChild(meta);
+          }
+          container.appendChild(widget);
+        });
+        animateContainerItems(container);
+      }
+
+      function renderAutonomousCoreV3(core = null) {
+        const empty = !core || core.empty;
+        if (autonomousCoreOverview) {
+          autonomousCoreOverview.innerHTML = "";
+          const overview = core?.overview || {};
+          [
+            ["Understanding", `${core?.understandingScore || 0}%`, core?.evidencePolicy || "No hallucinations. Empty accounts stay empty."],
+            ["Graph Nodes", core?.knowledgeGraph?.stats?.nodeCount || 0, "People, places, goals, projects, topics, memories, and predictions."],
+            ["Decisions", overview.decisionSignals || 0, "Tracked decisions with expected and actual outcomes."],
+            ["Opportunities", overview.opportunitySignals || 0, "Evidence-backed openings NeuroNest found in your activity."],
+            ["Relationships", overview.relationshipSignals || 0, "People signals connected through the relationship graph."],
+            ["Predictions", overview.predictionSignals || 0, "Future Intelligence signals feeding Future Me."],
+          ].forEach(([label, value, body]) => {
+            const card = document.createElement("article");
+            card.className = "mission-card";
+            const strong = document.createElement("strong");
+            strong.textContent = value;
+            const small = document.createElement("small");
+            small.textContent = label;
+            const text = document.createElement("p");
+            text.textContent = body;
+            card.append(strong, small, text);
+            autonomousCoreOverview.appendChild(card);
+          });
+          animateContainerItems(autonomousCoreOverview);
+        }
+
+        renderWidgetList(autonomousCoreIdentity, [
+          core?.identity?.identity ? {
+            title: core.identity.identity,
+            body: (core.identity.motivations || []).join(" | ") || "Identity signals are forming from your evidence.",
+            meta: `${core.identity.confidence || 0}% confidence`,
+          } : null,
+          ...(core?.behaviorProfile?.habits || []).slice(0, 3).map((habit) => ({
+            title: `Habit signal: ${habit.label}`,
+            body: `${habit.count} real records support this pattern.`,
+            meta: `${habit.confidence || 0}% confidence`,
+          })),
+        ], empty ? "Autonomous identity waiting" : "No identity evidence yet");
+
+        renderWidgetList(autonomousCoreGraph, [
+          core?.knowledgeGraph?.stats ? {
+            title: `${core.knowledgeGraph.stats.nodeCount || 0} nodes / ${core.knowledgeGraph.stats.edgeCount || 0} links`,
+            body: `${core.knowledgeGraph.stats.topicCount || 0} topics, ${core.knowledgeGraph.stats.personCount || 0} people, ${core.knowledgeGraph.stats.projectCount || 0} projects.`,
+            meta: `${core.knowledgeGraph.stats.evidenceCount || 0} evidence links`,
+          } : null,
+          ...(core?.knowledgeGraph?.nodes || []).slice(0, 4).map((node) => ({
+            title: node.label,
+            body: `${node.type} | ${node.evidenceCount || 0} evidence signals`,
+          })),
+        ], "Knowledge graph waiting");
+
+        if (autonomousCoreChief) {
+          autonomousCoreChief.innerHTML = "";
+          const missions = core?.chiefOfStaff || [];
+          if (!missions.length) {
+            const task = document.createElement("article");
+            task.className = "mission-task";
+            const strong = document.createElement("strong");
+            strong.textContent = "Chief of Staff waiting";
+            const body = document.createElement("p");
+            body.textContent = "Add an active Life OS goal or related memory evidence to generate roadmaps and actions.";
+            task.append(strong, body);
+            autonomousCoreChief.appendChild(task);
+          }
+          missions.slice(0, 4).forEach((mission, index) => {
+            const task = document.createElement("article");
+            task.className = "mission-task";
+            const strong = document.createElement("strong");
+            strong.textContent = `${index + 1}. ${mission.title}`;
+            const body = document.createElement("p");
+            body.textContent = mission.recommendedActions?.[0] || "NeuroNest is tracking this mission from real evidence.";
+            const meta = document.createElement("div");
+            meta.className = "mission-task-meta";
+            [`${mission.progress || 0}% progress`, `${mission.completionProbability || 0}% probability`, `${mission.confidence || 0}% confidence`].forEach((label) => {
+              const chip = document.createElement("span");
+              chip.className = "badge";
+              chip.textContent = label;
+              meta.appendChild(chip);
+            });
+            task.append(strong, body, meta);
+            autonomousCoreChief.appendChild(task);
+          });
+          animateContainerItems(autonomousCoreChief);
+        }
+
+        renderWidgetList(autonomousCoreFuture, (core?.futureSelf?.horizons || []).slice(0, 5).map((horizon) => ({
+          title: `${horizon.horizon}: ${horizon.title}`,
+          body: horizon.summary,
+          meta: `${horizon.probability || 0}% probability | ${horizon.confidence || 0}% confidence`,
+        })), "Future Me waiting", "Future Me needs evidence-backed predictions before it can forecast.");
+
+        const stories = [
+          ...(core?.lifeStories?.daily || []).slice(0, 1),
+          ...(core?.lifeStories?.weekly || []).slice(0, 1),
+          ...(core?.lifeStories?.monthly || []).slice(0, 2),
+        ].map((story) => ({
+          title: story.title,
+          body: story.summary,
+          meta: `${story.evidenceCount || 0} evidence signals | ${story.confidence || 0}% confidence`,
+        }));
+        renderWidgetList(autonomousCoreStories, stories, "Life story waiting", "Stories appear only when real timeline and memory evidence exists.");
+
+        const decisionRows = [
+          ...(core?.decisions || []).slice(0, 3).map((decision) => ({
+            title: decision.decision,
+            body: decision.actualOutcome,
+            meta: `${decision.qualityScore || 0}% quality | ${decision.confidence || 0}% confidence`,
+          })),
+          ...(core?.opportunities || []).slice(0, 3).map((item) => ({
+            title: item.title,
+            body: item.recommendation,
+            meta: `${item.confidence || 0}% confidence`,
+          })),
+        ];
+        renderWidgetList(autonomousCoreDecisions, decisionRows, "No decisions or opportunities yet", "NeuroNest will not invent them. It waits for real evidence.");
+      }
+
       function renderLifeOs(data = null) {
         const emptyState = {
           summary: {
@@ -9828,6 +10025,8 @@
           });
           animateContainerItems(weeklyLifeReview);
         }
+
+        renderAutonomousCoreV3(life.autonomousIntelligence);
       }
 
       async function loadLifeOs({ force = false } = {}) {
