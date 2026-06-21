@@ -3,7 +3,19 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createNeuroNestWarehouse } from "../shared/neuronest-warehouse/index.js";
+import {
+  adminRoleForEmail,
+  buildSecurityAnalytics,
+  createAuditEvent,
+  createNeuroNestWarehouse,
+  getRequestIp,
+  hasPermission,
+  normalizeRole,
+  recordAuditEvent,
+  redactSecrets,
+  securityHeaders,
+  validateOrigin,
+} from "../shared/neuronest-warehouse/index.js";
 import { createWebSocketHub } from "../shared/neuronest-warehouse/wsServer.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -68,29 +80,46 @@ function getGoogleClientId() {
 
 function getSuperAdminEmails() {
   loadEnv();
-  const raw = String(process.env.SUPER_ADMIN_EMAILS || "").trim();
-  if (!raw) return new Set();
-
-  let values = [];
-  if (raw.startsWith("[")) {
-    try {
-      values = JSON.parse(raw);
-    } catch {
-      values = raw.split(",");
-    }
-  } else {
-    values = raw.split(",");
-  }
-
   return new Set(
-    values
-      .map((value) => String(value).replace(/^mailto:/i, "").trim().toLowerCase())
+    String(process.env.SUPER_ADMIN_EMAILS || "")
+      .replace(/^\[/, "")
+      .replace(/\]$/, "")
+      .split(",")
+      .map((value) => String(value).replace(/["']/g, "").replace(/^mailto:/i, "").trim().toLowerCase())
       .filter(Boolean),
   );
 }
 
+function getAdminRole(email) {
+  loadEnv();
+  return adminRoleForEmail(email, process.env);
+}
+
+function roleLabel(role) {
+  return normalizeRole(role)
+    .split("_")
+    .map((part) => part[0] + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function isApprovedAdminEmail(email) {
+  return hasPermission(getAdminRole(email), "ADMIN_ACCESS");
+}
+
 function isSuperAdminEmail(email) {
-  return getSuperAdminEmails().has(String(email || "").trim().toLowerCase());
+  return hasPermission(getAdminRole(email), "USER_PRIVATE_READ");
+}
+
+function getAllowedOrigins() {
+  return [
+    process.env.NEURONEST_ADMIN_URL,
+    process.env.NEURONEST_APP_URL,
+    `http://localhost:${PORT}`,
+    `http://127.0.0.1:${PORT}`,
+    ...String(process.env.CORS_ALLOWED_ORIGINS || "").split(","),
+  ]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
 }
 
 function isValidAdminAccessCode(value) {
@@ -124,13 +153,18 @@ function sendJson(res, status, payload, headers = {}) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
+    ...securityHeaders({ production: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER) }),
     ...headers,
   });
-  res.end(JSON.stringify(payload));
+  res.end(JSON.stringify(redactSecrets(payload)));
 }
 
 function sendText(res, status, text) {
-  res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+  res.writeHead(status, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "no-store",
+    ...securityHeaders({ production: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER) }),
+  });
   res.end(text);
 }
 
@@ -168,6 +202,7 @@ function clearAdminCookie(req, res) {
 
 function createSession(profile) {
   const token = crypto.randomUUID();
+  const adminRole = getAdminRole(profile.email);
   const session = {
     token,
     admin: {
@@ -176,7 +211,8 @@ function createSession(profile) {
       email: profile.email,
       name: profile.name || profile.email,
       picture: profile.picture || "",
-      role: "Super Admin",
+      role: roleLabel(adminRole),
+      adminRole,
     },
     createdAt: new Date().toISOString(),
     expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
@@ -201,11 +237,25 @@ function getSession(req) {
 
 function requireAdmin(req, res) {
   const session = getSession(req);
-  if (!session || !isSuperAdminEmail(session.admin.email)) {
-    sendJson(res, 401, { error: "Super Admin authentication required.", dashboardUrl: normalDashboardUrl });
+  if (!session || !isApprovedAdminEmail(session.admin.email)) {
+    sendJson(res, 401, { error: "Admin authentication required.", dashboardUrl: normalDashboardUrl });
     return null;
   }
+  session.admin.adminRole = getAdminRole(session.admin.email);
+  session.admin.role = roleLabel(session.admin.adminRole);
   return session;
+}
+
+function requireAdminPermission(req, res, session, permission) {
+  if (hasPermission(session?.admin?.adminRole || getAdminRole(session?.admin?.email), permission)) return true;
+  auditAdminSecurity("PERMISSION_DENIED", {
+    admin: session?.admin || {},
+    req,
+    severity: "HIGH",
+    metadata: { permission, path: req.url },
+  });
+  sendJson(res, 403, { error: "Your admin role does not have permission for this action.", permission });
+  return false;
 }
 
 function decodeGoogleJwtPayload(credential) {
@@ -296,6 +346,42 @@ function normalizeDb(db) {
 function writeDb(db) {
   warehouseDb.writeDb(db);
   scheduleSyncBroadcast();
+}
+
+function auditAdminSecurity(action, { admin = {}, targetUserId = "", req = null, severity = "LOW", metadata = {} } = {}) {
+  try {
+    const db = readDb();
+    const event = createAuditEvent({
+      actor: { ...admin, role: admin.adminRole || admin.role || getAdminRole(admin.email) },
+      action: `ADMIN_${action}`,
+      targetUserId,
+      severity,
+      ip: req ? getRequestIp(req) : "",
+      userAgent: req?.headers?.["user-agent"] || "",
+      metadata,
+    });
+    recordAuditEvent(db, event);
+    writeDb(db);
+    if (productionStore.ready()) void productionStore.upsertSecurityAudit(event).catch(() => {});
+    return event;
+  } catch {
+    return null;
+  }
+}
+
+function recordAdminAuditOnDb(db, admin, action, { targetUserId = "", req = null, severity = "LOW", metadata = {} } = {}) {
+  const event = createAuditEvent({
+    actor: { ...admin, role: admin.adminRole || admin.role || getAdminRole(admin.email) },
+    action: `ADMIN_${action}`,
+    targetUserId,
+    severity,
+    ip: req ? getRequestIp(req) : "",
+    userAgent: req?.headers?.["user-agent"] || "",
+    metadata,
+  });
+  recordAuditEvent(db, event);
+  if (productionStore.ready()) void productionStore.upsertSecurityAudit(event).catch(() => {});
+  return event;
 }
 
 function safeReadDb() {
@@ -848,17 +934,25 @@ function buildOverview() {
   };
 }
 
-function logAdminAction(db, admin, action, detail = "", targetUserId = "") {
+function logAdminAction(db, admin, action, detail = "", targetUserId = "", context = {}) {
   db.adminLogs ||= [];
   db.adminLogs.unshift({
     id: crypto.randomUUID(),
     adminEmail: admin.email,
+    adminRole: admin.adminRole || getAdminRole(admin.email),
     action,
     detail,
     targetUserId,
+    reason: context.reason || "",
     createdAt: new Date().toISOString(),
   });
   db.adminLogs = db.adminLogs.slice(0, 500);
+  recordAdminAuditOnDb(db, admin, action, {
+    targetUserId,
+    req: context.req || null,
+    severity: context.severity || "LOW",
+    metadata: { detail, reason: context.reason || "", ...(context.metadata || {}) },
+  });
 }
 
 function getInspectableUser(db, userId) {
@@ -932,18 +1026,54 @@ function exportUserData(db, userId) {
   };
 }
 
-function applyUserAction(db, admin, userRef, action, payload = {}) {
+function applyUserAction(db, admin, userRef, action, payload = {}, req = null) {
   const user = resolveUserRecord(db, userRef);
   if (!user) return { status: 404, payload: { error: "User not found." } };
   const userId = user.id;
-  if (isSuperAdminEmail(user.email) && ["block", "suspend", "deleteUser", "resetUserData", "pendingReview"].includes(action)) {
-    return { status: 403, payload: { error: "Protected Super Admin accounts cannot be modified by this action." } };
+  const adminRole = admin.adminRole || getAdminRole(admin.email);
+  const targetRole = getAdminRole(user.email);
+  if (hasPermission(targetRole, "USER_PRIVATE_READ") && adminRole !== "OWNER" && ["block", "suspend", "deleteUser", "resetUserData", "pendingReview"].includes(action)) {
+    recordAdminAuditOnDb(db, admin, "PROTECTED_ADMIN_ACTION_DENIED", {
+      targetUserId: userId,
+      req,
+      severity: "HIGH",
+      metadata: { action, targetEmail: user.email },
+    });
+    return { status: 403, payload: { error: "Protected admin accounts can only be modified by the Owner." } };
   }
 
   const confirm = Boolean(payload.confirm);
   const destructive = new Set(["deleteUser", "resetUserData", "forceLogout", "logoutAllDevices"]);
   if (destructive.has(action) && !confirm) {
     return { status: 409, payload: { error: "Confirmation required.", requiresConfirmation: true } };
+  }
+  if (destructive.has(action) && !String(payload.reason || "").trim()) {
+    return { status: 400, payload: { error: "A reason is required for this admin action." } };
+  }
+
+  const permissionByAction = {
+    block: "USER_MODERATE",
+    unblock: "USER_MODERATE",
+    suspend: "USER_MODERATE",
+    unsuspend: "USER_MODERATE",
+    forceLogout: "USER_MODERATE",
+    logoutAllDevices: "USER_MODERATE",
+    saveAccountNotes: "USER_MODERATE",
+    pendingReview: "USER_MODERATE",
+    resetUserData: "USER_DELETE",
+    deleteUser: "USER_DELETE",
+    exportUserData: "USER_EXPORT",
+    viewActivityLogs: "SECURITY_READ",
+  };
+  const requiredPermission = permissionByAction[action];
+  if (requiredPermission && !hasPermission(adminRole, requiredPermission)) {
+    recordAdminAuditOnDb(db, admin, "ACTION_PERMISSION_DENIED", {
+      targetUserId: userId,
+      req,
+      severity: "HIGH",
+      metadata: { action, requiredPermission, adminRole },
+    });
+    return { status: 403, payload: { error: "Your admin role cannot perform this action.", requiredPermission } };
   }
 
   const moderationActions = new Set([
@@ -962,7 +1092,11 @@ function applyUserAction(db, admin, userRef, action, payload = {}) {
       if (action === "forceLogout" || action === "logoutAllDevices") {
         liveMonitorService.endAllUserSessions(db, userId, action);
       }
-      logAdminAction(db, admin, action, `${user.name || user.email} moderated`, userId);
+      logAdminAction(db, admin, action, `${user.name || user.email} moderated`, userId, {
+        req,
+        reason: payload.reason || payload.category || "",
+        severity: ["block", "suspend"].includes(action) ? "HIGH" : "MEDIUM",
+      });
       return { status: 200, payload: { ok: true, action, moderation, user: getInspectableUser(db, userId) } };
     } catch (error) {
       return { status: 400, payload: { error: error.message } };
@@ -987,10 +1121,10 @@ function applyUserAction(db, admin, userRef, action, payload = {}) {
     delete db.learningProfiles[userId];
     delete db.adminUserStatus[userId];
     adminSyncService.purgeUserWarehouse(db, userId);
-    logAdminAction(db, admin, "Delete User", user.email, userId);
+    logAdminAction(db, admin, "Delete User", user.email, userId, { req, reason: payload.reason, severity: "CRITICAL" });
     return { status: 200, payload: { ok: true, action, deleted: true } };
   } else if (action === "exportUserData") {
-    logAdminAction(db, admin, "Export User Data", user.email, userId);
+    logAdminAction(db, admin, "Export User Data", user.email, userId, { req, reason: payload.reason || "admin export", severity: "HIGH" });
     return { status: 200, payload: { ok: true, action, export: exportUserData(db, userId) } };
   } else if (action === "viewActivityLogs") {
     return {
@@ -1005,7 +1139,11 @@ function applyUserAction(db, admin, userRef, action, payload = {}) {
     return { status: 400, payload: { error: "Unsupported admin action." } };
   }
 
-  logAdminAction(db, admin, action, `${user.name || user.email} -> ${action}`, userId);
+  logAdminAction(db, admin, action, `${user.name || user.email} -> ${action}`, userId, {
+    req,
+    reason: payload.reason || "",
+    severity: destructive.has(action) ? "CRITICAL" : "MEDIUM",
+  });
   return { status: 200, payload: { ok: true, action, user: getInspectableUser(db, userId) } };
 }
 
@@ -1116,6 +1254,13 @@ function collectionRows(db, collection) {
   }
   if (collection === "adminLogs") {
     return { columns: ["adminEmail", "action", "detail", "createdAt"], rows: db.adminLogs.slice(0, maxRows) };
+  }
+  if (collection === "securityAuditLogs" || collection === "security_audit_logs") {
+    const analytics = buildSecurityAnalytics(db);
+    return {
+      columns: ["actorEmail", "actorRole", "action", "severity", "targetUserId", "ip", "createdAt"],
+      rows: analytics.recentEvents.slice(0, maxRows),
+    };
   }
   if (collection === "screenshots") {
     const rows = adminSyncService.getWarehouseCollection(db, "screenshots", maxRows);
@@ -1244,23 +1389,36 @@ function serveStatic(req, res, url) {
     res.writeHead(200, {
       "Content-Type": contentTypeFor(filePath),
       "Cache-Control": filePath.endsWith("index.html") ? "no-store" : "public, max-age=86400",
+      ...securityHeaders({ production: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER) }),
     });
     return fs.createReadStream(filePath).pipe(res);
   }
 
   const indexPath = path.join(publicDir, "index.html");
-  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+  res.writeHead(200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store",
+    ...securityHeaders({ production: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER) }),
+  });
   return fs.createReadStream(indexPath).pipe(res);
 }
 
 async function handleApi(req, res, url) {
   const ip = req.socket.remoteAddress || "unknown";
-  if (isRateLimited(ip, 160, 60_000)) return sendJson(res, 429, { error: "Too many admin requests. Slow down briefly." });
+  const origin = validateOrigin(req, getAllowedOrigins());
+  if (!origin.ok) {
+    auditAdminSecurity("ORIGIN_DENIED", { admin: getSession(req)?.admin || {}, req, severity: "HIGH", metadata: { origin: origin.origin } });
+    return sendJson(res, 403, { error: origin.error });
+  }
+  if (isRateLimited(ip, 160, 60_000)) {
+    auditAdminSecurity("RATE_LIMIT_TRIGGERED", { admin: getSession(req)?.admin || {}, req, severity: "MEDIUM", metadata: { path: url.pathname } });
+    return sendJson(res, 429, { error: "Too many admin requests. Slow down briefly." });
+  }
 
   if (req.method === "GET" && url.pathname === "/api/admin/config") {
     return sendJson(res, 200, {
       googleClientId: getGoogleClientId(),
-      adminConfigured: getSuperAdminEmails().size > 0,
+      adminConfigured: Boolean(process.env.OWNER_EMAILS || process.env.SUPER_ADMIN_EMAILS),
       allowDevLogin,
       allowEmailLogin,
       dashboardUrl: normalDashboardUrl,
@@ -1272,17 +1430,20 @@ async function handleApi(req, res, url) {
       const body = await readBody(req);
       if (!body.credential) return sendJson(res, 400, { error: "Missing Google credential." });
       const profile = await verifyGoogleCredential(body.credential);
-      if (!isSuperAdminEmail(profile.email)) {
+      if (!isApprovedAdminEmail(profile.email)) {
+        auditAdminSecurity("LOGIN_DENIED", { req, severity: "HIGH", metadata: { email: profile.email, method: "google" } });
         return sendJson(res, 403, {
           error: "Access Denied",
-          message: "This Google account is not approved as a NeuroNest Super Admin.",
+          message: "This Google account is not approved as a NeuroNest admin.",
           dashboardUrl: normalDashboardUrl,
         });
       }
       const session = createSession(profile);
       setAdminCookie(res, session.token);
+      auditAdminSecurity("LOGIN_SUCCESS", { admin: session.admin, req, severity: "LOW", metadata: { method: "google" } });
       return sendJson(res, 200, { admin: session.admin });
     } catch (error) {
+      auditAdminSecurity("LOGIN_FAILED", { req, severity: "MEDIUM", metadata: { method: "google", error: error.message } });
       return sendJson(res, 401, { error: error.message });
     }
   }
@@ -1291,7 +1452,10 @@ async function handleApi(req, res, url) {
     try {
       if (!allowDevLogin) return sendJson(res, 403, { error: "Local admin dev login is disabled." });
       const body = await readBody(req);
-      if (!isSuperAdminEmail(body.email)) return sendJson(res, 403, { error: "Access Denied", dashboardUrl: normalDashboardUrl });
+      if (!isApprovedAdminEmail(body.email)) {
+        auditAdminSecurity("LOGIN_DENIED", { req, severity: "HIGH", metadata: { email: body.email, method: "dev" } });
+        return sendJson(res, 403, { error: "Access Denied", dashboardUrl: normalDashboardUrl });
+      }
       const session = createSession({
         googleSub: "local-admin",
         email: body.email,
@@ -1299,6 +1463,7 @@ async function handleApi(req, res, url) {
         picture: "",
       });
       setAdminCookie(res, session.token);
+      auditAdminSecurity("LOGIN_SUCCESS", { admin: session.admin, req, severity: "LOW", metadata: { method: "dev" } });
       return sendJson(res, 200, { admin: session.admin });
     } catch (error) {
       return sendJson(res, 400, { error: error.message });
@@ -1309,10 +1474,12 @@ async function handleApi(req, res, url) {
     try {
       if (!allowEmailLogin) return sendJson(res, 403, { error: "Admin email login is not configured." });
       if (isRateLimited(`admin-email-login:${ip}`, 8, 15 * 60_000)) {
+        auditAdminSecurity("EMAIL_LOGIN_RATE_LIMIT", { req, severity: "HIGH", metadata: { method: "email" } });
         return sendJson(res, 429, { error: "Too many email login attempts. Try again later." });
       }
       const body = await readBody(req);
-      if (!isSuperAdminEmail(body.email) || !isValidAdminAccessCode(body.accessCode)) {
+      if (!isApprovedAdminEmail(body.email) || !isValidAdminAccessCode(body.accessCode)) {
+        auditAdminSecurity("LOGIN_DENIED", { req, severity: "HIGH", metadata: { email: body.email, method: "email" } });
         return sendJson(res, 403, { error: "Invalid approved admin email or access code." });
       }
       const email = String(body.email).trim().toLowerCase();
@@ -1323,6 +1490,7 @@ async function handleApi(req, res, url) {
         picture: "",
       });
       setAdminCookie(res, session.token);
+      auditAdminSecurity("LOGIN_SUCCESS", { admin: session.admin, req, severity: "LOW", metadata: { method: "email" } });
       return sendJson(res, 200, { admin: session.admin });
     } catch (error) {
       return sendJson(res, 400, { error: error.message });
@@ -1335,11 +1503,22 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/admin/logout") {
+    const session = getSession(req);
+    if (session?.admin) auditAdminSecurity("LOGOUT", { admin: session.admin, req, severity: "LOW" });
     clearAdminCookie(req, res);
     return sendJson(res, 200, { ok: true });
   }
 
-  const protectedNamespaces = ["/api/admin/", "/api/users/", "/api/system/", "/api/analytics/", "/api/database/"];
+  const protectedNamespaces = [
+    "/api/admin/",
+    "/api/users/",
+    "/api/system/",
+    "/api/analytics/",
+    "/api/database/",
+    "/api/security/",
+    "/api/super-admin/",
+    "/api/ai/admin/",
+  ];
   if (protectedNamespaces.some((namespace) => url.pathname.startsWith(namespace))) {
     const session = requireAdmin(req, res);
     if (!session) return;
@@ -1378,13 +1557,19 @@ async function handleApi(req, res, url) {
 
       const adminFileRoute = url.pathname.match(/^\/api\/admin\/files\/([^/]+)\/([^/]+)$/);
       if (req.method === "GET" && adminFileRoute) {
+        if (!requireAdminPermission(req, res, session, "USER_PRIVATE_READ")) return;
         const storedPath = warehouseDb.resolveStoredFile(decodeURIComponent(adminFileRoute[1]), decodeURIComponent(adminFileRoute[2]));
         if (!storedPath) return sendJson(res, 404, { error: "File not found." });
-        res.writeHead(200, { "Content-Type": contentTypeFor(storedPath), "Cache-Control": "public, max-age=86400" });
+        res.writeHead(200, {
+          "Content-Type": contentTypeFor(storedPath),
+          "Cache-Control": "private, max-age=600",
+          ...securityHeaders({ production: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER) }),
+        });
         return fs.createReadStream(storedPath).pipe(res);
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/users") {
+        if (!requireAdminPermission(req, res, session, "USER_READ")) return;
         const { db } = safeReadDb();
         const search = url.searchParams.get("search") || "";
         const filter = url.searchParams.get("filter") || "all";
@@ -1393,6 +1578,7 @@ async function handleApi(req, res, url) {
 
       const userMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
       if (req.method === "GET" && userMatch) {
+        if (!requireAdminPermission(req, res, session, "USER_PRIVATE_READ")) return;
         const { db } = safeReadDb();
         const user = getInspectableUser(db, decodeURIComponent(userMatch[1]));
         return user ? sendJson(res, 200, { user }) : sendJson(res, 404, { error: "User not found." });
@@ -1402,7 +1588,7 @@ async function handleApi(req, res, url) {
       if (req.method === "POST" && actionMatch) {
         const body = await readBody(req);
         const db = readDb();
-        const result = applyUserAction(db, session.admin, decodeURIComponent(actionMatch[1]), body.action, body);
+        const result = applyUserAction(db, session.admin, decodeURIComponent(actionMatch[1]), body.action, body, req);
         if (result.status < 400) writeDb(db);
         return sendJson(res, result.status, result.payload);
       }
@@ -1411,7 +1597,7 @@ async function handleApi(req, res, url) {
       if (req.method === "POST" && moderationMatch) {
         const body = await readBody(req);
         const db = readDb();
-        const result = applyUserAction(db, session.admin, decodeURIComponent(moderationMatch[1]), body.action, body);
+        const result = applyUserAction(db, session.admin, decodeURIComponent(moderationMatch[1]), body.action, body, req);
         if (result.status < 400) writeDb(db);
         return sendJson(res, result.status, result.payload);
       }
@@ -1422,22 +1608,26 @@ async function handleApi(req, res, url) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/live-monitor/overview") {
+        if (!requireAdminPermission(req, res, session, "SYSTEM_READ")) return;
         const { db } = safeReadDb();
         return sendJson(res, 200, liveMonitorService.buildLiveMonitorSnapshot(db));
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/live-monitor/feed") {
+        if (!requireAdminPermission(req, res, session, "SYSTEM_READ")) return;
         const { db } = safeReadDb();
         return sendJson(res, 200, { feed: liveMonitorService.buildLiveFeed(db, 100) });
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/live-monitor/analytics") {
+        if (!requireAdminPermission(req, res, session, "SYSTEM_READ")) return;
         const { db } = safeReadDb();
         return sendJson(res, 200, liveMonitorService.buildLiveAnalytics(db));
       }
 
       const liveUserMatch = url.pathname.match(/^\/api\/admin\/live-monitor\/users\/([^/]+)$/);
       if (req.method === "GET" && liveUserMatch) {
+        if (!requireAdminPermission(req, res, session, "USER_PRIVATE_READ")) return;
         const { db } = safeReadDb();
         const user = resolveUserRecord(db, decodeURIComponent(liveUserMatch[1]));
         if (!user) return sendJson(res, 404, { error: "User not found." });
@@ -1446,6 +1636,7 @@ async function handleApi(req, res, url) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/live-monitor/sessions") {
+        if (!requireAdminPermission(req, res, session, "SYSTEM_READ")) return;
         const { db } = safeReadDb();
         liveMonitorService.pruneStaleSessions(db);
         return sendJson(res, 200, {
@@ -1455,12 +1646,14 @@ async function handleApi(req, res, url) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/system/health") {
+        if (!requireAdminPermission(req, res, session, "SYSTEM_READ")) return;
         const { error } = safeReadDb();
         const health = buildSystemHealth(error);
         return sendJson(res, 200, { health, score: systemHealthScore(health), checkedAt: new Date().toISOString() });
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/analytics/ai") {
+        if (!requireAdminPermission(req, res, session, "AI_ADMIN")) return;
         const { db } = safeReadDb();
         return sendJson(res, 200, {
           usage: buildAiUsage(db),
@@ -1475,23 +1668,37 @@ async function handleApi(req, res, url) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/analytics/places") {
+        if (!requireAdminPermission(req, res, session, "SYSTEM_READ")) return;
         const { db } = safeReadDb();
         return sendJson(res, 200, buildPlaceAnalytics(db));
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/analytics/relationships") {
+        if (!requireAdminPermission(req, res, session, "AI_ADMIN")) return;
         const { db } = safeReadDb();
         return sendJson(res, 200, buildRelationshipAnalytics(db));
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/analytics/predictions") {
+        if (!requireAdminPermission(req, res, session, "AI_ADMIN")) return;
         const { db } = safeReadDb();
         return sendJson(res, 200, buildPredictionAnalytics(db));
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/admin/security/overview") {
+        if (!requireAdminPermission(req, res, session, "SECURITY_READ")) return;
+        const { db } = safeReadDb();
+        return sendJson(res, 200, {
+          ...buildSecurityAnalytics(db),
+          rlsStatus: "configured-in-supabase-schema",
+          exposedConfigWarnings: [],
+        });
       }
 
       const dbMatch = url.pathname.match(/^\/api\/admin\/database\/([^/]+)$/);
       const dbAliasMatch = url.pathname.match(/^\/api\/database\/([^/]+)$/);
       if (req.method === "GET" && (dbMatch || dbAliasMatch)) {
+        if (!requireAdminPermission(req, res, session, "DATABASE_READ")) return;
         const collection = decodeURIComponent((dbMatch || dbAliasMatch)[1]);
         const { db } = safeReadDb();
         return sendJson(res, 200, { collection, ...collectionRows(db, collection) });
@@ -1503,6 +1710,7 @@ async function handleApi(req, res, url) {
       }
 
       if (req.method === "POST" && url.pathname === "/api/admin/announcements") {
+        if (!requireAdminPermission(req, res, session, "ANNOUNCEMENT_WRITE")) return;
         const body = await readBody(req);
         const title = String(body.title || "").trim();
         const message = String(body.message || "").trim();
@@ -1519,7 +1727,7 @@ async function handleApi(req, res, url) {
           createdAt: new Date().toISOString(),
         };
         db.announcements.unshift(announcement);
-        logAdminAction(db, session.admin, "Announcement Sent", title);
+        logAdminAction(db, session.admin, "Announcement Sent", title, "", { req, severity: "MEDIUM" });
         writeDb(db);
         return sendJson(res, 201, { announcement });
       }
@@ -1533,7 +1741,10 @@ async function handleApi(req, res, url) {
       }
 
       if (req.method === "GET" && url.pathname === "/api/admin/export") {
-        const { db } = safeReadDb();
+        if (!requireAdminPermission(req, res, session, "EXPORT_ALL")) return;
+        const db = readDb();
+        recordAdminAuditOnDb(db, session.admin, "EXPORT_ALL_DATA", { req, severity: "CRITICAL", metadata: { users: db.users.length } });
+        writeDb(db);
         return sendJson(res, 200, {
           exportedAt: new Date().toISOString(),
           summary: buildOverview(),

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { sanitizeFileName, validateUploadPayload } from "./securityService.js";
 
 const WAREHOUSE_VERSION = 3;
 
@@ -33,6 +34,7 @@ export function createEmptyWarehouse() {
     futurePredictions: [],
     predictionModels: [],
     predictionHistory: [],
+    securityAuditLogs: [],
     replays: [],
     insights: [],
     aiJobs: [],
@@ -68,6 +70,7 @@ export function normalizeWarehouse(db) {
   warehouse.futurePredictions ||= [];
   warehouse.predictionModels ||= [];
   warehouse.predictionHistory ||= [];
+  warehouse.securityAuditLogs ||= [];
   warehouse.replays ||= [];
   warehouse.insights ||= [];
   warehouse.aiJobs ||= [];
@@ -84,6 +87,7 @@ export function normalizeDb(db) {
   db.learningProfiles ||= {};
   db.adminUserStatus ||= {};
   db.adminLogs ||= [];
+  db.securityAuditLogs ||= [];
   db.announcements ||= [];
   db.moderationHistory ||= [];
   db.userNotifications ||= {};
@@ -117,6 +121,7 @@ export function createDatabaseService(options = {}) {
             brainModels: {},
             lifeGoals: {},
             learningProfiles: {},
+            securityAuditLogs: [],
             warehouse: createEmptyWarehouse(),
           },
           null,
@@ -150,10 +155,14 @@ export function createDatabaseService(options = {}) {
   }
 
   function saveFile(userId, payload = {}) {
-    const dataUrl = String(payload.dataUrl || payload.imageData || payload.base64 || "").trim();
-    const fileName = String(payload.fileName || payload.name || "upload.bin").replace(/[^\w.\-]+/g, "_");
-    const mimeType = String(payload.mimeType || payload.type || "application/octet-stream");
+    const dataUrl = String(payload.dataUrl || payload.imageData || payload.audioData || payload.fileData || payload.base64 || "").trim();
     if (!userId || !dataUrl) return null;
+    const validation = validateUploadPayload({ ...payload, dataUrl });
+    if (!validation.ok) {
+      throw new Error(validation.error);
+    }
+    const fileName = sanitizeFileName(validation.fileName || payload.fileName || payload.name || "upload.bin");
+    const mimeType = validation.mimeType;
 
     let buffer;
     let ext = path.extname(fileName) || guessExtension(mimeType);

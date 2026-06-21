@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "security:scan": "node ../shared/neuronest-warehouse/scripts/securityScan.mjs .."
   }
 }

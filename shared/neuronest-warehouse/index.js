@@ -10,6 +10,7 @@ import { createAdminSyncService } from "./adminSyncService.js";
 import { createModerationService } from "./moderationService.js";
 import { createLiveMonitorService } from "./liveMonitorService.js";
 import { createSupabaseProductionStore } from "./supabaseProductionStore.js";
+export * from "./securityService.js";
 
 export function createNeuroNestWarehouse(options = {}) {
   const databaseService = createDatabaseService(options);

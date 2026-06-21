@@ -289,6 +289,66 @@ create table if not exists public.ai_usage (
 create index if not exists ai_usage_created_idx on public.ai_usage(created_at desc);
 create index if not exists intelligence_records_user_type_idx on public.intelligence_records(user_id, type);
 
+create table if not exists public.security_audit_logs (
+  id text primary key,
+  actor_user_id text,
+  actor_email text,
+  actor_role text not null default 'USER',
+  action text not null,
+  target_user_id text,
+  ip text,
+  user_agent text,
+  severity text not null default 'LOW' check (severity in ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists security_audit_logs_created_idx on public.security_audit_logs(created_at desc);
+create index if not exists security_audit_logs_severity_idx on public.security_audit_logs(severity, created_at desc);
+create index if not exists security_audit_logs_actor_idx on public.security_audit_logs(actor_email, created_at desc);
+
+create or replace function public.prevent_security_audit_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  raise exception 'security_audit_logs are append-only';
+end;
+$$;
+
+drop trigger if exists security_audit_logs_append_only_update on public.security_audit_logs;
+create trigger security_audit_logs_append_only_update
+before update on public.security_audit_logs
+for each row execute function public.prevent_security_audit_mutation();
+
+drop trigger if exists security_audit_logs_append_only_delete on public.security_audit_logs;
+create trigger security_audit_logs_append_only_delete
+before delete on public.security_audit_logs
+for each row execute function public.prevent_security_audit_mutation();
+
+create table if not exists public.activity_logs (
+  id text primary key,
+  user_id text references public.neuronest_users(id) on delete cascade,
+  action text not null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.admin_logs (
+  id text primary key,
+  admin_email text not null,
+  admin_role text not null default 'SUPER_ADMIN',
+  action text not null,
+  detail text,
+  target_user_id text,
+  reason text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists activity_logs_user_created_idx on public.activity_logs(user_id, created_at desc);
+create index if not exists admin_logs_created_idx on public.admin_logs(created_at desc);
+
 create or replace function public.match_memory_vectors(
   match_user_id text,
   query_embedding vector(1536),
@@ -332,7 +392,52 @@ alter table public.predictions enable row level security;
 alter table public.prediction_models enable row level security;
 alter table public.prediction_history enable row level security;
 alter table public.ai_usage enable row level security;
+alter table public.security_audit_logs enable row level security;
+alter table public.activity_logs enable row level security;
+alter table public.admin_logs enable row level security;
+
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'neuronest_users',
+    'memories',
+    'memory_vectors',
+    'media_records',
+    'ai_chats',
+    'timeline_events',
+    'place_memories',
+    'relationships',
+    'relationship_events',
+    'relationship_insights',
+    'relationship_clusters',
+    'goals',
+    'intelligence_records',
+    'predictions',
+    'prediction_models',
+    'prediction_history',
+    'ai_usage',
+    'security_audit_logs',
+    'activity_logs',
+    'admin_logs'
+  ]
+  loop
+    execute format('drop policy if exists neuronest_service_role_all on public.%I', table_name);
+    execute format(
+      'create policy neuronest_service_role_all on public.%I for all using (auth.role() = ''service_role'') with check (auth.role() = ''service_role'')',
+      table_name
+    );
+  end loop;
+end $$;
 
 insert into storage.buckets (id, name, public)
 values ('neuronest-media', 'neuronest-media', false)
 on conflict (id) do nothing;
+
+drop policy if exists neuronest_media_service_role_all on storage.objects;
+create policy neuronest_media_service_role_all
+on storage.objects
+for all
+using (bucket_id = 'neuronest-media' and auth.role() = 'service_role')
+with check (bucket_id = 'neuronest-media' and auth.role() = 'service_role');

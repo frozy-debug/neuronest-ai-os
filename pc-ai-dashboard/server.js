@@ -47,7 +47,17 @@ import {
   processPassiveLocationSample,
   resolveGooglePlaceVisit,
 } from "./services/passivePlaceMemoryService.js";
-import { createNeuroNestWarehouse } from "../shared/neuronest-warehouse/index.js";
+import {
+  createAuditEvent,
+  createNeuroNestWarehouse,
+  detectSuspiciousAiRequest,
+  getRequestIp,
+  recordAuditEvent,
+  redactSecrets,
+  securityHeaders,
+  validateOrigin,
+  validateUploadPayload,
+} from "../shared/neuronest-warehouse/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,6 +86,7 @@ let lastAccountDbSignature = "";
 let productionSyncTimer = null;
 const sessions = new Map();
 const rateLimitBuckets = new Map();
+const SESSION_MAX_AGE_MS = Number(process.env.SESSION_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000);
 
 function loadEnv() {
   const envPath = path.join(__dirname, ".env");
@@ -116,6 +127,28 @@ function getGooglePlacesServerApiKey() {
   return process.env.GOOGLE_PLACES_SERVER_API_KEY || process.env.GOOGLE_MAPS_API_KEY || "";
 }
 
+function getAllowedOrigins() {
+  const configured = String(process.env.CORS_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const defaults = [
+    process.env.NEURONEST_APP_URL,
+    `http://localhost:${PORT}`,
+    `http://127.0.0.1:${PORT}`,
+  ].filter(Boolean);
+  return [...new Set([...configured, ...defaults])];
+}
+
+function getAllowedGoogleDomains() {
+  return new Set(
+    String(process.env.GOOGLE_ALLOWED_DOMAINS || "")
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
 function getClientMeta(req, body = {}) {
   const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
   const ip = forwarded || req.socket?.remoteAddress || "unknown";
@@ -148,6 +181,27 @@ function readDb() {
 function writeDb(db) {
   warehouseDb.writeDb(db);
   scheduleAccountBroadcast();
+}
+
+function auditSecurity(action, { actor = {}, targetUserId = "", req = null, severity = "LOW", metadata = {} } = {}) {
+  try {
+    const db = readDb();
+    const event = createAuditEvent({
+      actor,
+      action,
+      targetUserId,
+      severity,
+      ip: req ? getRequestIp(req) : "",
+      userAgent: req?.headers?.["user-agent"] || "",
+      metadata,
+    });
+    recordAuditEvent(db, event);
+    writeDb(db);
+    if (productionStore.ready()) void productionStore.upsertSecurityAudit(event).catch(() => {});
+    return event;
+  } catch {
+    return null;
+  }
 }
 
 function persistIntelligenceRecord(userId, collection, record) {
@@ -1381,6 +1435,10 @@ function getSession(req) {
   const session = sessions.get(sid);
   if (!session) return null;
   session.createdAt ||= Date.now();
+  if (Date.now() - Number(session.createdAt || 0) > SESSION_MAX_AGE_MS) {
+    sessions.delete(sid);
+    return null;
+  }
   return { sid, ...session };
 }
 
@@ -1505,17 +1563,18 @@ function enforceAuthenticatedAccess(req, res, session) {
 function setSession(res, user) {
   const sid = crypto.randomUUID();
   sessions.set(sid, { user, createdAt: Date.now() });
-  const secureCookie = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  const secureCookie = process.env.NODE_ENV === "production" || process.env.RENDER ? "; Secure" : "";
+  const maxAgeSeconds = Math.max(300, Math.floor(SESSION_MAX_AGE_MS / 1000));
   res.setHeader(
     "Set-Cookie",
-    `neuronest.sid=${encodeURIComponent(sid)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800${secureCookie}`,
+    `neuronest.sid=${encodeURIComponent(sid)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAgeSeconds}${secureCookie}`,
   );
 }
 
 function clearSession(req, res) {
   const sid = parseCookies(req)["neuronest.sid"];
   if (sid) sessions.delete(sid);
-  const secureCookie = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  const secureCookie = process.env.NODE_ENV === "production" || process.env.RENDER ? "; Secure" : "";
   res.setHeader("Set-Cookie", `neuronest.sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secureCookie}`);
 }
 
@@ -1523,8 +1582,9 @@ function sendJson(res, status, data) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
+    ...securityHeaders({ production: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER) }),
   });
-  res.end(JSON.stringify(data));
+  res.end(JSON.stringify(redactSecrets(data)));
 }
 
 function isRateLimited(req) {
@@ -1593,6 +1653,12 @@ function profileFromGooglePayload(payload) {
     throw new Error("Google token is missing required profile details.");
   }
 
+  const allowedDomains = getAllowedGoogleDomains();
+  const emailDomain = String(payload.email).split("@")[1]?.toLowerCase() || "";
+  if (allowedDomains.size && !allowedDomains.has(emailDomain)) {
+    throw new Error("This Google account domain is not approved for NeuroNest.");
+  }
+
   return {
     googleSub: payload.sub,
     email: payload.email,
@@ -1625,6 +1691,28 @@ async function verifyGoogleCredential(credential) {
     console.warn("Google tokeninfo was unreachable. Using local ID-token decode for development login only.");
     return profileFromGooglePayload(decodeGoogleJwtPayload(credential));
   }
+}
+
+function enforceAiRequestBoundary(req, res, session, message, capability = "ai") {
+  const inspection = detectSuspiciousAiRequest(message);
+  if (!inspection.suspicious) return true;
+  auditSecurity(inspection.blocked ? "AI_ABUSE_BLOCKED" : "AI_ABUSE_SUSPICIOUS", {
+    actor: session?.user || {},
+    targetUserId: session?.user?.id || "",
+    req,
+    severity: inspection.severity,
+    metadata: {
+      capability,
+      categories: inspection.categories,
+      reason: inspection.reason,
+    },
+  });
+  if (!inspection.blocked) return true;
+  sendJson(res, 403, {
+    error: "I can only use your own NeuroNest memories and cannot reveal secrets, system instructions, or another user's data.",
+    code: "AI_SECURITY_BOUNDARY",
+  });
+  return false;
 }
 
 async function handleApi(req, res, url) {
@@ -1691,32 +1779,57 @@ async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/health") {
     return sendJson(res, 200, {
       ok: true,
-      intelligence: {
-        embeddings: getVectorStatus(),
-        generation: getProductionAiStatus(),
+      status: "ok",
+      checkedAt: new Date().toISOString(),
+      services: {
+        server: "ok",
+        ai: getProductionAiStatus().aiReady ? "ok" : "degraded",
+        embeddings: getVectorStatus().productionReady ? "ok" : "degraded",
+        maps: getGooglePlacesServerApiKey() ? "ok" : "degraded",
+        database: productionStore.ready() ? "ok" : "local",
       },
-      passivePlaces: {
-        googlePlacesServerReady: Boolean(getGooglePlacesServerApiKey()),
-        supabaseReady: productionStore.ready(),
-        minimumStayMinutes: 10,
-        movementRadiusMeters: 100,
-      },
-      warehouse: adminSyncService.buildSyncSnapshot(readDb()),
     });
   }
 
   const fileRoute = url.pathname.match(/^\/api\/files\/([^/]+)\/([^/]+)$/);
   if (req.method === "GET" && fileRoute) {
-    const storedPath = warehouseDb.resolveStoredFile(decodeURIComponent(fileRoute[1]), decodeURIComponent(fileRoute[2]));
+    const requestedUserId = decodeURIComponent(fileRoute[1]);
+    if (!session?.user?.id || session.user.id !== requestedUserId) {
+      auditSecurity("FILE_ACCESS_DENIED", {
+        actor: session?.user || {},
+        targetUserId: requestedUserId,
+        req,
+        severity: "MEDIUM",
+        metadata: { file: fileRoute[2] },
+      });
+      return sendJson(res, 403, { error: "File access denied." });
+    }
+    const storedPath = warehouseDb.resolveStoredFile(requestedUserId, decodeURIComponent(fileRoute[2]));
     if (!storedPath) return sendJson(res, 404, { error: "File not found." });
-    res.writeHead(200, { "Content-Type": contentTypeFor(storedPath), "Cache-Control": "public, max-age=86400" });
+    res.writeHead(200, {
+      "Content-Type": contentTypeFor(storedPath),
+      "Cache-Control": "private, max-age=600",
+      ...securityHeaders({ production: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER) }),
+    });
     return fs.createReadStream(storedPath).pipe(res);
   }
 
   if (req.method === "POST" && url.pathname === "/api/files/upload") {
     if (!session?.user) return sendJson(res, 401, { error: "Please login first." });
+    if (!enforceAuthenticatedAccess(req, res, session)) return;
     try {
       const body = await readBody(req);
+      const validation = validateUploadPayload(body);
+      if (!validation.ok) {
+        auditSecurity("UPLOAD_REJECTED", {
+          actor: session.user,
+          targetUserId: session.user.id,
+          req,
+          severity: "MEDIUM",
+          metadata: { code: validation.code, fileName: body.fileName, mimeType: body.mimeType, kind: body.kind },
+        });
+        return sendJson(res, 400, { error: validation.error, code: validation.code });
+      }
       const db = readDb();
       const fileRecord = warehouseDb.saveFile(session.user.id, body);
       if (!fileRecord) return sendJson(res, 400, { error: "File data is required." });
@@ -1746,6 +1859,13 @@ async function handleApi(req, res, url) {
       const user = upsertUser(profile);
       const access = resolveAccountAccess(user.id);
       if (!access.allowed) {
+        auditSecurity("LOGIN_BLOCKED", {
+          actor: { id: user.id, email: user.email, role: "USER" },
+          targetUserId: user.id,
+          req,
+          severity: "HIGH",
+          metadata: { status: access.status, reason: access.reason || access.headline },
+        });
         return sendJson(res, 403, {
           error: access.headline || "Account access restricted.",
           moderation: access,
@@ -1758,8 +1878,19 @@ async function handleApi(req, res, url) {
       writeDb(loginDb);
       const safeUser = publicUser(user);
       setSession(res, safeUser);
+      auditSecurity("LOGIN_SUCCESS", {
+        actor: { id: user.id, email: user.email, role: "USER" },
+        targetUserId: user.id,
+        req,
+        severity: "LOW",
+      });
       return sendJson(res, 200, { user: safeUser, accountStatus: access.status, presenceSessionId: liveSession?.sessionId || null });
     } catch (error) {
+      auditSecurity("LOGIN_FAILED", {
+        req,
+        severity: "MEDIUM",
+        metadata: { error: error.message },
+      });
       return sendJson(res, 401, { error: error.message });
     }
   }
@@ -1785,6 +1916,12 @@ async function handleApi(req, res, url) {
       }
     }
     clearSession(req, res);
+    auditSecurity("LOGOUT", {
+      actor: session?.user || {},
+      targetUserId: session?.user?.id || "",
+      req,
+      severity: "LOW",
+    });
     return sendJson(res, 200, { ok: true });
   }
 
@@ -2056,6 +2193,7 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     const message = String(body.message || body.query || "").trim();
     if (!message) return sendJson(res, 400, { error: "Message is required." });
+    if (!enforceAiRequestBoundary(req, res, session, message, "intelligence-core")) return;
     const core = await buildIntelligenceCoreResponse(session.user, { query: message, activity: message, focusState: "reasoning" });
     const reply = await generateOpenAiIntelligenceReply({
       message,
@@ -2290,6 +2428,7 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     const query = String(body.query || "").trim();
     if (!query) return sendJson(res, 400, { error: "Search query is required." });
+    if (!enforceAiRequestBoundary(req, res, session, query, "semantic-search")) return;
 
     const memories = allUnifiedMemories(session.user.id);
     let semanticMatches;
@@ -2543,6 +2682,7 @@ async function handleApi(req, res, url) {
 
     if (!message) return sendJson(res, 400, { error: "Message is required." });
     if (message.length > 1000) return sendJson(res, 400, { error: "Message is too long." });
+    if (!enforceAiRequestBoundary(req, res, session, message, "ai-chat")) return;
     if (!getProductionAiStatus().aiReady) {
       return sendJson(res, 503, { error: "AI Chat requires GROQ_API_KEY or OPENAI_API_KEY.", code: "AI_PROVIDER_NOT_CONFIGURED" });
     }
@@ -2744,7 +2884,11 @@ function contentTypeFor(filePath) {
     ".png": "image/png",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
     ".svg": "image/svg+xml",
+    ".webm": "audio/webm",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
   };
 
   return types[ext] || "application/octet-stream";
@@ -2756,7 +2900,7 @@ function serveStatic(req, res, url) {
   const filePath = path.join(publicDir, safePath);
 
   if (!filePath.startsWith(publicDir)) {
-    res.writeHead(403);
+    res.writeHead(403, securityHeaders({ production: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER) }));
     res.end("Forbidden");
     return;
   }
@@ -2765,7 +2909,11 @@ function serveStatic(req, res, url) {
     ? filePath
     : path.join(publicDir, "index.html");
 
-  res.writeHead(200, { "Content-Type": contentTypeFor(finalPath) });
+  res.writeHead(200, {
+    "Content-Type": contentTypeFor(finalPath),
+    "Cache-Control": finalPath.endsWith("index.html") ? "no-store" : "public, max-age=86400",
+    ...securityHeaders({ production: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER) }),
+  });
   fs.createReadStream(finalPath).pipe(res);
 }
 
@@ -2774,6 +2922,17 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (url.pathname.startsWith("/api/")) {
+    const origin = validateOrigin(req, getAllowedOrigins());
+    if (!origin.ok) {
+      auditSecurity("ORIGIN_DENIED", {
+        actor: getSession(req)?.user || {},
+        req,
+        severity: "MEDIUM",
+        metadata: { origin: origin.origin },
+      });
+      sendJson(res, 403, { error: origin.error });
+      return;
+    }
 
     const skipRateLimit = [
         "/api/presence/heartbeat",
@@ -2786,6 +2945,12 @@ const server = http.createServer(async (req, res) => {
         !skipRateLimit.includes(url.pathname) &&
         isRateLimited(req)
     ) {
+        auditSecurity("RATE_LIMIT_TRIGGERED", {
+          actor: getSession(req)?.user || {},
+          req,
+          severity: "LOW",
+          metadata: { path: url.pathname },
+        });
         sendJson(res, 429, {
             error: "Too many requests. Please slow down for a moment."
         });

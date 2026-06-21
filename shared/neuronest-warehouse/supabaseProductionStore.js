@@ -255,6 +255,23 @@ export function createSupabaseProductionStore() {
     });
   }
 
+  async function upsertSecurityAudit(event = {}) {
+    if (!event?.id) return null;
+    return upsert("security_audit_logs", {
+      id: event.id,
+      actor_user_id: event.actorUserId || null,
+      actor_email: event.actorEmail || null,
+      actor_role: event.actorRole || "USER",
+      action: event.action,
+      target_user_id: event.targetUserId || null,
+      ip: event.ip || null,
+      user_agent: event.userAgent || null,
+      severity: event.severity || "LOW",
+      metadata: event.metadata || {},
+      created_at: event.createdAt || new Date().toISOString(),
+    });
+  }
+
   async function replaceRelationshipIntelligence(userId, snapshot = {}) {
     if (!ready() || !userId) return null;
     const profiles = (snapshot.relationships || []).map((item) => ({
@@ -383,7 +400,7 @@ export function createSupabaseProductionStore() {
         return [];
       }
     };
-    const [users, memories, chats, goals, media, intelligence, usage, embeddings, placeMemories, relationshipProfiles, relationshipEvents, relationshipInsights, relationshipClusters, futurePredictions, predictionModels, predictionHistory] = await Promise.all([
+    const [users, memories, chats, goals, media, intelligence, usage, embeddings, placeMemories, relationshipProfiles, relationshipEvents, relationshipInsights, relationshipClusters, futurePredictions, predictionModels, predictionHistory, securityAuditLogs] = await Promise.all([
       rest("neuronest_users?select=*&limit=5000"),
       rest("memories?select=*&order=created_at.desc&limit=5000"),
       rest("ai_chats?select=*&order=created_at.desc&limit=5000"),
@@ -400,6 +417,7 @@ export function createSupabaseProductionStore() {
       optionalRest("predictions?select=*&order=generated_at.desc&limit=5000"),
       optionalRest("prediction_models?select=*&order=updated_at.desc&limit=5000"),
       optionalRest("prediction_history?select=*&order=evaluated_at.desc&limit=5000"),
+      optionalRest("security_audit_logs?select=*&order=created_at.desc&limit=5000"),
     ]);
 
     db.users = users.map((user) => ({
@@ -567,6 +585,20 @@ export function createSupabaseProductionStore() {
       evidence: item.evidence || [],
       evaluatedAt: item.evaluated_at,
     }));
+    db.securityAuditLogs = securityAuditLogs.map((item) => ({
+      id: item.id,
+      actorUserId: item.actor_user_id || "",
+      actorEmail: item.actor_email || "",
+      actorRole: item.actor_role || "USER",
+      action: item.action,
+      targetUserId: item.target_user_id || "",
+      ip: item.ip || "",
+      userAgent: item.user_agent || "",
+      severity: item.severity || "LOW",
+      metadata: item.metadata || {},
+      createdAt: item.created_at,
+    }));
+    warehouse.securityAuditLogs = [...db.securityAuditLogs];
     warehouse.replays = [];
     warehouse.insights = [];
     warehouse.aiJobs ||= [];
@@ -671,6 +703,7 @@ export function createSupabaseProductionStore() {
     upsertChat,
     upsertGoal,
     upsertIntelligence,
+    upsertSecurityAudit,
     replaceRelationshipIntelligence,
     replaceFuturePredictions,
     hydrateAdminDb,
