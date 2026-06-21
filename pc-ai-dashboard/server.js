@@ -22,9 +22,9 @@ import { buildIntelligenceCore } from "./services/intelligenceCoreService.js";
 import {
   answerAutonomousIntelligenceQuery,
   buildAutonomousIntelligenceCoreV3,
-  buildMemoryTimeMachine,
 } from "./services/autonomousIntelligenceCoreV3Service.js";
 import { answerChiefOfStaffQuery, buildAiChiefOfStaff } from "./services/aiChiefOfStaffService.js";
+import { answerMemoryTimeMachineQuery, buildMemoryTimeMachine as buildProductionMemoryTimeMachine } from "./services/memoryTimeMachineService.js";
 import { buildLanguageAwareAssistantReply, localizedFallback } from "./services/languageIntelligenceService.js";
 import { generateOpenAiIntelligenceReply } from "./services/openAiIntelligenceService.js";
 import {
@@ -1055,6 +1055,55 @@ function buildAiChiefOfStaffForUser(user, { persist = false, trigger = "read" } 
     progressTracking: snapshot.progressTracking,
     evidencePolicy: snapshot.evidencePolicy,
     evidenceMemoryCount: snapshot.goalHealth.reduce((sum, goal) => sum + Number(goal.relatedSignalCount || 0), 0),
+  });
+}
+
+function buildMemoryTimeMachineForUser(user, { persist = false, trigger = "read", query = "", from = "", to = "" } = {}) {
+  const db = readDb();
+  warehouseDb.normalizeWarehouse(db);
+  const memories = allUnifiedMemories(user.id);
+  const relationships = detectRelationships(memories);
+  const relationshipIntelligence = buildRelationshipIntelligenceForUser(user.id);
+  const futurePredictions = buildFuturePredictionsForUser(user.id);
+  const timeline = buildTimeline({ memories, relationships, limit: 1000 }).events;
+  const snapshot = buildProductionMemoryTimeMachine({
+    user,
+    query,
+    from,
+    to,
+    memories,
+    records: allMemoryRecords(user.id),
+    chats: getChatHistory(user.id),
+    places: placeService.getUserPlaceMemories(db, user.id, 10_000),
+    relationships: relationshipIntelligence,
+    goals: getLifeGoals(user.id),
+    timeline,
+    predictions: futurePredictions,
+  });
+  if (!persist) return snapshot;
+  return persistIntelligenceRecord(user.id, "memoryTimeMachine", {
+    id: `memory-time-machine_${user.id}_${Date.now()}`,
+    type: "memory-time-machine",
+    trigger,
+    version: snapshot.version,
+    generatedAt: snapshot.generatedAt,
+    query: snapshot.query,
+    period: snapshot.period,
+    filters: snapshot.filters,
+    summary: snapshot.summary,
+    story: snapshot.story,
+    timelineReplay: snapshot.timelineReplay,
+    importantEvents: snapshot.importantEvents.slice(0, 12),
+    people: snapshot.people.slice(0, 12),
+    places: snapshot.places.slice(0, 20),
+    goals: snapshot.goals.slice(0, 12),
+    screenshots: snapshot.screenshots.slice(0, 20),
+    voiceNotes: snapshot.voiceNotes.slice(0, 20),
+    emotionalTrend: snapshot.emotionalTrend,
+    topics: snapshot.topics,
+    predictions: snapshot.predictions,
+    evidencePolicy: snapshot.evidencePolicy,
+    evidenceMemoryCount: snapshot.summary?.totalEvents || 0,
   });
 }
 
@@ -2217,10 +2266,32 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/ai/time-machine") {
     const body = await readBody(req);
-    const snapshot = buildAutonomousIntelligenceCoreV3ForUser(session.user, {
+    return sendJson(res, 200, buildMemoryTimeMachineForUser(session.user, {
       query: body.query || "",
-    });
-    return sendJson(res, 200, buildMemoryTimeMachine(snapshot, body.query || ""));
+      from: body.from || "",
+      to: body.to || "",
+      persist: Boolean(body.persist),
+      trigger: body.trigger || "legacy-time-machine",
+    }));
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/ai/memory-time-machine") {
+    return sendJson(res, 200, buildMemoryTimeMachineForUser(session.user, {
+      query: url.searchParams.get("query") || "",
+      from: url.searchParams.get("from") || "",
+      to: url.searchParams.get("to") || "",
+    }));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/ai/memory-time-machine/replay") {
+    const body = await readBody(req);
+    return sendJson(res, 200, buildMemoryTimeMachineForUser(session.user, {
+      query: body.query || "",
+      from: body.from || "",
+      to: body.to || "",
+      persist: Boolean(body.persist),
+      trigger: body.trigger || "time-machine-replay",
+    }));
   }
 
   if (req.method === "GET" && url.pathname === "/api/ai/digital-twin") {
@@ -2837,6 +2908,8 @@ async function handleApi(req, res, url) {
     const autonomousAnswer = answerAutonomousIntelligenceQuery(message, autonomousIntelligence);
     const chiefOfStaff = buildAiChiefOfStaffForUser(session.user);
     const chiefAnswer = answerChiefOfStaffQuery(message, chiefOfStaff);
+    const memoryTimeMachine = buildMemoryTimeMachineForUser(session.user, { query: message });
+    const timeMachineAnswer = answerMemoryTimeMachineQuery(message, memoryTimeMachine);
     const timeline = buildTimeline({ memories, relationships, limit: 80 });
     const insights = generateInsightCards(memories, relationships);
     const patterns = detectLifePatterns(memories, relationships);
@@ -2968,6 +3041,20 @@ async function handleApi(req, res, url) {
           directAnswer: chiefAnswer.matched ? chiefAnswer : null,
           evidencePolicy: chiefOfStaff.evidencePolicy,
         },
+        memoryTimeMachine: {
+          period: memoryTimeMachine.period,
+          summary: memoryTimeMachine.summary,
+          story: memoryTimeMachine.story,
+          importantEvents: memoryTimeMachine.importantEvents.slice(0, 8),
+          people: memoryTimeMachine.people.slice(0, 6),
+          places: memoryTimeMachine.places.slice(0, 6),
+          goals: memoryTimeMachine.goals.slice(0, 6),
+          screenshots: memoryTimeMachine.screenshots.slice(0, 6),
+          voiceNotes: memoryTimeMachine.voiceNotes.slice(0, 6),
+          emotionalTrend: memoryTimeMachine.emotionalTrend,
+          directAnswer: timeMachineAnswer.matched ? timeMachineAnswer : null,
+          evidencePolicy: memoryTimeMachine.evidencePolicy,
+        },
         recentConversation: getChatHistory(session.user.id).slice(-10).map((item) => ({
           role: item.role,
           content: item.content,
@@ -3012,7 +3099,9 @@ async function handleApi(req, res, url) {
     const contextualReply = providerReply;
     const decisionLine = "";
     const reply =
-      chiefAnswer.matched && chiefAnswer.confidence >= 40
+      timeMachineAnswer.matched
+        ? `${contextualReply}${decisionLine} ${timeMachineAnswer.answer}`
+        : chiefAnswer.matched && chiefAnswer.confidence >= 40
         ? `${contextualReply}${decisionLine} ${chiefAnswer.answer}`
         : autonomousAnswer.matched && autonomousAnswer.confidence >= 50
         ? `${contextualReply}${decisionLine} ${autonomousAnswer.answer}`

@@ -228,6 +228,7 @@ export function createSupabaseProductionStore() {
       predictions: "prediction",
       autonomousIntelligence: "insight",
       chiefOfStaff: "insight",
+      memoryTimeMachine: "insight",
       replays: "replay",
       insights: "insight",
     };
@@ -694,6 +695,8 @@ export function createSupabaseProductionStore() {
         ? "autonomousIntelligence"
         : data.type === "ai-chief-of-staff"
           ? "chiefOfStaff"
+          : data.type === "memory-time-machine"
+            ? "memoryTimeMachine"
           : collectionMap[item.type];
       if (collection) warehouse[collection].push({ ...data, id: item.id, userId: item.user_id, createdAt: item.created_at, updatedAt: item.updated_at });
     }

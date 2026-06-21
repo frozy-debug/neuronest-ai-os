@@ -4265,6 +4265,7 @@
           <button data-view="mission-control" type="button">Mission Control</button>
           <button data-view="chief-of-staff" type="button">AI Chief of Staff</button>
           <button data-view="future-intelligence" type="button">Future Intelligence</button>
+          <button data-view="memory-time-machine" type="button">Memory Time Machine</button>
           <button data-view="place-hunter" type="button">Place hunter</button>
           <button data-view="timeline" type="button">Timeline</button>
           <button data-view="memories" type="button">Memories</button>
@@ -4926,6 +4927,81 @@
               <span class="muted">Evidence-backed coaching</span>
             </div>
             <div id="chief-recommendations" class="mission-recommendations"></div>
+          </section>
+        </div>
+
+        <div class="view" data-view-panel="memory-time-machine">
+          <section class="panel hero mission-control">
+            <div class="section-title">
+              <div>
+                <h2>Memory Time Machine</h2>
+                <span id="time-machine-status" class="muted">AI life reconstruction from real memories</span>
+              </div>
+              <button id="time-machine-replay-button" class="chip" type="button">Replay</button>
+            </div>
+            <form id="time-machine-form" class="goal-form">
+              <input id="time-machine-query" name="query" placeholder="Take me back to June 2026, last Christmas, startup journey..." />
+              <input id="time-machine-from" name="from" type="date" aria-label="Start date" />
+              <input id="time-machine-to" name="to" type="date" aria-label="End date" />
+              <button type="submit">Travel</button>
+            </form>
+            <p class="ai-system-status">Only real memories, screenshots, voice notes, places, relationships, goals, timeline events, and predictions are used.</p>
+            <div id="time-machine-overview" class="mission-stat-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Story View</h2>
+              <span class="muted">Narrative reconstruction</span>
+            </div>
+            <div id="time-machine-story" class="ai-widget-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Timeline Replay</h2>
+              <span class="muted">Morning, afternoon, evening</span>
+            </div>
+            <div id="time-machine-replay" class="mission-review-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Important Events</h2><span class="muted">Highest signal moments</span></div>
+                <div id="time-machine-events" class="relationship-insight-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>People</h2><span class="muted">Relationship evidence</span></div>
+                <div id="time-machine-people" class="relationship-insight-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Places</h2><span class="muted">Visited or captured locations</span></div>
+                <div id="time-machine-places" class="relationship-insight-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Goals</h2><span class="muted">What you were working on</span></div>
+                <div id="time-machine-goals" class="relationship-insight-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Screenshots</h2><span class="muted">Visual memory captures</span></div>
+                <div id="time-machine-screenshots" class="relationship-insight-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Voice Notes</h2><span class="muted">Recorded reflections</span></div>
+                <div id="time-machine-voices" class="relationship-insight-list"></div>
+              </article>
+            </div>
           </section>
         </div>
 
@@ -5610,6 +5686,21 @@
       const chiefRisks = document.getElementById("chief-risks");
       const chiefWeeklyFocus = document.getElementById("chief-weekly-focus");
       const chiefRecommendations = document.getElementById("chief-recommendations");
+      const timeMachineStatus = document.getElementById("time-machine-status");
+      const timeMachineReplayButton = document.getElementById("time-machine-replay-button");
+      const timeMachineForm = document.getElementById("time-machine-form");
+      const timeMachineQuery = document.getElementById("time-machine-query");
+      const timeMachineFrom = document.getElementById("time-machine-from");
+      const timeMachineTo = document.getElementById("time-machine-to");
+      const timeMachineOverview = document.getElementById("time-machine-overview");
+      const timeMachineStory = document.getElementById("time-machine-story");
+      const timeMachineReplay = document.getElementById("time-machine-replay");
+      const timeMachineEvents = document.getElementById("time-machine-events");
+      const timeMachinePeople = document.getElementById("time-machine-people");
+      const timeMachinePlaces = document.getElementById("time-machine-places");
+      const timeMachineGoals = document.getElementById("time-machine-goals");
+      const timeMachineScreenshots = document.getElementById("time-machine-screenshots");
+      const timeMachineVoices = document.getElementById("time-machine-voices");
       const aiAvatarSrc = "/assets/neuronest-ai-avatar.png";
 
       let appConfig = {};
@@ -5629,6 +5720,7 @@
         "digital-twin": "Digital Twin",
         relationships: "Relationship Intelligence",
         "future-intelligence": "Future Intelligence",
+        "memory-time-machine": "Memory Time Machine",
         "ai-systems": "AI Systems",
         "mission-control": "Mission Control",
         "chief-of-staff": "AI Chief of Staff",
@@ -5728,6 +5820,7 @@
       let relationshipDashboardLoaded = false;
       let lifeOsLoaded = false;
       let chiefOfStaffLoaded = false;
+      let memoryTimeMachineLoaded = false;
       let futurePredictionsLoaded = false;
       let autonomousCaptureEnabled = localStorage.getItem("neuronest.passiveCapture") !== "false";
       let autonomousCaptureReady = false;
@@ -7380,6 +7473,11 @@
         if (viewName === "chief-of-staff") {
           void loadChiefOfStaff();
           void reportLiveAction("AI_CHIEF_OF_STAFF", { page: "chief-of-staff", label: "AI Chief of Staff" });
+        }
+
+        if (viewName === "memory-time-machine") {
+          void loadMemoryTimeMachine();
+          void reportLiveAction("MEMORY_TIME_MACHINE", { page: "memory-time-machine", label: "Memory Time Machine" });
         }
 
         if (viewName === "future-intelligence") {
@@ -10284,6 +10382,164 @@
         }
       }
 
+      function renderTimeMachineList(container, rows = [], emptyTitle = "No evidence found", emptyBody = "Try a different date, person, topic, or memory type.") {
+        if (!container) return;
+        container.innerHTML = "";
+        if (!rows.length) {
+          const item = document.createElement("article");
+          item.className = "relationship-insight-card";
+          const strong = document.createElement("strong");
+          strong.textContent = emptyTitle;
+          const body = document.createElement("p");
+          body.textContent = emptyBody;
+          item.append(strong, body);
+          container.appendChild(item);
+          animateContainerItems(container);
+          return;
+        }
+        rows.forEach((row) => {
+          const item = document.createElement("article");
+          item.className = "relationship-insight-card";
+          const strong = document.createElement("strong");
+          strong.textContent = row.title || row.name || row.label || "Memory signal";
+          const body = document.createElement("p");
+          body.textContent = row.body || row.summary || row.description || row.address || "";
+          const small = document.createElement("small");
+          small.textContent = row.meta || row.timestamp || row.category || "";
+          item.append(strong, body, small);
+          container.appendChild(item);
+        });
+        animateContainerItems(container);
+      }
+
+      function renderMemoryTimeMachine(data = null) {
+        const machine = data || {
+          empty: true,
+          period: { label: "Choose a period" },
+          summary: {},
+          story: "",
+          timelineReplay: [],
+          importantEvents: [],
+          people: [],
+          places: [],
+          goals: [],
+          screenshots: [],
+          voiceNotes: [],
+          emotionalTrend: {},
+        };
+        if (timeMachineStatus) {
+          timeMachineStatus.textContent = machine.empty
+            ? `${machine.period?.label || "No period"} - no real events found`
+            : `${machine.period?.label || "Selected period"} - ${machine.summary?.totalEvents || 0} real events`;
+        }
+        if (timeMachineOverview) {
+          timeMachineOverview.innerHTML = "";
+          [
+            ["Events", machine.summary?.totalEvents || 0, "Real records found for this reconstruction."],
+            ["People", machine.summary?.peopleCount || 0, "Relationship signals connected to this period."],
+            ["Places", machine.summary?.placeCount || 0, "Visited or captured location memories."],
+            ["Goals", machine.summary?.goalCount || 0, "Goals connected to this period."],
+            ["Screenshots", machine.summary?.screenshotCount || 0, "Visual memory captures."],
+            ["Voice Notes", machine.summary?.voiceNoteCount || 0, "Recorded reflections and transcripts."],
+          ].forEach(([label, value, body]) => {
+            const card = document.createElement("article");
+            card.className = "mission-card";
+            const strong = document.createElement("strong");
+            strong.textContent = value;
+            const small = document.createElement("small");
+            small.textContent = label;
+            const text = document.createElement("p");
+            text.textContent = body;
+            card.append(strong, small, text);
+            timeMachineOverview.appendChild(card);
+          });
+          animateContainerItems(timeMachineOverview);
+        }
+
+        renderWidgetList(timeMachineStory, [
+          machine.story ? {
+            title: machine.period?.label || "Memory reconstruction",
+            body: machine.story,
+            meta: `${machine.emotionalTrend?.label || "balanced"} | ${machine.evidencePolicy || ""}`,
+          } : null,
+        ], "No story found", "There are no real memory events for this query yet.");
+
+        if (timeMachineReplay) {
+          timeMachineReplay.innerHTML = "";
+          (machine.timelineReplay || []).forEach((bucket) => {
+            const card = document.createElement("article");
+            card.className = "mission-card";
+            const strong = document.createElement("strong");
+            strong.textContent = bucket.label;
+            const body = document.createElement("p");
+            body.textContent = bucket.events?.length
+              ? bucket.events.slice(0, 3).map((event) => event.title).join(" | ")
+              : bucket.summary;
+            const small = document.createElement("small");
+            small.textContent = bucket.summary;
+            card.append(strong, body, small);
+            timeMachineReplay.appendChild(card);
+          });
+          animateContainerItems(timeMachineReplay);
+        }
+
+        renderTimeMachineList(timeMachineEvents, (machine.importantEvents || []).map((event) => ({
+          title: event.title,
+          body: event.description,
+          meta: `${event.bucket || "event"} | ${event.importanceScore || 0}% signal | ${new Date(event.timestamp).toLocaleString()}`,
+        })), "No important events", "No high-signal memories were found for this reconstruction.");
+
+        renderTimeMachineList(timeMachinePeople, (machine.people || []).map((person) => ({
+          title: person.name,
+          body: `${person.relationshipType || "Relationship"} | ${person.interactionCount || 0} interaction signals`,
+          meta: `${person.strength || 0}% strength`,
+        })), "No people evidence", "No relationship signals matched this period or query.");
+
+        renderTimeMachineList(timeMachinePlaces, (machine.places || []).map((place) => ({
+          title: place.name,
+          body: place.address || place.category,
+          meta: place.timestamp ? new Date(place.timestamp).toLocaleString() : place.category,
+        })), "No place evidence", "No real place memories matched this reconstruction.");
+
+        renderTimeMachineList(timeMachineGoals, (machine.goals || []).map((goal) => ({
+          title: goal.title,
+          body: `${goal.status || "active"} | ${goal.progress || 0}% progress | ${goal.relatedEventCount || 0} related events`,
+          meta: `${goal.evidence?.length || 0} evidence links`,
+        })), "No goal evidence", "No goals matched this time period or topic.");
+
+        renderTimeMachineList(timeMachineScreenshots, (machine.screenshots || []).map((shot) => ({
+          title: shot.title,
+          body: shot.description,
+          meta: shot.timestamp ? new Date(shot.timestamp).toLocaleString() : "Screenshot",
+        })), "No screenshots", "No screenshot memories matched this query.");
+
+        renderTimeMachineList(timeMachineVoices, (machine.voiceNotes || []).map((voice) => ({
+          title: voice.title,
+          body: voice.description,
+          meta: voice.timestamp ? new Date(voice.timestamp).toLocaleString() : "Voice note",
+        })), "No voice notes", "No voice memories matched this query.");
+      }
+
+      async function loadMemoryTimeMachine({ force = false, persist = false } = {}) {
+        if (!force && memoryTimeMachineLoaded) return;
+        renderMemoryTimeMachine();
+        if (!currentUser) return;
+        try {
+          const query = timeMachineQuery?.value || "startup journey";
+          const from = timeMachineFrom?.value || "";
+          const to = timeMachineTo?.value || "";
+          const data = await api("/api/ai/memory-time-machine/replay", {
+            method: "POST",
+            body: JSON.stringify({ query, from, to, persist }),
+          });
+          renderMemoryTimeMachine(data);
+          memoryTimeMachineLoaded = true;
+          if (!data.empty && data.story) showAiNotification("Time Machine ready", data.story);
+        } catch {
+          // Keep the empty state visible.
+        }
+      }
+
       async function loadLifeOs({ force = false } = {}) {
         if (!force && lifeOsLoaded) return;
         renderLifeOs();
@@ -10315,8 +10571,10 @@
         renderLifeOs(data.lifeOs);
         lifeOsLoaded = true;
         chiefOfStaffLoaded = false;
+        memoryTimeMachineLoaded = false;
         futurePredictionsLoaded = false;
         if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
+        if (activeView === "memory-time-machine") void loadMemoryTimeMachine({ force: true });
         if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         showAiNotification("Life OS goal created", `${data.goal.title} is now tracked by Mission Control.`);
       }
@@ -10329,8 +10587,10 @@
         renderLifeOs(data.lifeOs);
         lifeOsLoaded = true;
         chiefOfStaffLoaded = false;
+        memoryTimeMachineLoaded = false;
         futurePredictionsLoaded = false;
         if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
+        if (activeView === "memory-time-machine") void loadMemoryTimeMachine({ force: true });
         if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         showAiNotification("Goal updated", `${data.goal.title} is now ${data.goal.progress}% complete.`);
       }
@@ -11144,6 +11404,7 @@
         currentUser = null;
         aiSystemsLoaded = false;
         relationshipDashboardLoaded = false;
+        memoryTimeMachineLoaded = false;
         profileIdentityLoaded = false;
         closeProfileIdentity();
         renderMessages([]);
@@ -11191,9 +11452,11 @@
           await typeInto(loadingBubble, assistantMessage?.content || "Done.", 10);
           lifeOsLoaded = false;
           chiefOfStaffLoaded = false;
+          memoryTimeMachineLoaded = false;
           futurePredictionsLoaded = false;
           if (activeView === "mission-control") void loadLifeOs({ force: true });
           if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
+          if (activeView === "memory-time-machine") void loadMemoryTimeMachine({ force: true });
           if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         } catch (error) {
           loadingBubble.textContent = friendlyError(error);
@@ -11296,6 +11559,17 @@
         void loadChiefOfStaff({ force: true });
       });
 
+      timeMachineForm?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        memoryTimeMachineLoaded = false;
+        void loadMemoryTimeMachine({ force: true });
+      });
+
+      timeMachineReplayButton?.addEventListener("click", () => {
+        memoryTimeMachineLoaded = false;
+        void loadMemoryTimeMachine({ force: true, persist: true });
+      });
+
       futureRebuildButton?.addEventListener("click", () => {
         futurePredictionsLoaded = false;
         void loadFuturePredictions({ force: true });
@@ -11345,6 +11619,7 @@
             relationshipDashboardLoaded = false;
             lifeOsLoaded = false;
             chiefOfStaffLoaded = false;
+            memoryTimeMachineLoaded = false;
             futurePredictionsLoaded = false;
           } catch (error) {
             alert(friendlyError(error));
