@@ -25,6 +25,7 @@ import {
 } from "./services/autonomousIntelligenceCoreV3Service.js";
 import { answerChiefOfStaffQuery, buildAiChiefOfStaff } from "./services/aiChiefOfStaffService.js";
 import { answerMemoryTimeMachineQuery, buildMemoryTimeMachine as buildProductionMemoryTimeMachine } from "./services/memoryTimeMachineService.js";
+import { answerMemoryAtlasQuery, buildMemoryAtlas } from "./services/memoryAtlasService.js";
 import { buildLanguageAwareAssistantReply, localizedFallback } from "./services/languageIntelligenceService.js";
 import { generateOpenAiIntelligenceReply } from "./services/openAiIntelligenceService.js";
 import {
@@ -1107,6 +1108,51 @@ function buildMemoryTimeMachineForUser(user, { persist = false, trigger = "read"
   });
 }
 
+function buildMemoryAtlasForUser(user, { persist = false, trigger = "read", query = "", from = "", to = "" } = {}) {
+  const db = readDb();
+  warehouseDb.normalizeWarehouse(db);
+  const memories = allUnifiedMemories(user.id);
+  const relationships = detectRelationships(memories);
+  const relationshipIntelligence = buildRelationshipIntelligenceForUser(user.id);
+  const timeline = buildTimeline({ memories, relationships, limit: 1000 }).events;
+  const snapshot = buildMemoryAtlas({
+    user,
+    query,
+    from,
+    to,
+    memories,
+    records: allMemoryRecords(user.id),
+    chats: getChatHistory(user.id),
+    places: placeService.getUserPlaceMemories(db, user.id, 10_000),
+    relationships: relationshipIntelligence,
+    timeline,
+  });
+  if (!persist) return snapshot;
+  return persistIntelligenceRecord(user.id, "memoryAtlas", {
+    id: `memory-atlas_${user.id}_${Date.now()}`,
+    type: "memory-atlas",
+    trigger,
+    version: snapshot.version,
+    generatedAt: snapshot.generatedAt,
+    query: snapshot.query,
+    period: snapshot.period,
+    filters: snapshot.filters,
+    empty: snapshot.empty,
+    overview: snapshot.overview,
+    mapPoints: snapshot.mapPoints.slice(0, 500),
+    locationClusters: snapshot.locationClusters,
+    categoryBreakdown: snapshot.categoryBreakdown,
+    timeTravel: {
+      ...snapshot.timeTravel,
+      points: snapshot.timeTravel.points.slice(0, 500),
+      journeys: snapshot.timeTravel.journeys.slice(0, 500),
+    },
+    aiAnswers: snapshot.aiAnswers,
+    evidencePolicy: snapshot.evidencePolicy,
+    evidenceMemoryCount: snapshot.overview?.evidenceCount || 0,
+  });
+}
+
 async function buildIntelligenceCoreResponse(user, context = {}) {
   const memories = allUnifiedMemories(user.id);
   const relationships = detectRelationships(memories);
@@ -1161,6 +1207,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
   const futurePredictions = buildFuturePredictionsForUser(userId, { persist: true, trigger });
   const autonomousIntelligence = buildAutonomousIntelligenceCoreV3ForUser(user, { persist: true, trigger });
   const chiefOfStaff = buildAiChiefOfStaffForUser(user, { persist: true, trigger });
+  const memoryAtlas = buildMemoryAtlasForUser(user, { persist: true, trigger });
   const predictions = futurePredictions.predictions.slice(0, 12);
 
   persistIntelligenceRecord(userId, "relationships", {
@@ -1198,7 +1245,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
     relationshipCount: relationshipIntelligence.relationships.length,
   });
   await buildDigitalTwinResponse(user, { activity: trigger, trigger });
-  return { relationships, predictions, replay, insights, relationshipIntelligence, futurePredictions, autonomousIntelligence, chiefOfStaff };
+  return { relationships, predictions, replay, insights, relationshipIntelligence, futurePredictions, autonomousIntelligence, chiefOfStaff, memoryAtlas };
 }
 
 function buildLearningEngineResponse(user, { rebuild = false, context = {} } = {}) {
@@ -2294,6 +2341,31 @@ async function handleApi(req, res, url) {
     }));
   }
 
+  if (req.method === "GET" && url.pathname === "/api/ai/memory-atlas") {
+    return sendJson(res, 200, buildMemoryAtlasForUser(session.user, {
+      query: url.searchParams.get("query") || "",
+      from: url.searchParams.get("from") || "",
+      to: url.searchParams.get("to") || "",
+    }));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/ai/memory-atlas/rebuild") {
+    const body = await readBody(req);
+    const snapshot = buildMemoryAtlasForUser(session.user, {
+      query: body.query || "",
+      from: body.from || "",
+      to: body.to || "",
+    });
+    const persisted = buildMemoryAtlasForUser(session.user, {
+      query: body.query || "",
+      from: body.from || "",
+      to: body.to || "",
+      persist: true,
+      trigger: body.trigger || "memory-atlas-rebuild",
+    });
+    return sendJson(res, 200, { ...snapshot, persisted });
+  }
+
   if (req.method === "GET" && url.pathname === "/api/ai/digital-twin") {
     return sendJson(res, 200, await buildDigitalTwinResponse(session.user, {
       query: url.searchParams.get("query") || "",
@@ -2910,6 +2982,8 @@ async function handleApi(req, res, url) {
     const chiefAnswer = answerChiefOfStaffQuery(message, chiefOfStaff);
     const memoryTimeMachine = buildMemoryTimeMachineForUser(session.user, { query: message });
     const timeMachineAnswer = answerMemoryTimeMachineQuery(message, memoryTimeMachine);
+    const memoryAtlas = buildMemoryAtlasForUser(session.user, { query: message });
+    const atlasAnswer = answerMemoryAtlasQuery(message, memoryAtlas);
     const timeline = buildTimeline({ memories, relationships, limit: 80 });
     const insights = generateInsightCards(memories, relationships);
     const patterns = detectLifePatterns(memories, relationships);
@@ -3055,6 +3129,30 @@ async function handleApi(req, res, url) {
           directAnswer: timeMachineAnswer.matched ? timeMachineAnswer : null,
           evidencePolicy: memoryTimeMachine.evidencePolicy,
         },
+        memoryAtlas: {
+          period: memoryAtlas.period,
+          overview: memoryAtlas.overview,
+          mapPoints: memoryAtlas.mapPoints.slice(0, 10).map((point) => ({
+            name: point.name,
+            category: point.category,
+            city: point.city,
+            area: point.area,
+            country: point.country,
+            memoryCount: point.memoryCount,
+            visitCount: point.visitCount,
+            happinessScore: point.happinessScore,
+            productivityScore: point.productivityScore,
+            people: point.people,
+            evidenceCount: point.evidence.length,
+          })),
+          clusters: {
+            cities: memoryAtlas.locationClusters.cities.slice(0, 8),
+            countries: memoryAtlas.locationClusters.countries.slice(0, 6),
+          },
+          aiAnswers: memoryAtlas.aiAnswers.slice(0, 4),
+          directAnswer: atlasAnswer.matched ? atlasAnswer : null,
+          evidencePolicy: memoryAtlas.evidencePolicy,
+        },
         recentConversation: getChatHistory(session.user.id).slice(-10).map((item) => ({
           role: item.role,
           content: item.content,
@@ -3099,7 +3197,9 @@ async function handleApi(req, res, url) {
     const contextualReply = providerReply;
     const decisionLine = "";
     const reply =
-      timeMachineAnswer.matched
+      atlasAnswer.matched && atlasAnswer.confidence >= 40
+        ? `${contextualReply}${decisionLine} ${atlasAnswer.answer}`
+        : timeMachineAnswer.matched
         ? `${contextualReply}${decisionLine} ${timeMachineAnswer.answer}`
         : chiefAnswer.matched && chiefAnswer.confidence >= 40
         ? `${contextualReply}${decisionLine} ${chiefAnswer.answer}`

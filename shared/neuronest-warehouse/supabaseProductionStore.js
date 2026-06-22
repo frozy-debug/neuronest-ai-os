@@ -229,6 +229,7 @@ export function createSupabaseProductionStore() {
       autonomousIntelligence: "insight",
       chiefOfStaff: "insight",
       memoryTimeMachine: "insight",
+      memoryAtlas: "insight",
       replays: "replay",
       insights: "insight",
     };
@@ -697,7 +698,9 @@ export function createSupabaseProductionStore() {
           ? "chiefOfStaff"
           : data.type === "memory-time-machine"
             ? "memoryTimeMachine"
-          : collectionMap[item.type];
+            : data.type === "memory-atlas"
+              ? "memoryAtlas"
+              : collectionMap[item.type];
       if (collection) warehouse[collection].push({ ...data, id: item.id, userId: item.user_id, createdAt: item.created_at, updatedAt: item.updated_at });
     }
     warehouse.lastSyncAt = new Date().toISOString();

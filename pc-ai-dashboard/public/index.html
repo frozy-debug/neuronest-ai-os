@@ -2047,6 +2047,55 @@
         text-decoration: none;
       }
 
+      .memory-atlas-shell {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.55fr);
+        gap: 14px;
+        min-height: 420px;
+      }
+
+      .memory-atlas-map,
+      .memory-atlas-map-list {
+        min-height: 420px;
+        border-radius: 14px;
+        border: 1px solid rgba(56, 189, 248, 0.18);
+        background:
+          radial-gradient(circle at 30% 30%, rgba(124, 58, 237, 0.18), transparent 34%),
+          radial-gradient(circle at 70% 65%, rgba(36, 198, 255, 0.14), transparent 30%),
+          rgba(5, 10, 22, 0.78);
+        overflow: hidden;
+      }
+
+      .memory-atlas-map-list {
+        padding: 12px;
+        overflow-y: auto;
+      }
+
+      .atlas-place-card {
+        display: grid;
+        gap: 6px;
+        padding: 12px;
+        border-radius: 10px;
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+      }
+
+      .atlas-place-card + .atlas-place-card {
+        margin-top: 10px;
+      }
+
+      .atlas-place-card strong {
+        font-size: 13px;
+      }
+
+      .atlas-place-card p,
+      .atlas-place-card small {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
       .map-preview {
         display: grid;
         gap: 10px;
@@ -2560,6 +2609,7 @@
         .place-grid,
         .insight-grid,
         .digital-twin-grid,
+        .memory-atlas-shell,
         .twin-map-grid {
           grid-template-columns: 1fr;
         }
@@ -4266,6 +4316,7 @@
           <button data-view="chief-of-staff" type="button">AI Chief of Staff</button>
           <button data-view="future-intelligence" type="button">Future Intelligence</button>
           <button data-view="memory-time-machine" type="button">Memory Time Machine</button>
+          <button data-view="memory-atlas" type="button">Memory Atlas</button>
           <button data-view="place-hunter" type="button">Place hunter</button>
           <button data-view="timeline" type="button">Timeline</button>
           <button data-view="memories" type="button">Memories</button>
@@ -5005,6 +5056,63 @@
           </section>
         </div>
 
+        <div class="view" data-view-panel="memory-atlas">
+          <section class="panel hero mission-control">
+            <div class="section-title">
+              <div>
+                <h2>Memory Atlas</h2>
+                <span id="memory-atlas-status" class="muted">Google Maps + Life Timeline + Memory Engine</span>
+              </div>
+              <button id="memory-atlas-rebuild-button" class="chip" type="button">Rebuild Atlas</button>
+            </div>
+            <form id="memory-atlas-form" class="goal-form">
+              <input id="memory-atlas-query" name="query" placeholder="Where was I happiest? Show all places visited in June 2026..." />
+              <input id="memory-atlas-from" name="from" type="date" aria-label="Start date" />
+              <input id="memory-atlas-to" name="to" type="date" aria-label="End date" />
+              <button type="submit">Explore</button>
+            </form>
+            <p class="ai-system-status">Only real place memories and location-linked records are mapped. NeuroNest will not fabricate trips, cities, or locations.</p>
+            <div id="memory-atlas-overview" class="mission-stat-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Geographic Memory Map</h2>
+              <span id="memory-atlas-map-status" class="muted">Waiting for real map points</span>
+            </div>
+            <div class="memory-atlas-shell">
+              <div id="memory-atlas-map" class="memory-atlas-map" aria-label="Memory Atlas Google Map"></div>
+              <div id="memory-atlas-map-list" class="memory-atlas-map-list"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Location Clusters</h2><span class="muted">Country, state, city, area</span></div>
+                <div id="memory-atlas-clusters" class="relationship-insight-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>AI Location Answers</h2><span class="muted">Happiness, cities, people, travel</span></div>
+                <div id="memory-atlas-answers" class="relationship-insight-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Time Travel Map</h2><span class="muted">Chronological place journey</span></div>
+                <div id="memory-atlas-time-travel" class="relationship-insight-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Category Intelligence</h2><span class="muted">Restaurants, cafes, gyms, hotels</span></div>
+                <div id="memory-atlas-categories" class="relationship-insight-list"></div>
+              </article>
+            </div>
+          </section>
+        </div>
+
         <div class="view" data-view-panel="future-intelligence">
           <section class="panel hero relationship-intelligence-panel">
             <div class="section-title">
@@ -5701,6 +5809,20 @@
       const timeMachineGoals = document.getElementById("time-machine-goals");
       const timeMachineScreenshots = document.getElementById("time-machine-screenshots");
       const timeMachineVoices = document.getElementById("time-machine-voices");
+      const memoryAtlasStatus = document.getElementById("memory-atlas-status");
+      const memoryAtlasRebuildButton = document.getElementById("memory-atlas-rebuild-button");
+      const memoryAtlasForm = document.getElementById("memory-atlas-form");
+      const memoryAtlasQuery = document.getElementById("memory-atlas-query");
+      const memoryAtlasFrom = document.getElementById("memory-atlas-from");
+      const memoryAtlasTo = document.getElementById("memory-atlas-to");
+      const memoryAtlasOverview = document.getElementById("memory-atlas-overview");
+      const memoryAtlasMapStatus = document.getElementById("memory-atlas-map-status");
+      const memoryAtlasMapElement = document.getElementById("memory-atlas-map");
+      const memoryAtlasMapList = document.getElementById("memory-atlas-map-list");
+      const memoryAtlasClusters = document.getElementById("memory-atlas-clusters");
+      const memoryAtlasAnswers = document.getElementById("memory-atlas-answers");
+      const memoryAtlasTimeTravel = document.getElementById("memory-atlas-time-travel");
+      const memoryAtlasCategories = document.getElementById("memory-atlas-categories");
       const aiAvatarSrc = "/assets/neuronest-ai-avatar.png";
 
       let appConfig = {};
@@ -5721,6 +5843,7 @@
         relationships: "Relationship Intelligence",
         "future-intelligence": "Future Intelligence",
         "memory-time-machine": "Memory Time Machine",
+        "memory-atlas": "Memory Atlas",
         "ai-systems": "AI Systems",
         "mission-control": "Mission Control",
         "chief-of-staff": "AI Chief of Staff",
@@ -5821,6 +5944,11 @@
       let lifeOsLoaded = false;
       let chiefOfStaffLoaded = false;
       let memoryTimeMachineLoaded = false;
+      let memoryAtlasLoaded = false;
+      let memoryAtlasMap = null;
+      let memoryAtlasInfoWindow = null;
+      let memoryAtlasMarkers = [];
+      let memoryAtlasLines = [];
       let futurePredictionsLoaded = false;
       let autonomousCaptureEnabled = localStorage.getItem("neuronest.passiveCapture") !== "false";
       let autonomousCaptureReady = false;
@@ -7480,6 +7608,11 @@
           void reportLiveAction("MEMORY_TIME_MACHINE", { page: "memory-time-machine", label: "Memory Time Machine" });
         }
 
+        if (viewName === "memory-atlas") {
+          void loadMemoryAtlas();
+          void reportLiveAction("MEMORY_ATLAS", { page: "memory-atlas", label: "Memory Atlas" });
+        }
+
         if (viewName === "future-intelligence") {
           void loadFuturePredictions();
           void reportLiveAction("FUTURE_INTELLIGENCE", { page: "future-intelligence", label: "Future Intelligence" });
@@ -7607,6 +7740,7 @@
         await loadEntries();
         aiSystemsLoaded = false;
         relationshipDashboardLoaded = false;
+        memoryAtlasLoaded = false;
         futurePredictionsLoaded = false;
       }
 
@@ -7615,6 +7749,7 @@
         await loadEntries();
         aiSystemsLoaded = false;
         relationshipDashboardLoaded = false;
+        memoryAtlasLoaded = false;
         futurePredictionsLoaded = false;
       }
 
@@ -8834,6 +8969,7 @@
             if (!options.silent) showAiNotification("Autonomous memory captured", data.message);
             aiSystemsLoaded = false;
             relationshipDashboardLoaded = false;
+            memoryAtlasLoaded = false;
             profileIdentityLoaded = false;
             await loadEntries();
             void loadAutonomousCaptureDashboard();
@@ -10540,6 +10676,237 @@
         }
       }
 
+      function clearMemoryAtlasMap() {
+        memoryAtlasMarkers.forEach((marker) => marker.setMap(null));
+        memoryAtlasLines.forEach((line) => line.setMap(null));
+        memoryAtlasMarkers = [];
+        memoryAtlasLines = [];
+      }
+
+      function renderAtlasPlaceList(points = []) {
+        if (!memoryAtlasMapList) return;
+        memoryAtlasMapList.innerHTML = "";
+        if (!points.length) {
+          const card = document.createElement("article");
+          card.className = "atlas-place-card";
+          const strong = document.createElement("strong");
+          strong.textContent = "No real mapped places yet";
+          const body = document.createElement("p");
+          body.textContent = "Memory Atlas will show places after passive place memories or location-linked memories are saved.";
+          card.append(strong, body);
+          memoryAtlasMapList.appendChild(card);
+          return;
+        }
+
+        points.slice(0, 80).forEach((point) => {
+          const card = document.createElement("article");
+          card.className = "atlas-place-card";
+          const strong = document.createElement("strong");
+          strong.textContent = point.name || "Visited location";
+          const body = document.createElement("p");
+          body.textContent = [point.category, point.area, point.city, point.country].filter(Boolean).join(" | ");
+          const small = document.createElement("small");
+          small.textContent = `${point.memoryCount || 0} memory signals | ${point.visitCount || 0} visits | ${point.happinessScore || 0}% happiness`;
+          const link = document.createElement("a");
+          link.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${point.latitude},${point.longitude}`)}`;
+          link.target = "_blank";
+          link.rel = "noreferrer";
+          link.textContent = "Open in Maps";
+          card.append(strong, body, small, link);
+          memoryAtlasMapList.appendChild(card);
+        });
+        animateContainerItems(memoryAtlasMapList);
+      }
+
+      async function renderMemoryAtlasMap(points = [], journeys = []) {
+        renderAtlasPlaceList(points);
+        clearMemoryAtlasMap();
+        if (!memoryAtlasMapElement) return;
+        if (!points.length) {
+          memoryAtlasMapElement.innerHTML = '<div class="place-hunter-empty">No real coordinates available for this Atlas query.</div>';
+          if (memoryAtlasMapStatus) memoryAtlasMapStatus.textContent = "No real map points";
+          return;
+        }
+        if (!appConfig.googleMapsApiKey) {
+          memoryAtlasMapElement.innerHTML = '<div class="place-hunter-empty">Add GOOGLE_MAPS_API_KEY to render Memory Atlas markers. The evidence list still works.</div>';
+          if (memoryAtlasMapStatus) memoryAtlasMapStatus.textContent = `${points.length} real places ready`;
+          return;
+        }
+
+        try {
+          memoryAtlasMapElement.innerHTML = "";
+          await loadGoogleMapsApi(appConfig.googleMapsApiKey);
+          const { Map, InfoWindow } = await google.maps.importLibrary("maps");
+          const firstPoint = points[0];
+          if (!memoryAtlasMap) {
+            memoryAtlasMap = new Map(memoryAtlasMapElement, {
+              center: { lat: firstPoint.latitude, lng: firstPoint.longitude },
+              zoom: points.length > 1 ? 8 : 14,
+              backgroundColor: "#081225",
+              clickableIcons: true,
+              disableDefaultUI: false,
+              fullscreenControl: false,
+              mapTypeControl: false,
+              streetViewControl: false,
+              styles: neuroNestMapStyles,
+            });
+            memoryAtlasInfoWindow = new InfoWindow();
+          } else {
+            memoryAtlasMap.panTo({ lat: firstPoint.latitude, lng: firstPoint.longitude });
+            memoryAtlasMap.setZoom(points.length > 1 ? 8 : 14);
+          }
+
+          const bounds = new google.maps.LatLngBounds();
+          points.forEach((point) => {
+            const position = { lat: point.latitude, lng: point.longitude };
+            bounds.extend(position);
+            const marker = new google.maps.Marker({
+              map: memoryAtlasMap,
+              position,
+              title: point.name,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: Math.min(14, 6 + Math.max(1, point.memoryCount || 1)),
+                fillColor: point.category === "Cafe" ? "#8b5cf6" : point.category === "Gym" ? "#22d3ee" : "#24c6ff",
+                fillOpacity: 0.92,
+                strokeColor: "#ffffff",
+                strokeWeight: 2,
+              },
+            });
+            marker.addListener("click", () => {
+              const content = document.createElement("div");
+              content.style.maxWidth = "240px";
+              const title = document.createElement("strong");
+              title.textContent = point.name;
+              const body = document.createElement("div");
+              body.textContent = `${point.category} | ${point.city} | ${point.memoryCount} memory signals`;
+              const evidence = document.createElement("small");
+              evidence.textContent = point.evidence?.[0]?.title || point.address || "";
+              content.append(title, body, evidence);
+              memoryAtlasInfoWindow.setContent(content);
+              memoryAtlasInfoWindow.open(memoryAtlasMap, marker);
+            });
+            memoryAtlasMarkers.push(marker);
+          });
+          if (points.length > 1) memoryAtlasMap.fitBounds(bounds, 58);
+
+          journeys
+            .filter((journey) => journey.from && journey.to)
+            .slice(0, 60)
+            .forEach((journey) => {
+              const line = new google.maps.Polyline({
+                map: memoryAtlasMap,
+                path: [
+                  { lat: journey.from.latitude, lng: journey.from.longitude },
+                  { lat: journey.to.latitude, lng: journey.to.longitude },
+                ],
+                strokeColor: "#8b5cf6",
+                strokeOpacity: 0.42,
+                strokeWeight: 2,
+              });
+              memoryAtlasLines.push(line);
+            });
+
+          if (memoryAtlasMapStatus) memoryAtlasMapStatus.textContent = `${points.length} real mapped places rendered`;
+        } catch (error) {
+          if (memoryAtlasMapStatus) memoryAtlasMapStatus.textContent = friendlyError(error);
+        }
+      }
+
+      function renderMemoryAtlas(data = null) {
+        const atlas = data || {
+          empty: true,
+          period: { label: "All real place history" },
+          overview: {},
+          mapPoints: [],
+          locationClusters: { countries: [], states: [], cities: [], areas: [] },
+          categoryBreakdown: [],
+          timeTravel: { points: [], journeys: [] },
+          aiAnswers: [],
+        };
+        if (memoryAtlasStatus) {
+          memoryAtlasStatus.textContent = atlas.empty
+            ? `${atlas.period?.label || "Atlas"} - no real mapped evidence`
+            : `${atlas.period?.label || "Atlas"} - ${atlas.overview?.mapPointCount || 0} real mapped places`;
+        }
+        if (memoryAtlasOverview) {
+          memoryAtlasOverview.innerHTML = "";
+          [
+            ["Map Points", atlas.overview?.mapPointCount || 0, "Real locations with coordinates."],
+            ["Cities", atlas.overview?.cityCount || 0, "Cities discovered from stored place evidence."],
+            ["Countries", atlas.overview?.countryCount || 0, "Countries found in real place records."],
+            ["Categories", atlas.overview?.categoryCount || 0, "Restaurants, cafes, gyms, hotels, and more."],
+            ["Evidence", atlas.overview?.evidenceCount || 0, "Memory, place, timeline, chat, screenshot, or voice links."],
+            ["Top City", atlas.overview?.topCity || "None", "City with the strongest location-linked memory count."],
+          ].forEach(([label, value, body]) => {
+            const card = document.createElement("article");
+            card.className = "mission-card";
+            const strong = document.createElement("strong");
+            strong.textContent = value;
+            const small = document.createElement("small");
+            small.textContent = label;
+            const text = document.createElement("p");
+            text.textContent = body;
+            card.append(strong, small, text);
+            memoryAtlasOverview.appendChild(card);
+          });
+          animateContainerItems(memoryAtlasOverview);
+        }
+
+        void renderMemoryAtlasMap(atlas.mapPoints || [], atlas.timeTravel?.journeys || []);
+
+        renderTimeMachineList(memoryAtlasClusters, [
+          ...(atlas.locationClusters?.cities || []).slice(0, 6).map((cluster) => ({
+            title: cluster.label,
+            body: `${cluster.placeCount || 0} places | ${cluster.memoryCount || 0} memory signals | ${cluster.happinessScore || 0}% happiness`,
+            meta: `City cluster | ${cluster.categories?.slice(0, 3).join(", ") || "Location"}`,
+          })),
+          ...(atlas.locationClusters?.countries || []).slice(0, 3).map((cluster) => ({
+            title: cluster.label,
+            body: `${cluster.placeCount || 0} places across ${cluster.memoryCount || 0} memory signals.`,
+            meta: "Country cluster",
+          })),
+        ], "No location clusters", "Clusters appear after real place memories are saved.");
+
+        renderTimeMachineList(memoryAtlasAnswers, (atlas.aiAnswers || []).map((answer) => ({
+          title: answer.title,
+          body: answer.answer,
+          meta: `${answer.confidence || 0}% confidence | ${answer.evidence?.length || 0} evidence links`,
+        })), "No Atlas answers yet", "Ask about happiness, cities, travel history, or where you met someone.");
+
+        renderTimeMachineList(memoryAtlasTimeTravel, (atlas.timeTravel?.points || []).slice(0, 20).map((point) => ({
+          title: point.name,
+          body: `${point.category} | ${point.city} | ${point.address || "Stored coordinates"}`,
+          meta: point.firstVisit ? new Date(point.firstVisit).toLocaleString() : `${point.memoryCount || 0} memory signals`,
+        })), "No time travel places", "Time Travel Map appears when real place visits match the selected period.");
+
+        renderTimeMachineList(memoryAtlasCategories, (atlas.categoryBreakdown || []).map((category) => ({
+          title: category.label,
+          body: `${category.placeCount || 0} places | ${category.visitCount || 0} visits`,
+          meta: `${category.memoryCount || 0} location-linked memory signals`,
+        })), "No place categories", "Categories come only from saved Google place metadata or location-linked memories.");
+      }
+
+      async function loadMemoryAtlas({ force = false, persist = false } = {}) {
+        if (!force && memoryAtlasLoaded) return;
+        renderMemoryAtlas();
+        if (!currentUser) return;
+        try {
+          const query = memoryAtlasQuery?.value || "show my travel history";
+          const from = memoryAtlasFrom?.value || "";
+          const to = memoryAtlasTo?.value || "";
+          const data = await api("/api/ai/memory-atlas/rebuild", {
+            method: "POST",
+            body: JSON.stringify({ query, from, to, persist, trigger: persist ? "dashboard-rebuild" : "dashboard-read" }),
+          });
+          renderMemoryAtlas(data);
+          memoryAtlasLoaded = true;
+          if (!data.empty && data.aiAnswers?.[0]) showAiNotification("Memory Atlas ready", data.aiAnswers[0].answer);
+        } catch {
+          // Keep the honest empty state visible.
+        }
+      }
+
       async function loadLifeOs({ force = false } = {}) {
         if (!force && lifeOsLoaded) return;
         renderLifeOs();
@@ -10572,9 +10939,11 @@
         lifeOsLoaded = true;
         chiefOfStaffLoaded = false;
         memoryTimeMachineLoaded = false;
+        memoryAtlasLoaded = false;
         futurePredictionsLoaded = false;
         if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
         if (activeView === "memory-time-machine") void loadMemoryTimeMachine({ force: true });
+        if (activeView === "memory-atlas") void loadMemoryAtlas({ force: true });
         if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         showAiNotification("Life OS goal created", `${data.goal.title} is now tracked by Mission Control.`);
       }
@@ -10588,9 +10957,11 @@
         lifeOsLoaded = true;
         chiefOfStaffLoaded = false;
         memoryTimeMachineLoaded = false;
+        memoryAtlasLoaded = false;
         futurePredictionsLoaded = false;
         if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
         if (activeView === "memory-time-machine") void loadMemoryTimeMachine({ force: true });
+        if (activeView === "memory-atlas") void loadMemoryAtlas({ force: true });
         if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         showAiNotification("Goal updated", `${data.goal.title} is now ${data.goal.progress}% complete.`);
       }
@@ -11048,6 +11419,7 @@
           speakText(reply, detectVoiceLanguage(reply) || voiceAssistantState.lastLanguage);
           aiSystemsLoaded = false;
           relationshipDashboardLoaded = false;
+          memoryAtlasLoaded = false;
           profileIdentityLoaded = false;
           digitalTwinLoaded = false;
           return reply;
@@ -11240,6 +11612,7 @@
               await loadEntries();
               aiSystemsLoaded = false;
               relationshipDashboardLoaded = false;
+              memoryAtlasLoaded = false;
               await loadAiSystems();
             }
           }
@@ -11315,6 +11688,7 @@
           await loadEntries();
           aiSystemsLoaded = false;
           relationshipDashboardLoaded = false;
+          memoryAtlasLoaded = false;
           futurePredictionsLoaded = false;
         } finally {
           hideSnapshotOverlay();
@@ -11405,6 +11779,7 @@
         aiSystemsLoaded = false;
         relationshipDashboardLoaded = false;
         memoryTimeMachineLoaded = false;
+        memoryAtlasLoaded = false;
         profileIdentityLoaded = false;
         closeProfileIdentity();
         renderMessages([]);
@@ -11453,10 +11828,12 @@
           lifeOsLoaded = false;
           chiefOfStaffLoaded = false;
           memoryTimeMachineLoaded = false;
+          memoryAtlasLoaded = false;
           futurePredictionsLoaded = false;
           if (activeView === "mission-control") void loadLifeOs({ force: true });
           if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
           if (activeView === "memory-time-machine") void loadMemoryTimeMachine({ force: true });
+          if (activeView === "memory-atlas") void loadMemoryAtlas({ force: true });
           if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
         } catch (error) {
           loadingBubble.textContent = friendlyError(error);
@@ -11570,6 +11947,17 @@
         void loadMemoryTimeMachine({ force: true, persist: true });
       });
 
+      memoryAtlasForm?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        memoryAtlasLoaded = false;
+        void loadMemoryAtlas({ force: true });
+      });
+
+      memoryAtlasRebuildButton?.addEventListener("click", () => {
+        memoryAtlasLoaded = false;
+        void loadMemoryAtlas({ force: true, persist: true });
+      });
+
       futureRebuildButton?.addEventListener("click", () => {
         futurePredictionsLoaded = false;
         void loadFuturePredictions({ force: true });
@@ -11620,6 +12008,7 @@
             lifeOsLoaded = false;
             chiefOfStaffLoaded = false;
             memoryTimeMachineLoaded = false;
+            memoryAtlasLoaded = false;
             futurePredictionsLoaded = false;
           } catch (error) {
             alert(friendlyError(error));

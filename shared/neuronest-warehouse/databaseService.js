@@ -37,6 +37,7 @@ export function createEmptyWarehouse() {
     autonomousIntelligence: [],
     chiefOfStaff: [],
     memoryTimeMachine: [],
+    memoryAtlas: [],
     securityAuditLogs: [],
     replays: [],
     insights: [],
@@ -76,6 +77,7 @@ export function normalizeWarehouse(db) {
   warehouse.autonomousIntelligence ||= [];
   warehouse.chiefOfStaff ||= [];
   warehouse.memoryTimeMachine ||= [];
+  warehouse.memoryAtlas ||= [];
   warehouse.securityAuditLogs ||= [];
   warehouse.replays ||= [];
   warehouse.insights ||= [];
