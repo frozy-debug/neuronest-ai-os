@@ -226,10 +226,12 @@ export function createSupabaseProductionStore() {
       digitalTwins: "digital-twin",
       relationships: "relationship-graph",
       predictions: "prediction",
+      decisions: "decision",
       autonomousIntelligence: "insight",
       chiefOfStaff: "insight",
       memoryTimeMachine: "insight",
       memoryAtlas: "insight",
+      decisionIntelligence: "insight",
       replays: "replay",
       insights: "insight",
     };
@@ -700,6 +702,10 @@ export function createSupabaseProductionStore() {
             ? "memoryTimeMachine"
             : data.type === "memory-atlas"
               ? "memoryAtlas"
+              : data.type === "life-decision"
+                ? "decisions"
+                : data.type === "decision-intelligence"
+                  ? "decisionIntelligence"
               : collectionMap[item.type];
       if (collection) warehouse[collection].push({ ...data, id: item.id, userId: item.user_id, createdAt: item.created_at, updatedAt: item.updated_at });
     }

@@ -148,7 +148,28 @@ function buildGoalAlignment(memories = [], goals = [], strengths = []) {
   };
 }
 
-function buildDecisionHistory(memories = []) {
+function buildDecisionHistory(memories = [], decisionIntelligence = null) {
+  if (decisionIntelligence?.decisions?.length) {
+    return {
+      decisions: decisionIntelligence.decisions.slice(0, 12).map((decision) => ({
+        id: decision.id,
+        title: decision.decision,
+        outcome: decision.outcomeStatus,
+        confidence: decision.confidence,
+        qualityScore: decision.qualityScore,
+        decisionStyle: decision.decisionStyle,
+        evidence: decision.evidence?.[0] || evidenceFromMemory(decision, "explicit decision record"),
+      })),
+      patterns: (decisionIntelligence.patterns || []).slice(0, 6).map((pattern) => ({
+        title: pattern.title,
+        body: pattern.body,
+        confidence: pattern.confidence,
+        evidenceCount: pattern.count || pattern.evidence?.length || 0,
+      })),
+      overview: decisionIntelligence.overview || {},
+      digitalTwinFeed: decisionIntelligence.digitalTwinFeed || {},
+    };
+  }
   const decisionMemories = memories
     .filter((memory) => /decided|decision|should i|choose|changed|pursue|learn|build|start|stop|launch|switch/.test(textOf(memory)))
     .slice(0, 10);
@@ -229,14 +250,14 @@ export function buildDecisionRecommendation({ question = "", twin, memories = []
   };
 }
 
-export function buildDigitalTwin({ user, memories = [], relationships = [], intelligenceCore = null, dna = null, peopleRelationships = null, futurePredictions = null }) {
+export function buildDigitalTwin({ user, memories = [], relationships = [], intelligenceCore = null, dna = null, peopleRelationships = null, futurePredictions = null, decisionIntelligence = null }) {
   const strengths = buildStrengthMap(memories);
   const weaknesses = buildWeaknessMap(memories);
   const goals = buildGoals(memories, relationships);
   const habits = buildHabits(memories);
   const personality = buildPersonality(memories);
   const goalAlignment = buildGoalAlignment(memories, goals, strengths);
-  const decisionHistory = buildDecisionHistory(memories);
+  const decisionHistory = buildDecisionHistory(memories, decisionIntelligence);
   const graph = buildPersonalKnowledgeGraph({ user, memories, relationships, dna });
   const movementProfile = buildMovementProfile(memories);
   const peopleProfiles = peopleRelationships?.relationships || [];

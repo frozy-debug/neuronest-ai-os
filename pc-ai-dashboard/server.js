@@ -26,6 +26,7 @@ import {
 import { answerChiefOfStaffQuery, buildAiChiefOfStaff } from "./services/aiChiefOfStaffService.js";
 import { answerMemoryTimeMachineQuery, buildMemoryTimeMachine as buildProductionMemoryTimeMachine } from "./services/memoryTimeMachineService.js";
 import { answerMemoryAtlasQuery, buildMemoryAtlas } from "./services/memoryAtlasService.js";
+import { answerDecisionQuery, buildDecisionIntelligence, normalizeDecisionInput } from "./services/decisionIntelligenceService.js";
 import { buildLanguageAwareAssistantReply, localizedFallback } from "./services/languageIntelligenceService.js";
 import { generateOpenAiIntelligenceReply } from "./services/openAiIntelligenceService.js";
 import {
@@ -553,6 +554,45 @@ function updateLifeGoal(userId, goalId, patch = {}) {
   return next;
 }
 
+function getLifeDecisions(userId) {
+  const db = readDb();
+  db.lifeDecisions ||= {};
+  return (db.lifeDecisions[userId] || [])
+    .map((decision) => normalizeDecisionInput(decision, decision))
+    .sort((a, b) => new Date(b.updatedAt || b.decidedAt) - new Date(a.updatedAt || a.decidedAt));
+}
+
+function persistLifeDecision(userId, decision, { silent = false } = {}) {
+  const db = readDb();
+  warehouseDb.normalizeWarehouse(db);
+  db.lifeDecisions ||= {};
+  db.lifeDecisions[userId] ||= [];
+  const next = normalizeDecisionInput({ ...decision, userId }, decision);
+  const index = db.lifeDecisions[userId].findIndex((item) => item.id === next.id);
+  if (index === -1) db.lifeDecisions[userId].unshift(next);
+  else db.lifeDecisions[userId][index] = next;
+  adminSyncService.syncDecision(db, userId, next, { silent });
+  writeDb(db);
+  if (productionStore.ready()) void productionStore.upsertIntelligence(userId, "decisions", { ...next, type: "life-decision" }).catch(() => {});
+  recordLearningSignal(userId, {
+    eventType: next.outcomeStatus === "success" ? "decision-success" : next.outcomeStatus === "failure" ? "decision-failure" : "decision-saved",
+    text: `${next.decision} ${next.reason} ${next.expectedOutcome} ${next.actualOutcome}`,
+    timestamp: next.updatedAt,
+    signal: next.outcomeStatus === "success" ? "positive" : next.outcomeStatus === "failure" ? "negative" : "neutral",
+  });
+  return next;
+}
+
+function createLifeDecision(userId, data = {}) {
+  return persistLifeDecision(userId, normalizeDecisionInput({ ...data, userId }));
+}
+
+function updateLifeDecision(userId, decisionId, patch = {}) {
+  const existing = getLifeDecisions(userId).find((decision) => decision.id === decisionId);
+  if (!existing) return null;
+  return persistLifeDecision(userId, normalizeDecisionInput({ ...existing, ...patch, id: existing.id, userId }, existing));
+}
+
 function cleanEntryKind(kind) {
   const allowedKinds = new Set([
     "note",
@@ -982,6 +1022,35 @@ function buildFuturePredictionsForUser(userId, { persist = false, trigger = "rea
   return persist ? persistFuturePredictionSnapshot(userId, snapshot, trigger) : snapshot;
 }
 
+function buildDecisionIntelligenceForUser(userId, { persist = false, trigger = "read" } = {}) {
+  const db = readDb();
+  warehouseDb.normalizeWarehouse(db);
+  const snapshot = buildDecisionIntelligence({
+    userId,
+    decisions: getLifeDecisions(userId),
+    memories: allUnifiedMemories(userId),
+    records: allMemoryRecords(userId),
+    chats: getChatHistory(userId),
+    goals: getLifeGoals(userId),
+  });
+  if (!persist) return snapshot;
+  return persistIntelligenceRecord(userId, "decisionIntelligence", {
+    id: `decision-intelligence_${userId}`,
+    type: "decision-intelligence",
+    trigger,
+    version: snapshot.version,
+    generatedAt: snapshot.generatedAt,
+    empty: snapshot.empty,
+    overview: snapshot.overview,
+    decisions: snapshot.decisions.slice(0, 80),
+    patterns: snapshot.patterns,
+    insights: snapshot.insights,
+    digitalTwinFeed: snapshot.digitalTwinFeed,
+    evidencePolicy: snapshot.evidencePolicy,
+    evidenceMemoryCount: snapshot.overview?.evidenceCount || 0,
+  });
+}
+
 function buildAutonomousIntelligenceCoreV3ForUser(user, { persist = false, trigger = "read", query = "" } = {}) {
   const db = readDb();
   warehouseDb.normalizeWarehouse(db);
@@ -994,6 +1063,7 @@ function buildAutonomousIntelligenceCoreV3ForUser(user, { persist = false, trigg
     chats: getChatHistory(user.id),
     places: placeService.getUserPlaceMemories(db, user.id, 10_000),
     goals: getLifeGoals(user.id),
+    decisions: getLifeDecisions(user.id),
     relationshipIntelligence,
     futurePredictions,
     learningProfile: getLearningProfile(user.id),
@@ -1186,7 +1256,8 @@ async function buildDigitalTwinResponse(user, context = {}) {
   const intelligenceCore = await buildIntelligenceCoreResponse(user, context);
   const peopleRelationships = buildRelationshipIntelligenceForUser(user.id);
   const futurePredictions = buildFuturePredictionsForUser(user.id);
-  const digitalTwin = buildDigitalTwin({ user, memories, relationships, intelligenceCore, dna, peopleRelationships, futurePredictions });
+  const decisionIntelligence = buildDecisionIntelligenceForUser(user.id);
+  const digitalTwin = buildDigitalTwin({ user, memories, relationships, intelligenceCore, dna, peopleRelationships, futurePredictions, decisionIntelligence });
   persistIntelligenceRecord(user.id, "digitalTwins", {
     id: `digital-twin_${user.id}`,
     snapshot: digitalTwin,
@@ -1208,6 +1279,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
   const autonomousIntelligence = buildAutonomousIntelligenceCoreV3ForUser(user, { persist: true, trigger });
   const chiefOfStaff = buildAiChiefOfStaffForUser(user, { persist: true, trigger });
   const memoryAtlas = buildMemoryAtlasForUser(user, { persist: true, trigger });
+  const decisionIntelligence = buildDecisionIntelligenceForUser(userId, { persist: true, trigger });
   const predictions = futurePredictions.predictions.slice(0, 12);
 
   persistIntelligenceRecord(userId, "relationships", {
@@ -1245,7 +1317,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
     relationshipCount: relationshipIntelligence.relationships.length,
   });
   await buildDigitalTwinResponse(user, { activity: trigger, trigger });
-  return { relationships, predictions, replay, insights, relationshipIntelligence, futurePredictions, autonomousIntelligence, chiefOfStaff, memoryAtlas };
+  return { relationships, predictions, replay, insights, relationshipIntelligence, futurePredictions, autonomousIntelligence, chiefOfStaff, memoryAtlas, decisionIntelligence };
 }
 
 function buildLearningEngineResponse(user, { rebuild = false, context = {} } = {}) {
@@ -2366,6 +2438,59 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ...snapshot, persisted });
   }
 
+  if (req.method === "GET" && url.pathname === "/api/ai/decision-intelligence") {
+    return sendJson(res, 200, buildDecisionIntelligenceForUser(session.user.id));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/ai/decision-intelligence/rebuild") {
+    const body = await readBody(req);
+    const snapshot = buildDecisionIntelligenceForUser(session.user.id);
+    const persisted = buildDecisionIntelligenceForUser(session.user.id, {
+      persist: true,
+      trigger: body.trigger || "decision-intelligence-rebuild",
+    });
+    return sendJson(res, 200, { ...snapshot, persisted });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/decisions") {
+    return sendJson(res, 200, {
+      decisions: getLifeDecisions(session.user.id),
+      intelligence: buildDecisionIntelligenceForUser(session.user.id),
+    });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/decisions") {
+    try {
+      const body = await readBody(req);
+      const decision = createLifeDecision(session.user.id, body);
+      buildDecisionIntelligenceForUser(session.user.id, { persist: true, trigger: "decision-created" });
+      refreshUserBrainModelForUserId(session.user.id, { trigger: "decision-created", activity: decision.decision });
+      return sendJson(res, 201, {
+        decision,
+        intelligence: buildDecisionIntelligenceForUser(session.user.id),
+      });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  const decisionRoute = url.pathname.match(/^\/api\/decisions\/([^/]+)$/);
+  if (decisionRoute && req.method === "PATCH") {
+    try {
+      const body = await readBody(req);
+      const decision = updateLifeDecision(session.user.id, decodeURIComponent(decisionRoute[1]), body);
+      if (!decision) return sendJson(res, 404, { error: "Decision not found." });
+      buildDecisionIntelligenceForUser(session.user.id, { persist: true, trigger: "decision-updated" });
+      refreshUserBrainModelForUserId(session.user.id, { trigger: "decision-updated", activity: decision.decision });
+      return sendJson(res, 200, {
+        decision,
+        intelligence: buildDecisionIntelligenceForUser(session.user.id),
+      });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
   if (req.method === "GET" && url.pathname === "/api/ai/digital-twin") {
     return sendJson(res, 200, await buildDigitalTwinResponse(session.user, {
       query: url.searchParams.get("query") || "",
@@ -2984,6 +3109,8 @@ async function handleApi(req, res, url) {
     const timeMachineAnswer = answerMemoryTimeMachineQuery(message, memoryTimeMachine);
     const memoryAtlas = buildMemoryAtlasForUser(session.user, { query: message });
     const atlasAnswer = answerMemoryAtlasQuery(message, memoryAtlas);
+    const decisionIntelligence = buildDecisionIntelligenceForUser(session.user.id);
+    const decisionAnswer = answerDecisionQuery(message, decisionIntelligence);
     const timeline = buildTimeline({ memories, relationships, limit: 80 });
     const insights = generateInsightCards(memories, relationships);
     const patterns = detectLifePatterns(memories, relationships);
@@ -3013,6 +3140,7 @@ async function handleApi(req, res, url) {
       dna: buildMemoryDnaProfile(memories, relationships),
       peopleRelationships,
       futurePredictions,
+      decisionIntelligence,
     });
     const userBrainModel = buildAndPersistUserBrainModel(session.user, {
       trigger: "chat-before-reply",
@@ -3153,6 +3281,24 @@ async function handleApi(req, res, url) {
           directAnswer: atlasAnswer.matched ? atlasAnswer : null,
           evidencePolicy: memoryAtlas.evidencePolicy,
         },
+        decisionIntelligence: {
+          overview: decisionIntelligence.overview,
+          decisions: decisionIntelligence.decisions.slice(0, 8).map((decision) => ({
+            decision: decision.decision,
+            reason: decision.reason,
+            expectedOutcome: decision.expectedOutcome,
+            actualOutcome: decision.actualOutcome,
+            outcomeStatus: decision.outcomeStatus,
+            decisionStyle: decision.decisionStyle,
+            decisionSpeed: decision.decisionSpeed,
+            qualityScore: decision.qualityScore,
+            confidence: decision.confidence,
+          })),
+          patterns: decisionIntelligence.patterns.slice(0, 6),
+          insights: decisionIntelligence.insights.slice(0, 6),
+          directAnswer: decisionAnswer.matched ? decisionAnswer : null,
+          evidencePolicy: decisionIntelligence.evidencePolicy,
+        },
         recentConversation: getChatHistory(session.user.id).slice(-10).map((item) => ({
           role: item.role,
           content: item.content,
@@ -3199,6 +3345,8 @@ async function handleApi(req, res, url) {
     const reply =
       atlasAnswer.matched && atlasAnswer.confidence >= 40
         ? `${contextualReply}${decisionLine} ${atlasAnswer.answer}`
+        : decisionAnswer.matched && decisionAnswer.confidence >= 40
+        ? `${contextualReply}${decisionLine} ${decisionAnswer.answer}`
         : timeMachineAnswer.matched
         ? `${contextualReply}${decisionLine} ${timeMachineAnswer.answer}`
         : chiefAnswer.matched && chiefAnswer.confidence >= 40

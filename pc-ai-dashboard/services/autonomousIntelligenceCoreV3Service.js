@@ -313,7 +313,25 @@ function buildKnowledgeGraph({ userId, user, records, goals, relationshipIntelli
   };
 }
 
-function buildDecisions({ userId, records, goals }) {
+function buildDecisions({ userId, records, goals, explicitDecisions = [] }) {
+  const fromExplicit = explicitDecisions.slice(0, 40).map((decision) => {
+    const evidence = [evidenceItem({ ...decision, type: "life-decision", timestamp: decision.decidedAt || decision.createdAt }, "explicit decision record")];
+    const text = textOf(decision);
+    const quality = Number(decision.qualityScore || 0) || (decision.outcomeStatus === "success" ? 84 : decision.outcomeStatus === "failure" ? 34 : 58);
+    return {
+      id: decision.id || `decision_explicit_${stableId(userId, decision.decision || decision.createdAt)}`,
+      userId,
+      decision: snippet(decision.decision || decision.title || text, 110),
+      reason: snippet(decision.reason || "Stored decision reason is empty.", 130),
+      expectedOutcome: snippet(decision.expectedOutcome || "Expected outcome is not recorded yet.", 130),
+      actualOutcome: snippet(decision.actualOutcome || "No clear outcome evidence yet.", 130),
+      qualityScore: clamp(quality),
+      confidence: confidenceFromEvidence(evidence.length, 1, quality),
+      evidence,
+      timestamp: decision.decidedAt || decision.createdAt || decision.updatedAt,
+      status: decision.outcomeStatus === "success" ? "supported" : decision.outcomeStatus === "failure" ? "needs-review" : "open",
+    };
+  });
   const decisionRecords = records.filter((record) => DECISION_WORDS.test(textOf(record)));
   const fromRecords = decisionRecords.slice(0, 24).map((record) => {
     const text = textOf(record);
@@ -356,7 +374,7 @@ function buildDecisions({ userId, records, goals }) {
     };
   });
 
-  return uniqueBy([...fromRecords, ...fromGoals], (item) => item.id, 40)
+  return uniqueBy([...fromExplicit, ...fromRecords, ...fromGoals], (item) => item.id, 40)
     .sort((a, b) => asDate(b.timestamp) - asDate(a.timestamp));
 }
 
@@ -658,6 +676,7 @@ export function buildAutonomousIntelligenceCoreV3({
   chats = [],
   places = [],
   goals = [],
+  decisions: explicitDecisions = [],
   relationshipIntelligence = null,
   futurePredictions = null,
   learningProfile = null,
@@ -695,7 +714,7 @@ export function buildAutonomousIntelligenceCoreV3({
   }
 
   const knowledgeGraph = buildKnowledgeGraph({ userId, user, records: allRecords, goals, relationshipIntelligence, futurePredictions });
-  const decisions = buildDecisions({ userId, records: allRecords, goals });
+  const decisions = buildDecisions({ userId, records: allRecords, goals, explicitDecisions });
   const lifeStories = buildStories(allRecords);
   const timeMachineBase = { sourceRecords: allRecords };
   const futureSelf = buildFutureSelf({ userId, futurePredictions, goals });

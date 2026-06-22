@@ -4311,6 +4311,7 @@
           <button data-view="ai-chat" type="button">AI Chat</button>
           <button data-view="ai-systems" type="button">AI Systems</button>
           <button data-view="digital-twin" type="button">Digital Twin</button>
+          <button data-view="decision-intelligence" type="button">Decision Intelligence</button>
           <button data-view="relationships" type="button">Relationships</button>
           <button data-view="mission-control" type="button">Mission Control</button>
           <button data-view="chief-of-staff" type="button">AI Chief of Staff</button>
@@ -4746,6 +4747,52 @@
               <span class="muted">Living user model</span>
             </div>
             <div id="digital-twin-feed" class="twin-feed"></div>
+          </section>
+        </div>
+
+        <div class="view" data-view-panel="decision-intelligence">
+          <section class="panel hero relationship-intelligence-panel">
+            <div class="section-title">
+              <div>
+                <h2>Decision Intelligence</h2>
+                <span id="decision-status" class="muted">Decision quality, speed, outcomes, and patterns</span>
+              </div>
+              <button id="decision-rebuild-button" class="chip" type="button">Rebuild Decisions</button>
+            </div>
+            <p class="ai-system-status">Store real decisions with reasons, expected outcomes, and actual outcomes. NeuroNest will not invent decision outcomes.</p>
+            <div id="decision-overview" class="relationship-metric-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Store Decision</h2><span class="muted">Reason -> expected -> actual</span></div>
+                <form id="decision-form" class="goal-form">
+                  <input name="decision" placeholder="Decision: Started Startup" required />
+                  <input name="reason" placeholder="Reason: Freedom, data, opportunity..." />
+                  <textarea name="expectedOutcome" placeholder="Expected outcome: Build business, improve focus..."></textarea>
+                  <textarea name="actualOutcome" placeholder="Actual outcome: Success, blocked, still open..."></textarea>
+                  <button type="submit">Save Decision</button>
+                </form>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Decision Patterns</h2><span class="muted">Emotional, logical, rushed, successful</span></div>
+                <div id="decision-patterns" class="relationship-insight-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="relationship-dashboard-grid">
+              <article class="ai-system-card">
+                <div class="section-title"><h2>Stored Decisions</h2><span class="muted">Explicit records only</span></div>
+                <div id="decision-list" class="relationship-insight-list"></div>
+              </article>
+              <article class="ai-system-card">
+                <div class="section-title"><h2>AI Insights</h2><span class="muted">Evidence-backed answers</span></div>
+                <div id="decision-insights" class="relationship-insight-list"></div>
+              </article>
+            </div>
           </section>
         </div>
 
@@ -5710,6 +5757,13 @@
       const memoryResurfacingClusters = document.getElementById("memory-resurfacing-clusters");
       const memoryResurfacingRefresh = document.getElementById("memory-resurfacing-refresh");
       const relationshipGraphElement = document.getElementById("relationship-graph");
+      const decisionStatus = document.getElementById("decision-status");
+      const decisionRebuildButton = document.getElementById("decision-rebuild-button");
+      const decisionForm = document.getElementById("decision-form");
+      const decisionOverview = document.getElementById("decision-overview");
+      const decisionPatterns = document.getElementById("decision-patterns");
+      const decisionList = document.getElementById("decision-list");
+      const decisionInsights = document.getElementById("decision-insights");
       const relationshipStatus = document.getElementById("relationship-status");
       const relationshipRebuildButton = document.getElementById("relationship-rebuild-button");
       const relationshipOverview = document.getElementById("relationship-overview");
@@ -5840,6 +5894,7 @@
         "place-hunter": "Place Hunter",
         voice: "Voice Assistant",
         "digital-twin": "Digital Twin",
+        "decision-intelligence": "Decision Intelligence",
         relationships: "Relationship Intelligence",
         "future-intelligence": "Future Intelligence",
         "memory-time-machine": "Memory Time Machine",
@@ -5940,6 +5995,7 @@
       let notificationsStarted = false;
       let profileIdentityLoaded = false;
       let digitalTwinLoaded = false;
+      let decisionIntelligenceLoaded = false;
       let relationshipDashboardLoaded = false;
       let lifeOsLoaded = false;
       let chiefOfStaffLoaded = false;
@@ -7589,6 +7645,11 @@
           void reportLiveAction("DIGITAL_TWIN", { page: "digital-twin", label: "Digital Twin" });
         }
 
+        if (viewName === "decision-intelligence") {
+          void loadDecisionIntelligence();
+          void reportLiveAction("DECISION_INTELLIGENCE", { page: "decision-intelligence", label: "Decision Intelligence" });
+        }
+
         if (viewName === "relationships") {
           void loadRelationshipDashboard();
           void reportLiveAction("RELATIONSHIP_INTELLIGENCE", { page: "relationships", label: "Relationship Intelligence" });
@@ -7740,6 +7801,7 @@
         await loadEntries();
         aiSystemsLoaded = false;
         relationshipDashboardLoaded = false;
+        decisionIntelligenceLoaded = false;
         memoryAtlasLoaded = false;
         futurePredictionsLoaded = false;
       }
@@ -7749,6 +7811,7 @@
         await loadEntries();
         aiSystemsLoaded = false;
         relationshipDashboardLoaded = false;
+        decisionIntelligenceLoaded = false;
         memoryAtlasLoaded = false;
         futurePredictionsLoaded = false;
       }
@@ -8113,6 +8176,7 @@
           trashedEntries = [];
           profileIdentityLoaded = false;
           digitalTwinLoaded = false;
+          decisionIntelligenceLoaded = false;
           lifeOsLoaded = false;
           renderEntries();
           return;
@@ -8123,11 +8187,13 @@
         trashedEntries = data.trash || [];
         profileIdentityLoaded = false;
         digitalTwinLoaded = false;
+        decisionIntelligenceLoaded = false;
         lifeOsLoaded = false;
         renderEntries();
         renderTimelineFilters();
         if (activeView === "timeline") void loadSmartTimeline({ reset: true });
         if (activeView === "mission-control") void loadLifeOs({ force: true });
+        if (activeView === "decision-intelligence") void loadDecisionIntelligence({ force: true });
         void renderCinematicAiSystems();
       }
 
@@ -8336,6 +8402,76 @@
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return "No timestamp";
         return date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+      }
+
+      function renderDecisionOverview(overview = {}) {
+        if (!decisionOverview) return;
+        decisionOverview.innerHTML = "";
+        [
+          ["Decisions", overview.totalDecisions || 0, "Explicit stored decisions."],
+          ["Quality", `${overview.decisionQuality || 0}%`, "Average decision quality from outcomes."],
+          ["Speed", `${overview.decisionSpeed || 0}%`, "Higher means more considered decisions."],
+          ["Success Rate", `${overview.successRate || 0}%`, "Successful outcomes among completed decisions."],
+          ["Failure Rate", `${overview.failureRate || 0}%`, "Failed outcomes among completed decisions."],
+          ["Evidence", overview.evidenceCount || 0, "Decision and related memory links."],
+        ].forEach(([label, value, body]) => {
+          const card = document.createElement("article");
+          card.className = "relationship-metric";
+          const small = document.createElement("span");
+          small.textContent = label;
+          const strong = document.createElement("strong");
+          strong.textContent = value;
+          const text = document.createElement("p");
+          text.textContent = body;
+          card.append(small, strong, text);
+          decisionOverview.appendChild(card);
+        });
+        animateContainerItems(decisionOverview);
+      }
+
+      function renderDecisionDashboard(data = {}) {
+        const intelligence = data.intelligence || data || {};
+        const decisions = data.decisions || intelligence.decisions || [];
+        const overview = intelligence.overview || {};
+        if (decisionStatus) {
+          decisionStatus.textContent = decisions.length
+            ? `${decisions.length} stored decisions | ${overview.decisionQuality || 0}% quality`
+            : "No explicit decisions stored yet";
+        }
+        renderDecisionOverview(overview);
+        renderTimeMachineList(decisionPatterns, (intelligence.patterns || []).map((pattern) => ({
+          title: pattern.title,
+          body: pattern.body,
+          meta: `${pattern.averageQuality || 0}% avg quality | ${pattern.confidence || 0}% confidence`,
+        })), "No decision patterns yet", "Patterns appear after you store decisions and outcomes.");
+        renderTimeMachineList(decisionList, decisions.map((decision) => ({
+          title: decision.decision,
+          body: `Reason: ${decision.reason || "Not recorded"} | Expected: ${decision.expectedOutcome || "Not recorded"} | Actual: ${decision.actualOutcome || "Open"}`,
+          meta: `${decision.outcomeStatus || "open"} | ${decision.qualityScore || 0}% quality | ${decision.decisionStyle || "unclear"}`,
+        })), "No decisions stored", "Add your first decision with a reason, expected outcome, and actual outcome.");
+        renderTimeMachineList(decisionInsights, (intelligence.insights || []).map((insight) => ({
+          title: insight.title,
+          body: insight.body,
+          meta: `${insight.confidence || 0}% confidence | ${insight.evidence?.length || 0} evidence links`,
+        })), "No decision insights yet", "Insights appear only after real decision records exist.");
+      }
+
+      async function loadDecisionIntelligence({ force = false } = {}) {
+        if (!currentUser || (decisionIntelligenceLoaded && !force)) return;
+        decisionIntelligenceLoaded = true;
+        if (decisionStatus) decisionStatus.textContent = force ? "Rebuilding decision intelligence..." : "Loading decision intelligence...";
+        try {
+          const data = force
+            ? await api("/api/ai/decision-intelligence/rebuild", { method: "POST", body: JSON.stringify({ trigger: "dashboard-rebuild" }) })
+            : await api("/api/decisions");
+          renderDecisionDashboard(data);
+        } catch (error) {
+          decisionIntelligenceLoaded = false;
+          if (decisionStatus) decisionStatus.textContent = "Decision Intelligence unavailable";
+          [decisionPatterns, decisionList, decisionInsights].forEach((element) => {
+            renderTimeMachineList(element, [], "Could not load decisions", friendlyError(error));
+          });
+        }
       }
 
       function renderRelationshipOverview(overview = {}) {
@@ -8969,6 +9105,7 @@
             if (!options.silent) showAiNotification("Autonomous memory captured", data.message);
             aiSystemsLoaded = false;
             relationshipDashboardLoaded = false;
+            decisionIntelligenceLoaded = false;
             memoryAtlasLoaded = false;
             profileIdentityLoaded = false;
             await loadEntries();
@@ -9623,6 +9760,10 @@
         relationshipRebuildButton?.addEventListener("click", () => {
           relationshipDashboardLoaded = false;
           void loadRelationshipDashboard({ force: true });
+        });
+        decisionRebuildButton?.addEventListener("click", () => {
+          decisionIntelligenceLoaded = false;
+          void loadDecisionIntelligence({ force: true });
         });
         snapshotCameraButton?.addEventListener("click", () => screenshotMemoryInput?.click());
         userPicture?.addEventListener("click", (event) => {
@@ -10938,10 +11079,12 @@
         renderLifeOs(data.lifeOs);
         lifeOsLoaded = true;
         chiefOfStaffLoaded = false;
+        decisionIntelligenceLoaded = false;
         memoryTimeMachineLoaded = false;
         memoryAtlasLoaded = false;
         futurePredictionsLoaded = false;
         if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
+        if (activeView === "decision-intelligence") void loadDecisionIntelligence({ force: true });
         if (activeView === "memory-time-machine") void loadMemoryTimeMachine({ force: true });
         if (activeView === "memory-atlas") void loadMemoryAtlas({ force: true });
         if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
@@ -10956,10 +11099,12 @@
         renderLifeOs(data.lifeOs);
         lifeOsLoaded = true;
         chiefOfStaffLoaded = false;
+        decisionIntelligenceLoaded = false;
         memoryTimeMachineLoaded = false;
         memoryAtlasLoaded = false;
         futurePredictionsLoaded = false;
         if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
+        if (activeView === "decision-intelligence") void loadDecisionIntelligence({ force: true });
         if (activeView === "memory-time-machine") void loadMemoryTimeMachine({ force: true });
         if (activeView === "memory-atlas") void loadMemoryAtlas({ force: true });
         if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
@@ -11419,6 +11564,7 @@
           speakText(reply, detectVoiceLanguage(reply) || voiceAssistantState.lastLanguage);
           aiSystemsLoaded = false;
           relationshipDashboardLoaded = false;
+          decisionIntelligenceLoaded = false;
           memoryAtlasLoaded = false;
           profileIdentityLoaded = false;
           digitalTwinLoaded = false;
@@ -11612,6 +11758,7 @@
               await loadEntries();
               aiSystemsLoaded = false;
               relationshipDashboardLoaded = false;
+              decisionIntelligenceLoaded = false;
               memoryAtlasLoaded = false;
               await loadAiSystems();
             }
@@ -11688,6 +11835,7 @@
           await loadEntries();
           aiSystemsLoaded = false;
           relationshipDashboardLoaded = false;
+          decisionIntelligenceLoaded = false;
           memoryAtlasLoaded = false;
           futurePredictionsLoaded = false;
         } finally {
@@ -11778,6 +11926,7 @@
         currentUser = null;
         aiSystemsLoaded = false;
         relationshipDashboardLoaded = false;
+        decisionIntelligenceLoaded = false;
         memoryTimeMachineLoaded = false;
         memoryAtlasLoaded = false;
         profileIdentityLoaded = false;
@@ -11827,11 +11976,13 @@
           await typeInto(loadingBubble, assistantMessage?.content || "Done.", 10);
           lifeOsLoaded = false;
           chiefOfStaffLoaded = false;
+          decisionIntelligenceLoaded = false;
           memoryTimeMachineLoaded = false;
           memoryAtlasLoaded = false;
           futurePredictionsLoaded = false;
           if (activeView === "mission-control") void loadLifeOs({ force: true });
           if (activeView === "chief-of-staff") void loadChiefOfStaff({ force: true });
+          if (activeView === "decision-intelligence") void loadDecisionIntelligence({ force: true });
           if (activeView === "memory-time-machine") void loadMemoryTimeMachine({ force: true });
           if (activeView === "memory-atlas") void loadMemoryAtlas({ force: true });
           if (activeView === "future-intelligence") void loadFuturePredictions({ force: true });
@@ -11963,6 +12114,30 @@
         void loadFuturePredictions({ force: true });
       });
 
+      decisionForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const submitButton = decisionForm.querySelector("button[type='submit']");
+        if (submitButton) submitButton.disabled = true;
+        try {
+          const formData = new FormData(decisionForm);
+          const payload = Object.fromEntries(formData.entries());
+          const data = await api("/api/decisions", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          decisionForm.reset();
+          renderDecisionDashboard(data);
+          decisionIntelligenceLoaded = true;
+          digitalTwinLoaded = false;
+          if (activeView === "digital-twin") void loadDigitalTwin({ force: true });
+          showAiNotification("Decision saved", `${data.decision.decision} is now part of your Decision Intelligence.`);
+        } catch (error) {
+          showAiNotification("Decision was not saved", friendlyError(error));
+        } finally {
+          if (submitButton) submitButton.disabled = false;
+        }
+      });
+
       lifeGoalForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
         const submitButton = lifeGoalForm.querySelector("button[type='submit']");
@@ -12005,6 +12180,7 @@
             await loadEntries();
             aiSystemsLoaded = false;
             relationshipDashboardLoaded = false;
+            decisionIntelligenceLoaded = false;
             lifeOsLoaded = false;
             chiefOfStaffLoaded = false;
             memoryTimeMachineLoaded = false;

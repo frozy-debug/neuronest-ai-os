@@ -46,6 +46,31 @@ export function createAdminSyncService({
     return db;
   }
 
+  function syncDecision(db, userId, decision, options = {}) {
+    databaseService.normalizeWarehouse(db);
+    if (!decision?.id || !userId) return null;
+    const now = new Date().toISOString();
+    const record = {
+      ...decision,
+      userId,
+      type: "life-decision",
+      createdAt: decision.createdAt || now,
+      updatedAt: decision.updatedAt || now,
+    };
+    const index = db.warehouse.decisions.findIndex((item) => item.id === decision.id && item.userId === userId);
+    if (index === -1) db.warehouse.decisions.unshift(record);
+    else db.warehouse.decisions[index] = { ...db.warehouse.decisions[index], ...record };
+    db.warehouse.decisions = db.warehouse.decisions.slice(0, 10_000);
+    if (!options.silent) {
+      activityService.logActivity(db, userId, activityService.ActivityActions.MEMORY_CREATED, {
+        decisionId: decision.id,
+        title: decision.decision,
+        kind: "life-decision",
+      });
+    }
+    return record;
+  }
+
   function syncIntelligenceRecord(db, collection, userId, record = {}) {
     databaseService.normalizeWarehouse(db);
     const allowed = new Set([
@@ -57,6 +82,7 @@ export function createAdminSyncService({
       "relationshipClusters",
       "digitalTwins",
       "predictions",
+      "decisions",
       "futurePredictions",
       "predictionModels",
       "predictionHistory",
@@ -64,6 +90,7 @@ export function createAdminSyncService({
       "chiefOfStaff",
       "memoryTimeMachine",
       "memoryAtlas",
+      "decisionIntelligence",
       "replays",
       "insights",
       "aiJobs",
@@ -171,6 +198,7 @@ export function createAdminSyncService({
       placeMemories: placeService.getUserPlaceMemories(db, userId, 50),
       timeline: timelineService.getUserTimeline(db, userId, 50),
       goals: goalService.getUserGoals(db, userId, 50),
+      decisions: db.warehouse.decisions.filter((item) => item.userId === userId).slice(0, 50),
       aiUsage: chatService.getUserAiUsage(db, userId, 50),
       relationshipProfiles: db.warehouse.relationshipProfiles.filter((item) => item.userId === userId).slice(0, 50),
       relationshipEvents: db.warehouse.relationshipEvents.filter((item) => item.userId === userId).slice(0, 50),
@@ -183,6 +211,7 @@ export function createAdminSyncService({
       chiefOfStaff: db.warehouse.chiefOfStaff.filter((item) => item.userId === userId).slice(0, 20),
       memoryTimeMachine: db.warehouse.memoryTimeMachine.filter((item) => item.userId === userId).slice(0, 20),
       memoryAtlas: db.warehouse.memoryAtlas.filter((item) => item.userId === userId).slice(0, 20),
+      decisionIntelligence: db.warehouse.decisionIntelligence.filter((item) => item.userId === userId).slice(0, 20),
       activityHistory: activityService.getUserActivity(db, userId, 50),
     };
   }
@@ -201,6 +230,7 @@ export function createAdminSyncService({
         placeMemories: db.warehouse.placeMemories.length,
         timelineEvents: db.warehouse.timelineEvents.length,
         aiChats: db.warehouse.aiChats.length,
+        decisions: db.warehouse.decisions.length,
         activityEvents: db.warehouse.activityStream.length,
         embeddings: db.warehouse.embeddings.length,
         relationships: db.warehouse.relationships.length,
@@ -217,6 +247,7 @@ export function createAdminSyncService({
         chiefOfStaff: db.warehouse.chiefOfStaff.length,
         memoryTimeMachine: db.warehouse.memoryTimeMachine.length,
         memoryAtlas: db.warehouse.memoryAtlas.length,
+        decisionIntelligence: db.warehouse.decisionIntelligence.length,
         securityAuditLogs: db.warehouse.securityAuditLogs.length,
         replays: db.warehouse.replays.length,
         insights: db.warehouse.insights.length,
@@ -238,6 +269,7 @@ export function createAdminSyncService({
       timeline: warehouse.timelineEvents,
       aiChats: warehouse.aiChats,
       goals: warehouse.goals,
+      decisions: warehouse.decisions,
       aiUsage: warehouse.aiUsage,
       activityStream: warehouse.activityStream,
       fileStorage: warehouse.fileStorage,
@@ -257,6 +289,7 @@ export function createAdminSyncService({
       chiefOfStaff: warehouse.chiefOfStaff,
       memoryTimeMachine: warehouse.memoryTimeMachine,
       memoryAtlas: warehouse.memoryAtlas,
+      decisionIntelligence: warehouse.decisionIntelligence,
       securityAuditLogs: warehouse.securityAuditLogs,
       replays: warehouse.replays,
       insights: warehouse.insights,
@@ -280,6 +313,7 @@ export function createAdminSyncService({
     db.warehouse.timelineEvents = filterOut(db.warehouse.timelineEvents);
     db.warehouse.aiChats = filterOut(db.warehouse.aiChats);
     db.warehouse.goals = filterOut(db.warehouse.goals);
+    db.warehouse.decisions = filterOut(db.warehouse.decisions);
     db.warehouse.aiUsage = filterOut(db.warehouse.aiUsage);
     db.warehouse.activityStream = filterOut(db.warehouse.activityStream);
     db.warehouse.fileStorage = filterOut(db.warehouse.fileStorage);
@@ -298,6 +332,7 @@ export function createAdminSyncService({
     db.warehouse.chiefOfStaff = filterOut(db.warehouse.chiefOfStaff);
     db.warehouse.memoryTimeMachine = filterOut(db.warehouse.memoryTimeMachine);
     db.warehouse.memoryAtlas = filterOut(db.warehouse.memoryAtlas);
+    db.warehouse.decisionIntelligence = filterOut(db.warehouse.decisionIntelligence);
     db.warehouse.replays = filterOut(db.warehouse.replays);
     db.warehouse.insights = filterOut(db.warehouse.insights);
     db.warehouse.aiJobs = filterOut(db.warehouse.aiJobs);
@@ -309,6 +344,7 @@ export function createAdminSyncService({
     syncUserLogin,
     syncChat,
     syncGoal,
+    syncDecision,
     syncIntelligenceRecord,
     syncEntryDeleted,
     migrateLegacyData,

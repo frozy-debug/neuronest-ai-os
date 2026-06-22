@@ -20,6 +20,7 @@ export function createEmptyWarehouse() {
     timelineEvents: [],
     aiChats: [],
     goals: [],
+    decisions: [],
     aiUsage: [],
     activityStream: [],
     fileStorage: [],
@@ -38,6 +39,7 @@ export function createEmptyWarehouse() {
     chiefOfStaff: [],
     memoryTimeMachine: [],
     memoryAtlas: [],
+    decisionIntelligence: [],
     securityAuditLogs: [],
     replays: [],
     insights: [],
@@ -60,6 +62,7 @@ export function normalizeWarehouse(db) {
   warehouse.timelineEvents ||= [];
   warehouse.aiChats ||= [];
   warehouse.goals ||= [];
+  warehouse.decisions ||= [];
   warehouse.aiUsage ||= [];
   warehouse.activityStream ||= [];
   warehouse.fileStorage ||= [];
@@ -78,6 +81,7 @@ export function normalizeWarehouse(db) {
   warehouse.chiefOfStaff ||= [];
   warehouse.memoryTimeMachine ||= [];
   warehouse.memoryAtlas ||= [];
+  warehouse.decisionIntelligence ||= [];
   warehouse.securityAuditLogs ||= [];
   warehouse.replays ||= [];
   warehouse.insights ||= [];
@@ -92,6 +96,7 @@ export function normalizeDb(db) {
   db.entries ||= {};
   db.brainModels ||= {};
   db.lifeGoals ||= {};
+  db.lifeDecisions ||= {};
   db.learningProfiles ||= {};
   db.adminUserStatus ||= {};
   db.adminLogs ||= [];
