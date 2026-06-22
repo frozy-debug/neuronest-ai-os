@@ -8193,6 +8193,7 @@
         renderTimelineFilters();
         if (activeView === "timeline") void loadSmartTimeline({ reset: true });
         if (activeView === "mission-control") void loadLifeOs({ force: true });
+        if (activeView === "relationships") void loadRelationshipDashboard({ force: true });
         if (activeView === "decision-intelligence") void loadDecisionIntelligence({ force: true });
         void renderCinematicAiSystems();
       }
@@ -12186,6 +12187,8 @@
             memoryTimeMachineLoaded = false;
             memoryAtlasLoaded = false;
             futurePredictionsLoaded = false;
+            if (activeView === "relationships") void loadRelationshipDashboard({ force: true });
+            if (activeView === "decision-intelligence") void loadDecisionIntelligence({ force: true });
           } catch (error) {
             alert(friendlyError(error));
           } finally {

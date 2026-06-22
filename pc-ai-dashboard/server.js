@@ -4,7 +4,8 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createChatMemoryObject, createUnifiedMemoryObject, normalizeMemoryCollection } from "./services/unifiedMemoryService.js";
-import { ensureMemoryVector, getVectorStatus, searchMemoryVectors } from "./services/vectorSearchService.js";
+import { ensureMemoryVector, getVectorStatus, searchMemoryVectorsWithFallback } from "./services/vectorSearchService.js";
+import { searchMemoriesByKeyword } from "./services/memorySearchService.js";
 import { buildRelationshipGraph, detectBehaviorPatterns, detectRelationships } from "./services/relationshipEngine.js";
 import { buildMemoryScores, scoreMemoryImportance, scoreMemories } from "./services/memoryScoringEngine.js";
 import { buildMemoryStream, generateInsightCards, generateProactiveNotifications } from "./services/insightEngine.js";
@@ -42,6 +43,7 @@ import { extractLearningFeatures, rebuildLearningProfile, summarizeLearningProfi
 import { detectLanguage } from "./services/languageIntelligenceService.js";
 import {
   answerRelationshipQuery,
+  buildRelationshipDebugSnapshot,
   buildRelationshipIntelligence,
   buildRelationshipTimeline,
   findRelationshipById,
@@ -60,6 +62,8 @@ import {
   createNeuroNestWarehouse,
   detectSuspiciousAiRequest,
   getRequestIp,
+  adminRoleForEmail,
+  hasPermission,
   recordAuditEvent,
   redactSecrets,
   securityHeaders,
@@ -988,7 +992,7 @@ async function buildResurfacingResponse(userId, context = {}) {
   const relationships = detectRelationships(memories);
   const query = String(context.query || context.activity || context.project || "").trim();
   const semanticMatches = query
-    ? await searchMemoryVectors({ userId, query, memories, limit: 8 }).catch(() => [])
+    ? await searchMemoryVectorsWithFallback({ userId, query, memories, limit: 8 }).catch(() => searchMemoriesByKeyword({ query, memories, limit: 8 }))
     : [];
   return buildMemoryResurfacingFeed({ memories, relationships, context, semanticMatches });
 }
@@ -1842,6 +1846,35 @@ function sendJson(res, status, data) {
     ...securityHeaders({ production: process.env.NODE_ENV === "production" || Boolean(process.env.RENDER) }),
   });
   res.end(JSON.stringify(redactSecrets(data)));
+}
+
+function isDebugEndpointAllowed(session) {
+  if (process.env.NODE_ENV !== "production" && !process.env.RENDER) return true;
+  const role = adminRoleForEmail(session?.user?.email || "");
+  return hasPermission(role, "AI_ADMIN") || hasPermission(role, "DATABASE_READ");
+}
+
+function buildMemoryLookupAnswer(query, matches = []) {
+  const lookupIntent = /\b(who is|what do you know|do i have|any memory|memories?|show|tell me about|know about|with)\b/i.test(query || "");
+  if (!lookupIntent || !matches.length) return { matched: false, confidence: 0, answer: "", evidence: [] };
+  const evidence = matches.slice(0, 5).map((match) => ({
+    id: match.memory.id,
+    type: match.memory.type,
+    title: match.memory.title,
+    summary: match.memory.summary || match.memory.content || match.memory.body || "",
+    timestamp: match.memory.createdAt || match.memory.timestamp,
+    score: match.score,
+    provider: match.provider,
+    matchedTerms: match.matchedTerms || [],
+  }));
+  const top = evidence[0];
+  const answer = `I found ${matches.length} saved memory${matches.length === 1 ? "" : "ies"} matching this. Strongest match: "${top.title}"${top.summary ? ` — ${String(top.summary).slice(0, 180)}` : ""}.`;
+  return {
+    matched: true,
+    confidence: Math.min(96, 50 + evidence.length * 8 + Math.max(0, Number(top.score || 0) - 50)),
+    answer,
+    evidence,
+  };
 }
 
 function isRateLimited(req) {
@@ -2833,14 +2866,17 @@ async function handleApi(req, res, url) {
     const memories = allUnifiedMemories(session.user.id);
     let semanticMatches;
     try {
-      semanticMatches = await searchMemoryVectors({ userId: session.user.id, query, memories, limit: 8 });
+      semanticMatches = await searchMemoryVectorsWithFallback({ userId: session.user.id, query, memories, limit: 8 });
     } catch (error) {
       recordAiUsage(session.user.id, "semantic-search", "failed", { query, error: error.message });
-      return sendJson(res, error.statusCode || 503, {
-        error: error.message,
-        code: error.code || "SEMANTIC_SEARCH_UNAVAILABLE",
-        vectorStatus: getVectorStatus(),
-      });
+      semanticMatches = searchMemoriesByKeyword({ query, memories, limit: 8 });
+      if (!semanticMatches.length) {
+        return sendJson(res, error.statusCode || 503, {
+          error: error.message,
+          code: error.code || "SEMANTIC_SEARCH_UNAVAILABLE",
+          vectorStatus: getVectorStatus(),
+        });
+      }
     }
     recordAiUsage(session.user.id, "semantic-search", "completed", { query, resultCount: semanticMatches.length });
     const relationships = detectRelationships(memories);
@@ -2865,6 +2901,83 @@ async function handleApi(req, res, url) {
             reason: `${match.provider} semantic match`,
             relationships: relationships.filter((item) => item.sourceId === match.memory.id || item.targetId === match.memory.id).slice(0, 3),
           })),
+    });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/debug/memory-search") {
+    if (!isDebugEndpointAllowed(session)) return sendJson(res, 404, { error: "Debug endpoint unavailable." });
+    const query = String(url.searchParams.get("q") || "").trim();
+    if (!query) return sendJson(res, 400, { error: "Query is required." });
+    const memories = allUnifiedMemories(session.user.id);
+    const keywordMatches = searchMemoriesByKeyword({ query, memories, limit: 20 });
+    let matches = keywordMatches;
+    let vectorError = null;
+    try {
+      matches = await searchMemoryVectorsWithFallback({ userId: session.user.id, query, memories, limit: 20 });
+    } catch (error) {
+      vectorError = error.message;
+    }
+    const relationshipDebug = buildRelationshipDebugSnapshot({
+      userId: session.user.id,
+      memories,
+      chats: getChatHistory(session.user.id),
+      places: placeService.getUserPlaceMemories(readDb(), session.user.id, 10_000),
+    });
+    const matchedIds = new Set(matches.map((match) => match.memory.id));
+    return sendJson(res, 200, {
+      query,
+      userId: session.user.id,
+      vectorStatus: getVectorStatus(),
+      vectorError,
+      totalMemories: memories.length,
+      matchedMemories: matches.map((match) => ({
+        id: match.memory.id,
+        type: match.memory.type,
+        title: match.memory.title,
+        summary: match.memory.summary || match.memory.content || "",
+        tags: match.memory.tags || [],
+        score: match.score,
+        provider: match.provider,
+        matchedTerms: match.matchedTerms || [],
+        createdAt: match.memory.createdAt,
+      })),
+      keywordOnlyMatches: keywordMatches.map((match) => ({
+        id: match.memory.id,
+        title: match.memory.title,
+        score: match.score,
+        matchedTerms: match.matchedTerms || [],
+      })),
+      extractedPeopleFromMatchedMemories: relationshipDebug.extractedSources.filter((source) => matchedIds.has(source.sourceId)),
+    });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/debug/relationships/raw") {
+    if (!isDebugEndpointAllowed(session)) return sendJson(res, 404, { error: "Debug endpoint unavailable." });
+    const db = readDb();
+    const memories = allUnifiedMemories(session.user.id);
+    return sendJson(res, 200, buildRelationshipDebugSnapshot({
+      userId: session.user.id,
+      memories,
+      chats: getChatHistory(session.user.id),
+      places: placeService.getUserPlaceMemories(db, session.user.id, 10_000),
+    }));
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/debug/relationships/graph") {
+    if (!isDebugEndpointAllowed(session)) return sendJson(res, 404, { error: "Debug endpoint unavailable." });
+    const snapshot = buildRelationshipIntelligenceForUser(session.user.id);
+    return sendJson(res, 200, {
+      userId: session.user.id,
+      overview: snapshot.overview,
+      graph: snapshot.graph,
+      relationships: snapshot.relationships.map((relationship) => ({
+        id: relationship.id,
+        personName: relationship.personName,
+        relationshipType: relationship.relationshipType,
+        relationshipStrength: relationship.relationshipStrength,
+        interactionCount: relationship.interactionCount,
+        lastSeen: relationship.lastSeen,
+      })),
     });
   }
 
@@ -3091,14 +3204,15 @@ async function handleApi(req, res, url) {
     const memories = allUnifiedMemories(session.user.id);
     let semanticMatches = [];
     try {
-      semanticMatches = await searchMemoryVectors({ userId: session.user.id, query: message, memories, limit: 5 });
+      semanticMatches = await searchMemoryVectorsWithFallback({ userId: session.user.id, query: message, memories, limit: 6 });
     } catch (error) {
       recordAiUsage(session.user.id, "semantic-search", "failed", { error: error.message, context: "ai-chat" });
-      semanticMatches = [];
+      semanticMatches = searchMemoriesByKeyword({ query: message, memories, limit: 6 });
     }
     const relationships = detectRelationships(memories);
     const peopleRelationships = buildRelationshipIntelligenceForUser(session.user.id);
     const relationshipAnswer = answerRelationshipQuery(message, peopleRelationships);
+    const memoryLookupAnswer = buildMemoryLookupAnswer(message, semanticMatches);
     const futurePredictions = buildFuturePredictionsForUser(session.user.id);
     const predictionAnswer = answerPredictionQuery(message, futurePredictions);
     const autonomousIntelligence = buildAutonomousIntelligenceCoreV3ForUser(session.user, { query: message });
@@ -3160,7 +3274,11 @@ async function handleApi(req, res, url) {
           title: match.memory.title,
           summary: match.memory.summary || match.memory.content,
           score: match.score,
+          provider: match.provider,
+          matchedTerms: match.matchedTerms || [],
+          reason: match.reason || "",
         })),
+        directMemoryLookup: memoryLookupAnswer.matched ? memoryLookupAnswer : null,
         relationships: relationships.slice(0, 5),
         peopleRelationships: {
           overview: peopleRelationships.overview,
@@ -3345,6 +3463,8 @@ async function handleApi(req, res, url) {
     const reply =
       atlasAnswer.matched && atlasAnswer.confidence >= 40
         ? `${contextualReply}${decisionLine} ${atlasAnswer.answer}`
+        : memoryLookupAnswer.matched && memoryLookupAnswer.confidence >= 45
+        ? `${contextualReply}${decisionLine} ${memoryLookupAnswer.answer}`
         : decisionAnswer.matched && decisionAnswer.confidence >= 40
         ? `${contextualReply}${decisionLine} ${decisionAnswer.answer}`
         : timeMachineAnswer.matched

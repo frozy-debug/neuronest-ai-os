@@ -93,3 +93,49 @@ test("answers relationship questions with evidence and confidence", () => {
   assert.ok(answer.answer.includes("Priya"));
   assert.ok(answer.confidence >= 50);
 });
+
+test("detects new people from later saved memories instead of sticking to the first relationship", () => {
+  const snapshot = buildRelationshipIntelligence({
+    userId: "test-user",
+    memories: [
+      { id: "m1", title: "Had lunch with Alex.", content: "Had lunch with Alex.", createdAt: daysAgo(3), userId: "test-user" },
+      { id: "m2", title: "Talked to Emily about NeuroNest.", content: "Talked to Emily about NeuroNest and startup ideas.", createdAt: daysAgo(1), userId: "test-user" },
+    ],
+  });
+
+  const names = snapshot.relationships.map((item) => item.personName).sort();
+  assert.deepEqual(names, ["Alex", "Emily"]);
+  assert.ok(snapshot.graph.nodes.some((node) => node.label === "Alex"));
+  assert.ok(snapshot.graph.nodes.some((node) => node.label === "Emily"));
+});
+
+test("detects multiple people and normalizes lowercase and uppercase mentions", () => {
+  const snapshot = buildRelationshipIntelligence({
+    userId: "test-user",
+    memories: [
+      { id: "m1", title: "Met Sarah at gym.", content: "Met Sarah at gym.", createdAt: daysAgo(4), userId: "test-user" },
+      { id: "m2", title: "Worked with John on startup.", content: "Worked with John on startup.", createdAt: daysAgo(3), userId: "test-user" },
+      { id: "m3", title: "called emily yesterday", content: "called emily yesterday about design.", createdAt: daysAgo(2), userId: "test-user" },
+      { id: "m4", title: "Coffee with EMILY", content: "coffee with EMILY was productive.", createdAt: daysAgo(1), userId: "test-user" },
+    ],
+  });
+
+  const names = snapshot.relationships.map((item) => item.personName).sort();
+  assert.deepEqual(names, ["Emily", "John", "Sarah"]);
+  const emily = snapshot.relationships.find((item) => item.personName === "Emily");
+  assert.equal(emily.interactionCount, 2);
+});
+
+test("answers person-specific relationship questions from stored evidence", () => {
+  const snapshot = buildRelationshipIntelligence({
+    userId: "test-user",
+    memories: [
+      { id: "m1", title: "Talked to Emily about NeuroNest.", content: "Talked to Emily about NeuroNest and startup ideas.", createdAt: daysAgo(1), userId: "test-user" },
+    ],
+  });
+
+  const answer = answerRelationshipQuery("Who is Emily?", snapshot);
+  assert.equal(answer.matched, true);
+  assert.match(answer.answer, /Emily/);
+  assert.ok(answer.evidence.some((item) => item.title.includes("Emily")));
+});

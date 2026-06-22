@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateEmbedding, getEmbeddingStatus } from "./embeddingService.js";
+import { mergeMemorySearchMatches, searchMemoriesByKeyword } from "./memorySearchService.js";
 import { memoryTextForEmbedding } from "./unifiedMemoryService.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -185,6 +186,22 @@ export async function searchMemoryVectors({ userId, query, memories, limit = 8 }
     .filter(Boolean)
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, limit);
+}
+
+export async function searchMemoryVectorsWithFallback({ userId, query, memories, limit = 8 }) {
+  const keywordMatches = searchMemoriesByKeyword({ query, memories, limit });
+  try {
+    const semanticMatches = await searchMemoryVectors({ userId, query, memories, limit });
+    return mergeMemorySearchMatches(semanticMatches, keywordMatches, limit);
+  } catch (error) {
+    if (keywordMatches.length) {
+      return keywordMatches.map((match) => ({
+        ...match,
+        vectorError: error.message,
+      }));
+    }
+    throw error;
+  }
 }
 
 export function getVectorStatus() {

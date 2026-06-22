@@ -247,15 +247,32 @@ function splitCandidateNames(value) {
 function extractExplicitNames(text) {
   const candidates = [];
   const patterns = [
-    /\b(?:with|met|meet|meeting|called|call|texted|messaged|dm(?:ed)?|talked to|spoke with|lunch with|dinner with|coffee with|worked with|studied with|gym with|travel(?:ed)? with|hang(?:ing)? out with)\s+([A-Z][a-z]+(?:\s+(?:and\s+)?[A-Z][a-z]+){0,3})/g,
-    /\b(?:friend|mentor|boss|client|investor|coworker|partner)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/g,
-    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:helped|called|messaged|met|joined|visited|supported|inspired|argued|discussed|shared)\b/g,
+    /\b(?:with|met|meet|meeting|called|call|texted|messaged|dm(?:ed)?|talked to|spoke with|lunch with|dinner with|coffee with|worked with|studied with|gym with|travel(?:ed)? with|hang(?:ing)? out with)\s+([\p{Lu}][\p{Ll}]+(?:\s+(?:and\s+)?[\p{Lu}][\p{Ll}]+){0,3})/gu,
+    /\b(?:friend|mentor|boss|client|investor|coworker|partner)\s+([\p{Lu}][\p{Ll}]+(?:\s+[\p{Lu}][\p{Ll}]+)?)/gu,
+    /\b([\p{Lu}][\p{Ll}]+(?:\s+[\p{Lu}][\p{Ll}]+)?)\s+(?:helped|called|messaged|met|joined|visited|supported|inspired|argued|discussed|shared|worked|talked|spoke)\b/gu,
   ];
 
   for (const pattern of patterns) {
     for (const match of text.matchAll(pattern)) {
       for (const name of splitCandidateNames(match[1])) {
         candidates.push({ name, raw: match[0], confidence: 0.86 });
+      }
+    }
+  }
+  return candidates;
+}
+
+function extractLowercaseInteractionNames(text) {
+  const candidates = [];
+  const patterns = [
+    /\b(?:with|met|called|texted|messaged|talked to|spoke with|worked with|lunch with|dinner with|coffee with|gym with)\s+([a-z]{3,}(?:\s+and\s+[a-z]{3,}){0,2})/gi,
+    /\b(?:me and|i and)\s+([a-z]{3,}(?:\s+and\s+[a-z]{3,}){0,2})/gi,
+    /\b([a-z]{3,})\s+and\s+i\b/gi,
+  ];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      for (const name of splitCandidateNames(match[1])) {
+        candidates.push({ name, raw: match[0], confidence: 0.72 });
       }
     }
   }
@@ -274,7 +291,7 @@ function extractKnownNames(text, knownNames) {
 }
 
 function hasInteractionContext(text) {
-  return /\b(with|met|meet|called|texted|messaged|spoke|talked|lunch|dinner|coffee|gym|friend|mentor|boss|client|investor|coworker|family|mom|dad|mother|father|brother|sister|girlfriend|boyfriend|wife|husband|support|helped|argument|discussed)\b/i.test(text);
+  return /\b(with|met|meet|called|call|texted|messaged|spoke|talked|lunch|dinner|coffee|gym|friend|mentor|boss|client|investor|coworker|family|mom|dad|mother|father|brother|sister|girlfriend|boyfriend|wife|husband|support|helped|argument|discussed|me and|and i|worked)\b/i.test(text);
 }
 
 function buildSources({ memories = [], chats = [], places = [] }) {
@@ -308,6 +325,7 @@ function extractEventsFromSource(source, knownNames, index) {
   const candidates = [
     ...extractFamilyAliases(text),
     ...extractExplicitNames(text),
+    ...extractLowercaseInteractionNames(text),
     ...extractKnownNames(text, knownNames),
   ];
   const uniqueByName = new Map();
@@ -352,6 +370,9 @@ function buildKnownNames(sources) {
     const text = sourceText(source);
     if (!hasInteractionContext(text)) continue;
     for (const candidate of [...extractFamilyAliases(text), ...extractExplicitNames(text)]) {
+      if (candidate.name) names.add(candidate.name);
+    }
+    for (const candidate of extractLowercaseInteractionNames(text)) {
       if (candidate.name) names.add(candidate.name);
     }
   }
@@ -625,6 +646,46 @@ export function buildRelationshipIntelligence({ userId, memories = [], chats = [
   };
 }
 
+export function buildRelationshipDebugSnapshot({ userId, memories = [], chats = [], places = [] }) {
+  const sources = buildSources({ memories, chats, places }).filter((source) => !source.deletedAt && !source.metadata?.deletedAt);
+  const knownNames = buildKnownNames(sources);
+  const extractedSources = sources.map((source, index) => {
+    const text = sourceText(source);
+    const candidates = [
+      ...extractFamilyAliases(text),
+      ...extractExplicitNames(text),
+      ...extractLowercaseInteractionNames(text),
+      ...extractKnownNames(text, knownNames),
+    ];
+    return {
+      sourceId: sourceId(source, index),
+      sourceType: sourceType(source),
+      title: source.title || "",
+      hasInteractionContext: hasInteractionContext(text),
+      searchableText: snippet(text, 260),
+      extractedPeople: [...new Map(candidates.map((candidate) => [candidate.name, candidate])).values()]
+        .filter((candidate) => candidate.name)
+        .map((candidate) => ({
+          name: candidate.name,
+          confidence: candidate.confidence,
+          raw: candidate.raw,
+        })),
+    };
+  });
+  const snapshot = buildRelationshipIntelligence({ userId, memories, chats, places });
+  return {
+    userId,
+    generatedAt: new Date().toISOString(),
+    sourceCount: sources.length,
+    knownNames: [...knownNames],
+    extractedSources,
+    events: snapshot.events,
+    graph: snapshot.graph,
+    relationships: snapshot.relationships,
+    overview: snapshot.overview,
+  };
+}
+
 export function findRelationshipById(snapshot, idOrName) {
   const lookup = String(idOrName || "").toLowerCase();
   return (snapshot?.relationships || []).find(
@@ -667,6 +728,19 @@ export function buildRelationshipTimeline(snapshot, relationshipId) {
   return { relationship, events, milestones };
 }
 
+function findRelationshipMentionInQuery(query, relationships = []) {
+  const text = String(query || "").toLowerCase();
+  for (const relationship of relationships) {
+    const escaped = relationship.personName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (new RegExp(`\\b${escaped}\\b`, "i").test(text)) return relationship;
+  }
+  const nameMatch = String(query || "").match(/\b(?:who is|about|know about|memories with|memory with|talked to|met|called)\s+([A-Z][a-z]+|[a-z]{3,})\b/i);
+  if (!nameMatch) return null;
+  const normalized = normalizePersonName(nameMatch[1]);
+  if (!normalized) return null;
+  return relationships.find((relationship) => relationship.personName.toLowerCase() === normalized.toLowerCase()) || null;
+}
+
 export function answerRelationshipQuery(query, snapshot) {
   const text = String(query || "").toLowerCase();
   const relationships = snapshot?.relationships || [];
@@ -676,6 +750,16 @@ export function answerRelationshipQuery(query, snapshot) {
       answer: "I do not have enough evidence-backed relationship memories yet.",
       confidence: 0,
       evidence: [],
+    };
+  }
+  const mentionedRelationship = findRelationshipMentionInQuery(query, relationships);
+  if (mentionedRelationship && /\b(who|what|know|about|memory|memories|show|have|met|called|talked|relationship)\b/i.test(query || "")) {
+    const evidence = mentionedRelationship.evidence || [];
+    return {
+      matched: true,
+      answer: `${mentionedRelationship.personName} appears in ${mentionedRelationship.interactionCount} stored relationship memory${mentionedRelationship.interactionCount === 1 ? "" : "ies"}. Current relationship signal: ${mentionedRelationship.relationshipStatus}, strength ${mentionedRelationship.relationshipStrength}%, last seen ${new Date(mentionedRelationship.lastSeen).toLocaleDateString()}.`,
+      confidence: clamp(50 + evidence.length * 8 + mentionedRelationship.interactionCount * 4),
+      evidence,
     };
   }
   let selected = [];
