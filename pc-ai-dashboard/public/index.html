@@ -8769,6 +8769,8 @@
       function renderFutureDashboard(data = {}) {
         const byType = data.byType || {};
         const predictions = data.predictions || [];
+        const opportunityEngine = data.opportunityEngine || {};
+        const opportunityRows = opportunityEngine.opportunities || byType.opportunities || [];
         if (futureStatus) futureStatus.textContent = predictions.length ? `${predictions.length} active evidence-backed predictions` : "No prediction evidence yet";
         renderFutureOverview(data.overview || {}, data.accuracy || {});
         renderFuturePredictionCards(futureGoals, byType.goals || [], "No goal forecast yet", "Add goals and related activity memories before NeuroNest predicts completion probability.");
@@ -8777,7 +8779,7 @@
         renderFuturePredictionCards(futureMood, byType.mood || [], "No mood forecast yet", "Mood forecasts require emotional memories, journals, or voice sentiment.");
         renderFuturePredictionCards(futureBurnout, byType.burnout || [], "No burnout signal yet", "Burnout detection needs workload, stress, or recovery evidence.");
         renderFuturePredictionCards(futureRelationships, byType.relationships || [], "No relationship forecast yet", "Relationship forecasts appear after people have repeated evidence-backed interactions.");
-        renderFuturePredictionCards(futureOpportunities, byType.opportunities || [], "No opportunity forecast yet", "Opportunities appear when interests and goals show repeated growth signals.");
+        renderFuturePredictionCards(futureOpportunities, opportunityRows, "No opportunity forecast yet", "Opportunities appear when interests, skills, projects, goals, and relationships show repeated real growth signals.");
         renderFutureAccuracy(data.history || [], data.accuracy || {});
         [futureOverview, futureGoals, futureHabits, futureProductivity, futureMood, futureBurnout, futureRelationships, futureOpportunities, futureAccuracy].forEach((element) => {
           if (element) {

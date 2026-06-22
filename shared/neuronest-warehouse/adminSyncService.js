@@ -91,6 +91,7 @@ export function createAdminSyncService({
       "memoryTimeMachine",
       "memoryAtlas",
       "decisionIntelligence",
+      "opportunityEngine",
       "replays",
       "insights",
       "aiJobs",
@@ -212,6 +213,7 @@ export function createAdminSyncService({
       memoryTimeMachine: db.warehouse.memoryTimeMachine.filter((item) => item.userId === userId).slice(0, 20),
       memoryAtlas: db.warehouse.memoryAtlas.filter((item) => item.userId === userId).slice(0, 20),
       decisionIntelligence: db.warehouse.decisionIntelligence.filter((item) => item.userId === userId).slice(0, 20),
+      opportunityEngine: db.warehouse.opportunityEngine.filter((item) => item.userId === userId).slice(0, 20),
       activityHistory: activityService.getUserActivity(db, userId, 50),
     };
   }
@@ -248,6 +250,7 @@ export function createAdminSyncService({
         memoryTimeMachine: db.warehouse.memoryTimeMachine.length,
         memoryAtlas: db.warehouse.memoryAtlas.length,
         decisionIntelligence: db.warehouse.decisionIntelligence.length,
+        opportunityEngine: db.warehouse.opportunityEngine.length,
         securityAuditLogs: db.warehouse.securityAuditLogs.length,
         replays: db.warehouse.replays.length,
         insights: db.warehouse.insights.length,
@@ -290,6 +293,7 @@ export function createAdminSyncService({
       memoryTimeMachine: warehouse.memoryTimeMachine,
       memoryAtlas: warehouse.memoryAtlas,
       decisionIntelligence: warehouse.decisionIntelligence,
+      opportunityEngine: warehouse.opportunityEngine,
       securityAuditLogs: warehouse.securityAuditLogs,
       replays: warehouse.replays,
       insights: warehouse.insights,
@@ -333,6 +337,7 @@ export function createAdminSyncService({
     db.warehouse.memoryTimeMachine = filterOut(db.warehouse.memoryTimeMachine);
     db.warehouse.memoryAtlas = filterOut(db.warehouse.memoryAtlas);
     db.warehouse.decisionIntelligence = filterOut(db.warehouse.decisionIntelligence);
+    db.warehouse.opportunityEngine = filterOut(db.warehouse.opportunityEngine);
     db.warehouse.replays = filterOut(db.warehouse.replays);
     db.warehouse.insights = filterOut(db.warehouse.insights);
     db.warehouse.aiJobs = filterOut(db.warehouse.aiJobs);

@@ -601,6 +601,7 @@ function buildMetrics(db) {
   const aiRequests = warehouse.aiUsage.length;
   const relationshipProfiles = warehouse.relationshipProfiles.length;
   const futurePredictions = warehouse.futurePredictions.length;
+  const opportunities = warehouse.opportunityEngine.length;
 
   return [
     { key: "users", label: "Total Users", value: db.users.length, accent: "blue", icon: "US", trend: trendFrom(todayUsers, db.users.length), trendLabel: "new today" },
@@ -614,6 +615,7 @@ function buildMetrics(db) {
     { key: "place-visits", label: "Automatic Place Visits", value: placeVisits, accent: "cyan", icon: "PV", trend: trendFrom(placeVisits, Math.max(places, 1)), trendLabel: "passively captured" },
     { key: "relationships", label: "People Relationships", value: relationshipProfiles, accent: "green", icon: "RI", trend: trendFrom(warehouse.relationshipEvents.length, Math.max(relationshipProfiles, 1)), trendLabel: "evidence signals" },
     { key: "future-predictions", label: "Future Predictions", value: futurePredictions, accent: "blue", icon: "FP", trend: trendFrom(warehouse.predictionHistory.length, Math.max(futurePredictions, 1)), trendLabel: "evaluated" },
+    { key: "opportunities", label: "Opportunity Engine", value: opportunities, accent: "cyan", icon: "OE", trend: trendFrom(opportunities, Math.max(futurePredictions + opportunities, 1)), trendLabel: "evidence-backed" },
     { key: "voice", label: "Voice Notes", value: voice, accent: "violet", icon: "VO", trend: trendFrom(voice, Math.max(entries.length, 1)), trendLabel: "of memories" },
     { key: "screenshots", label: "Screenshots", value: screenshots, accent: "pink", icon: "SC", trend: trendFrom(screenshots, Math.max(entries.length, 1)), trendLabel: "of memories" },
     { key: "embeddings", label: "Embeddings", value: embeddings, accent: "cyan", icon: "EM", trend: trendFrom(vectors, Math.max(embeddings, 1)), trendLabel: "vectorized" },
@@ -646,13 +648,15 @@ function buildAiUsage(db) {
   const embeddings = countEmbeddings(db);
   const voiceProcessing = warehouse.voiceNotes.length;
   const predictions = warehouse.futurePredictions.length || warehouse.predictions.length;
-  const total = Math.max(1, aiChat + memorySearch + embeddings + voiceProcessing + predictions);
+  const opportunities = warehouse.opportunityEngine.length;
+  const total = Math.max(1, aiChat + memorySearch + embeddings + voiceProcessing + predictions + opportunities);
   return [
     { label: "AI Chat", value: aiChat, color: "#8a4dff", percent: Math.round((aiChat / total) * 1000) / 10 },
     { label: "Memory Search", value: memorySearch, color: "#3478ff", percent: Math.round((memorySearch / total) * 1000) / 10 },
     { label: "Embeddings", value: embeddings, color: "#24d7ff", percent: Math.round((embeddings / total) * 1000) / 10 },
     { label: "Voice Processing", value: voiceProcessing, color: "#f7a531", percent: Math.round((voiceProcessing / total) * 1000) / 10 },
     { label: "Predictions", value: predictions, color: "#6d8fbf", percent: Math.round((predictions / total) * 1000) / 10 },
+    { label: "Opportunities", value: opportunities, color: "#24d7ff", percent: Math.round((opportunities / total) * 1000) / 10 },
   ];
 }
 
@@ -1232,6 +1236,13 @@ function collectionRows(db, collection) {
     const rows = adminSyncService.getWarehouseCollection(db, "futurePredictions", maxRows);
     return {
       columns: ["userId", "type", "title", "confidence", "predictionScore", "riskLevel", "evidenceCount", "generatedAt"],
+      rows,
+    };
+  }
+  if (collection === "opportunity_engine" || collection === "opportunityEngine") {
+    const rows = adminSyncService.getWarehouseCollection(db, "opportunityEngine", maxRows);
+    return {
+      columns: ["userId", "version", "empty", "overview", "opportunities", "evidencePolicy", "generatedAt"],
       rows,
     };
   }

@@ -232,6 +232,7 @@ export function createSupabaseProductionStore() {
       memoryTimeMachine: "insight",
       memoryAtlas: "insight",
       decisionIntelligence: "insight",
+      opportunityEngine: "insight",
       replays: "replay",
       insights: "insight",
     };
@@ -607,6 +608,7 @@ export function createSupabaseProductionStore() {
     warehouse.securityAuditLogs = [...db.securityAuditLogs];
     warehouse.replays = [];
     warehouse.insights = [];
+    warehouse.opportunityEngine = [];
     warehouse.aiJobs ||= [];
 
     for (const memory of memories) {
@@ -706,6 +708,8 @@ export function createSupabaseProductionStore() {
                 ? "decisions"
                 : data.type === "decision-intelligence"
                   ? "decisionIntelligence"
+                  : data.type === "opportunity-engine"
+                    ? "opportunityEngine"
               : collectionMap[item.type];
       if (collection) warehouse[collection].push({ ...data, id: item.id, userId: item.user_id, createdAt: item.created_at, updatedAt: item.updated_at });
     }

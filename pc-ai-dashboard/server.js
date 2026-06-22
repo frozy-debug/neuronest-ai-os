@@ -49,6 +49,7 @@ import {
   findRelationshipById,
 } from "./services/relationshipIntelligenceService.js";
 import { answerPredictionQuery, buildFuturePredictionEngine } from "./services/futurePredictionEngineService.js";
+import { answerOpportunityQuery, buildOpportunityEngine } from "./services/opportunityEngineService.js";
 import {
   buildAutomaticPlaceMemoryPayload,
   downloadGooglePlacePhoto,
@@ -1026,6 +1027,39 @@ function buildFuturePredictionsForUser(userId, { persist = false, trigger = "rea
   return persist ? persistFuturePredictionSnapshot(userId, snapshot, trigger) : snapshot;
 }
 
+function buildOpportunityEngineForUser(userId, {
+  persist = false,
+  trigger = "read",
+  relationshipIntelligence = null,
+} = {}) {
+  const db = readDb();
+  warehouseDb.normalizeWarehouse(db);
+  const relationshipsSnapshot = relationshipIntelligence || buildRelationshipIntelligenceForUser(userId);
+  const snapshot = buildOpportunityEngine({
+    userId,
+    memories: allUnifiedMemories(userId),
+    records: allMemoryRecords(userId),
+    chats: getChatHistory(userId),
+    places: placeService.getUserPlaceMemories(db, userId, 10_000),
+    goals: getLifeGoals(userId),
+    relationshipIntelligence: relationshipsSnapshot,
+  });
+  if (!persist) return snapshot;
+  return persistIntelligenceRecord(userId, "opportunityEngine", {
+    id: `opportunity-engine_${userId}`,
+    type: "opportunity-engine",
+    trigger,
+    version: snapshot.version,
+    generatedAt: snapshot.generatedAt,
+    empty: snapshot.empty,
+    overview: snapshot.overview,
+    opportunities: snapshot.opportunities.slice(0, 80),
+    byType: snapshot.byType,
+    evidencePolicy: snapshot.evidencePolicy,
+    evidenceMemoryCount: snapshot.overview?.evidenceCount || 0,
+  });
+}
+
 function buildDecisionIntelligenceForUser(userId, { persist = false, trigger = "read" } = {}) {
   const db = readDb();
   warehouseDb.normalizeWarehouse(db);
@@ -1280,6 +1314,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
   const insights = generateInsightCards(memories, relationships);
   const relationshipIntelligence = buildRelationshipIntelligenceForUser(userId, { persist: true, trigger });
   const futurePredictions = buildFuturePredictionsForUser(userId, { persist: true, trigger });
+  const opportunityEngine = buildOpportunityEngineForUser(userId, { persist: true, trigger, relationshipIntelligence });
   const autonomousIntelligence = buildAutonomousIntelligenceCoreV3ForUser(user, { persist: true, trigger });
   const chiefOfStaff = buildAiChiefOfStaffForUser(user, { persist: true, trigger });
   const memoryAtlas = buildMemoryAtlasForUser(user, { persist: true, trigger });
@@ -1321,7 +1356,7 @@ async function persistDerivedIntelligenceForUserId(userId, trigger = "interactio
     relationshipCount: relationshipIntelligence.relationships.length,
   });
   await buildDigitalTwinResponse(user, { activity: trigger, trigger });
-  return { relationships, predictions, replay, insights, relationshipIntelligence, futurePredictions, autonomousIntelligence, chiefOfStaff, memoryAtlas, decisionIntelligence };
+  return { relationships, predictions, replay, insights, relationshipIntelligence, futurePredictions, opportunityEngine, autonomousIntelligence, chiefOfStaff, memoryAtlas, decisionIntelligence };
 }
 
 function buildLearningEngineResponse(user, { rebuild = false, context = {} } = {}) {
@@ -2811,10 +2846,15 @@ async function handleApi(req, res, url) {
       persist: url.searchParams.get("persist") === "true",
       trigger: "ai-systems-read",
     });
+    const opportunityEngine = buildOpportunityEngineForUser(session.user.id, {
+      persist: url.searchParams.get("persist") === "true",
+      trigger: "ai-systems-read",
+    });
     return sendJson(res, 200, {
       predictions: snapshot.predictions.slice(0, 8),
       overview: snapshot.overview,
       accuracy: snapshot.accuracy,
+      opportunities: opportunityEngine.opportunities.slice(0, 6),
       evidencePolicy: snapshot.evidencePolicy,
     });
   }
@@ -2824,7 +2864,11 @@ async function handleApi(req, res, url) {
       persist: url.searchParams.get("persist") === "true",
       trigger: "predictions-read",
     });
-    return sendJson(res, 200, snapshot);
+    const opportunityEngine = buildOpportunityEngineForUser(session.user.id, {
+      persist: url.searchParams.get("persist") === "true",
+      trigger: "predictions-read",
+    });
+    return sendJson(res, 200, { ...snapshot, opportunityEngine });
   }
 
   const predictionTypeRoutes = {
@@ -2839,6 +2883,16 @@ async function handleApi(req, res, url) {
   if (req.method === "GET" && predictionTypeRoutes[url.pathname]) {
     const snapshot = buildFuturePredictionsForUser(session.user.id);
     const key = predictionTypeRoutes[url.pathname];
+    if (key === "opportunities") {
+      const opportunityEngine = buildOpportunityEngineForUser(session.user.id);
+      return sendJson(res, 200, {
+        type: key,
+        predictions: opportunityEngine.opportunities,
+        opportunityEngine,
+        overview: opportunityEngine.overview,
+        evidencePolicy: opportunityEngine.evidencePolicy,
+      });
+    }
     return sendJson(res, 200, {
       type: key,
       predictions: snapshot.byType?.[key] || [],
@@ -2849,10 +2903,43 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/predictions/rebuild") {
     const snapshot = buildFuturePredictionsForUser(session.user.id, { persist: true, trigger: "manual-rebuild" });
+    const opportunityEngine = buildOpportunityEngineForUser(session.user.id, { persist: true, trigger: "manual-rebuild" });
     recordAiUsage(session.user.id, "future-prediction-rebuild", "completed", {
       predictionCount: snapshot.predictions.length,
       averageConfidence: snapshot.overview.averageConfidence,
       historyCount: snapshot.history.length,
+      opportunityCount: opportunityEngine.opportunities.length,
+    });
+    return sendJson(res, 200, { ...snapshot, opportunityEngine });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/opportunities") {
+    const snapshot = buildOpportunityEngineForUser(session.user.id, {
+      persist: url.searchParams.get("persist") === "true",
+      trigger: "opportunities-read",
+    });
+    return sendJson(res, 200, snapshot);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/ai/opportunities") {
+    const snapshot = buildOpportunityEngineForUser(session.user.id, {
+      persist: url.searchParams.get("persist") === "true",
+      trigger: "ai-opportunities-read",
+    });
+    return sendJson(res, 200, {
+      overview: snapshot.overview,
+      opportunities: snapshot.opportunities.slice(0, 8),
+      byType: snapshot.byType,
+      evidencePolicy: snapshot.evidencePolicy,
+    });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/opportunities/rebuild") {
+    const snapshot = buildOpportunityEngineForUser(session.user.id, { persist: true, trigger: "manual-rebuild" });
+    recordAiUsage(session.user.id, "opportunity-engine-rebuild", "completed", {
+      opportunityCount: snapshot.opportunities.length,
+      averageConfidence: snapshot.overview.averageConfidence,
+      evidenceCount: snapshot.overview.evidenceCount,
     });
     return sendJson(res, 200, snapshot);
   }
@@ -3215,6 +3302,8 @@ async function handleApi(req, res, url) {
     const memoryLookupAnswer = buildMemoryLookupAnswer(message, semanticMatches);
     const futurePredictions = buildFuturePredictionsForUser(session.user.id);
     const predictionAnswer = answerPredictionQuery(message, futurePredictions);
+    const opportunityEngine = buildOpportunityEngineForUser(session.user.id, { relationshipIntelligence: peopleRelationships });
+    const opportunityAnswer = answerOpportunityQuery(message, opportunityEngine);
     const autonomousIntelligence = buildAutonomousIntelligenceCoreV3ForUser(session.user, { query: message });
     const autonomousAnswer = answerAutonomousIntelligenceQuery(message, autonomousIntelligence);
     const chiefOfStaff = buildAiChiefOfStaffForUser(session.user);
@@ -3307,6 +3396,23 @@ async function handleApi(req, res, url) {
           })),
           directAnswer: predictionAnswer.matched ? predictionAnswer : null,
           evidencePolicy: futurePredictions.evidencePolicy,
+        },
+        opportunityEngine: {
+          overview: opportunityEngine.overview,
+          topOpportunities: opportunityEngine.opportunities.slice(0, 8).map((item) => ({
+            title: item.title,
+            category: item.category,
+            summary: item.summary,
+            recommendation: item.recommendation,
+            confidence: item.confidence,
+            opportunityScore: item.opportunityScore,
+            growthPercent: item.growthPercent,
+            evidenceCount: item.evidenceCount,
+            reasoning: item.reasoning,
+            nextActions: item.nextActions,
+          })),
+          directAnswer: opportunityAnswer.matched ? opportunityAnswer : null,
+          evidencePolicy: opportunityEngine.evidencePolicy,
         },
         autonomousIntelligence: {
           overview: autonomousIntelligence.overview,
@@ -3471,6 +3577,8 @@ async function handleApi(req, res, url) {
         ? `${contextualReply}${decisionLine} ${timeMachineAnswer.answer}`
         : chiefAnswer.matched && chiefAnswer.confidence >= 40
         ? `${contextualReply}${decisionLine} ${chiefAnswer.answer}`
+        : opportunityAnswer.matched && opportunityAnswer.confidence >= 40
+        ? `${contextualReply}${decisionLine} ${opportunityAnswer.answer}`
         : autonomousAnswer.matched && autonomousAnswer.confidence >= 50
         ? `${contextualReply}${decisionLine} ${autonomousAnswer.answer}`
         : predictionAnswer.matched && predictionAnswer.confidence >= 50

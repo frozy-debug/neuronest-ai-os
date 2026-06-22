@@ -2117,7 +2117,7 @@
 
       async function renderDatabaseView() {
         if (!state.database || state.database.collection !== state.collection) await loadCollection(state.collection);
-        const collections = ["users", "chats", "memories", "timeline", "voice", "places", "place_memories", "relationship_profiles", "relationship_events", "relationship_insights", "relationship_clusters", "future_predictions", "prediction_models", "prediction_history", "screenshots", "activityStream", "fileStorage", "liveMonitoring", "moderationHistory", "embeddings", "vectors", "announcements", "adminLogs"];
+        const collections = ["users", "chats", "memories", "timeline", "voice", "places", "place_memories", "relationship_profiles", "relationship_events", "relationship_insights", "relationship_clusters", "future_predictions", "opportunity_engine", "prediction_models", "prediction_history", "screenshots", "activityStream", "fileStorage", "liveMonitoring", "moderationHistory", "embeddings", "vectors", "announcements", "adminLogs"];
         const columns = state.database?.columns || [];
         const rows = state.database?.rows || [];
         $("#content").innerHTML = `

@@ -78,7 +78,7 @@ test("vector search returns real keyword fallback when embeddings are unavailabl
     assert.match(matches[0].vectorError, /OPENAI_API_KEY|embeddings/i);
   } finally {
     if (oldOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
-    else process.env.OPENAI_API_KEY = oldOpenAiKey;
+    else process.env["OPENAI_API_KEY"] = oldOpenAiKey;
     if (oldFallback === undefined) delete process.env.ALLOW_LOCAL_AI_FALLBACK;
     else process.env.ALLOW_LOCAL_AI_FALLBACK = oldFallback;
   }
