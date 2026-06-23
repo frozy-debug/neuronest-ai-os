@@ -48,6 +48,18 @@ function getGoogleClientId() {
   return process.env.GOOGLE_CLIENT_ID || "";
 }
 
+function getGoogleClientIds() {
+  loadEnv();
+  return new Set(
+    [
+      process.env.GOOGLE_CLIENT_ID,
+      ...(process.env.GOOGLE_CLIENT_IDS || "").split(","),
+    ]
+      .map((item) => String(item || "").trim())
+      .filter(Boolean),
+  );
+}
+
 function getGoogleMapsApiKey() {
   loadEnv();
   return process.env.GOOGLE_MAPS_API_KEY || "";
@@ -56,7 +68,9 @@ function getGoogleMapsApiKey() {
 function shouldProxyApi(req, url) {
   if (!NEURONEST_API_BASE_URL) return false;
   if (!url.pathname.startsWith("/api/")) return false;
-  if (url.pathname === "/api/health" || url.pathname === "/api/mobile-health") return false;
+  if (url.pathname === "/api/health" || url.pathname === "/api/mobile-health" || url.pathname === "/api/config") {
+    return false;
+  }
   return true;
 }
 
@@ -896,7 +910,7 @@ function decodeGoogleJwtPayload(credential) {
 }
 
 function profileFromGooglePayload(payload) {
-  if (payload.aud !== getGoogleClientId()) {
+  if (!getGoogleClientIds().has(payload.aud)) {
     throw new Error("Google token audience does not match your client ID.");
   }
 
@@ -921,7 +935,7 @@ function profileFromGooglePayload(payload) {
 }
 
 async function verifyGoogleCredential(credential) {
-  if (!getGoogleClientId()) {
+  if (!getGoogleClientIds().size) {
     throw new Error("GOOGLE_CLIENT_ID is not configured.");
   }
 

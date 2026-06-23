@@ -32,6 +32,7 @@ Required on the mobile Render service:
 NODE_ENV=production
 SESSION_SECRET=make-a-long-random-secret
 GOOGLE_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_IDS=optional-extra-google-web-client-ids
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_MAPS_API_KEY=your-google-maps-browser-key
 NEURONEST_API_BASE_URL=https://your-pc-service.onrender.com
