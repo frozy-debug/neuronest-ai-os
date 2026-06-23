@@ -1519,6 +1519,116 @@
         line-height: 1.4;
       }
 
+      .feature-toolbar {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .feature-toolbar input,
+      .feature-toolbar select {
+        min-height: 44px;
+        width: 100%;
+        color: var(--text);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 16px;
+        outline: none;
+        background: rgba(2, 6, 23, 0.38);
+        padding: 0 12px;
+      }
+
+      .feature-toolbar select {
+        max-width: 136px;
+      }
+
+      .feature-cards {
+        display: grid;
+        gap: 10px;
+        max-height: 520px;
+        overflow: auto;
+        padding-right: 2px;
+        scrollbar-width: none;
+      }
+
+      .feature-cards::-webkit-scrollbar {
+        display: none;
+      }
+
+      .feature-card {
+        display: grid;
+        grid-template-columns: 38px 1fr;
+        gap: 11px;
+        padding: 12px;
+        border-radius: 18px;
+        text-align: left;
+        background:
+          radial-gradient(circle at 92% 18%, rgba(139, 92, 246, 0.15), transparent 34%),
+          rgba(2, 6, 23, 0.34);
+        border: 1px solid rgba(148, 163, 184, 0.13);
+        box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+        transition: transform 260ms ease, border-color 260ms ease, box-shadow 260ms ease;
+      }
+
+      .feature-card:active {
+        transform: scale(0.985);
+      }
+
+      .feature-card i {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        border-radius: 15px;
+        font-style: normal;
+        font-size: 11px;
+        background: linear-gradient(135deg, rgba(37, 169, 255, 0.75), rgba(139, 92, 246, 0.8));
+        box-shadow: 0 0 22px rgba(139, 92, 246, 0.28);
+      }
+
+      .feature-card strong {
+        display: block;
+        font-size: 12px;
+      }
+
+      .feature-card small {
+        display: block;
+        margin-top: 4px;
+        line-height: 1.35;
+      }
+
+      .feature-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 9px;
+      }
+
+      .endpoint-pill,
+      .feature-status {
+        display: inline-flex;
+        align-items: center;
+        min-height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        font-size: 9px;
+        color: #cbd5e1;
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+      }
+
+      .feature-status {
+        color: #99f6e4;
+        border-color: rgba(94, 234, 212, 0.2);
+      }
+
+      .feature-detail-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
       .system-panel-head {
         display: flex;
         align-items: flex-start;
@@ -2141,7 +2251,24 @@
           </div>
           <div id="feature-parity-list" class="parity-list" style="margin-top:12px"></div>
         </section>
+        <section class="panel">
+          <div class="system-panel-head">
+            <div>
+              <h2>Every Feature</h2>
+              <p class="muted">Search any PC feature and open its mobile command panel.</p>
+            </div>
+            <small id="feature-command-count">0 ready</small>
+          </div>
+          <div class="feature-toolbar">
+            <input id="feature-search" placeholder="Search features, APIs, systems..." />
+            <select id="feature-category">
+              <option value="all">All</option>
+            </select>
+          </div>
+          <div id="feature-command-grid" class="feature-cards" style="margin-top:12px"></div>
+        </section>
         <div id="mobile-system-detail" class="system-command"></div>
+        <div id="mobile-feature-detail" class="system-command"></div>
       </section>
 
       <section class="view" data-view="settings">
@@ -3115,6 +3242,196 @@
         ["Real Data / No Mock Intelligence Rules", "settings"],
       ];
 
+      const featureEndpointByKey = {
+        lifeOs: "/api/ai/life-os",
+        chief: "/api/ai/chief-of-staff",
+        digitalTwin: "/api/ai/digital-twin",
+        relationships: "/api/relationships",
+        future: "/api/predictions",
+        atlas: "/api/ai/memory-atlas",
+        timeMachine: "/api/ai/memory-time-machine",
+        decisions: "/api/ai/decision-intelligence",
+        opportunities: "/api/opportunities",
+        futureSelf: "/api/future-self",
+        capture: "/api/ai/autonomous-capture",
+        agent: "/api/ai/autonomous-life-agent",
+        advisors: "/api/ai/board-of-advisors?query=Should%20I%20continue%20NeuroNest%3F",
+        graph: "/api/ai/graph",
+        places: "/api/passive-places/visits",
+        settings: "/api/account/status",
+      };
+
+      const featureViewByKey = {
+        lifeOs: "systems",
+        chief: "systems",
+        digitalTwin: "profile",
+        relationships: "systems",
+        future: "systems",
+        atlas: "map",
+        timeMachine: "replay",
+        decisions: "systems",
+        opportunities: "systems",
+        futureSelf: "systems",
+        capture: "memories",
+        agent: "systems",
+        advisors: "systems",
+        graph: "graph",
+        places: "settings",
+        settings: "settings",
+      };
+
+      const featureEndpointOverrides = {
+        "Google Login / Auth System": "/api/me",
+        "Google Maps API Integration": "/api/config",
+        "Google Ratings": "/api/ai/memory-atlas",
+        "Google Map View": "/api/ai/memory-atlas",
+        "AI Chat Tab": "/api/chat/history",
+        "Multilingual AI Chat": "/api/ai/status",
+        "Hinglish / Mixed-Language Understanding": "/api/ai/status",
+        "AI Voice Assistant": "/api/ai/multimodal",
+        "Voice Memory Capture": "/api/ai/multimodal",
+        "Screenshot Memory AI": "/api/ai/multimodal",
+        "OCR Screenshot Extraction": "/api/ai/multimodal",
+        "Smart Memory Cards": "/api/entries",
+        "Memory Hub": "/api/entries",
+        "Memory Search": "/api/entries",
+        "Semantic Memory Search": "/api/ai/timeline",
+        "Memory Embeddings": "/api/ai/status",
+        "Vector Memory Search": "/api/ai/timeline",
+        "Unified Memory Object System": "/api/ai/timeline",
+        "Timeline Engine": "/api/ai/timeline",
+        "Real Memory Timeline": "/api/ai/timeline",
+        "Timeline Filters": "/api/ai/timeline",
+        "Memory Replay": "/api/ai/replay",
+        "Memory Replay 2.0": "/api/ai/replay",
+        "Life Replay": "/api/ai/replay",
+        "Passive Place Memory": "/api/passive-places/settings",
+        "Place Memory Storage": "/api/passive-places/visits",
+        "Passive Location Visit Detection": "/api/passive-places/visits",
+        "Place Timeline Integration": "/api/ai/timeline",
+        "Digital Twin V4": "/api/ai/digital-twin",
+        "AI Memory DNA": "/api/ai/dna",
+        "Profile & Identity Hub": "/api/ai/profile",
+        "Profile Avatar Integration": "/api/ai/profile",
+        "AI Assistant Avatar System": "/api/ai/profile",
+        "AI Auto Memory Engine": "/api/ai/memory-engine",
+        "AI Memory Stream Engine": "/api/ai/memory-engine",
+        "Relationship Graph": "/api/relationships/graph",
+        "Relationship Rebuild": "/api/relationships",
+        "Relationship Search Fix": "/api/debug/relationships/graph",
+        "Reconnect Suggestions": "/api/relationships/reconnect",
+        "Future Intelligence Dashboard": "/api/predictions",
+        "Life Simulation Engine": "/api/life-simulation?q=What%20if%20I%20focused%20on%20NeuroNest%3F",
+        "Goal Coach": "/api/ai/chief-of-staff",
+        "Goal Alignment Engine": "/api/ai/chief-of-staff",
+        "Daily Missions": "/api/ai/chief-of-staff",
+        "Weekly Review": "/api/ai/life-os",
+        "Autonomous Intelligence Core V3": "/api/ai/autonomous-core-v3",
+        "Learning Engine V2": "/api/ai/learning-engine",
+        "Intelligence Core V1": "/api/ai/intelligence-core",
+        "Personal Knowledge Graph": "/api/ai/autonomous-core-v3",
+        "Context Fusion Engine": "/api/ai/context-chains",
+        "AI Memory Resurfacing Engine": "/api/ai/resurfacing",
+        "Forgotten Idea Detection": "/api/ai/resurfacing",
+        "Forgotten Gold / Memory Rediscovery": "/api/ai/resurfacing",
+        "Proactive AI Notifications": "/api/ai/memory-engine",
+        "AI Daily Recap": "/api/ai/recap",
+        "Smart Journal Mode": "/api/ai/journal",
+        "Deep Focus Mode": "/api/ai/chief-of-staff",
+        "Productivity Analysis Engine": "/api/predictions/productivity",
+        "Behavior Prediction Engine": "/api/predictions",
+        "Pattern Analysis Engine": "/api/ai/patterns",
+        "Emotional Recall Engine": "/api/predictions/mood",
+        "Productivity Recall Engine": "/api/predictions/productivity",
+        "Goal Reconnection Service": "/api/ai/chief-of-staff",
+        "Idea Rediscovery Service": "/api/opportunities",
+        "Memory Scoring Engine": "/api/ai/scores",
+        "Memory Importance Scoring": "/api/ai/scores",
+        "Memory DNA Service": "/api/ai/dna",
+        "AI Insight Engine": "/api/ai/memory-engine",
+        "Multimodal Memory System": "/api/ai/multimodal",
+        "Voice Intelligence": "/api/ai/multimodal",
+        "Screenshot Intelligence": "/api/ai/multimodal",
+        "Image / Visual Memory Support": "/api/ai/multimodal",
+        "AI Relationship Engine": "/api/relationships",
+        "AI Prediction Engine": "/api/predictions",
+        "AI Board of Advisors": "/api/ai/board-of-advisors?query=Should%20I%20continue%20NeuroNest%3F",
+        "Strategist Advisor": "/api/ai/board-of-advisors?query=Should%20I%20continue%20NeuroNest%3F",
+        "Coach Advisor": "/api/ai/board-of-advisors?query=What%20should%20I%20do%20today%3F",
+        "Psychologist Advisor": "/api/ai/board-of-advisors?query=What%20patterns%20are%20affecting%20me%3F",
+        "Productivity Expert Advisor": "/api/ai/board-of-advisors?query=How%20can%20I%20improve%20productivity%3F",
+        "Relationship Advisor": "/api/ai/board-of-advisors?query=Which%20relationships%20need%20attention%3F",
+        "Career Advisor": "/api/ai/board-of-advisors?query=What%20career%20opportunity%20is%20strongest%3F",
+        "Combined Advisor Recommendation": "/api/ai/board-of-advisors?query=What%20should%20I%20focus%20on%3F",
+        "AI Systems Dashboard": "/api/ai/life-os",
+        "Super Admin Control Center": "/api/account/status",
+        "Admin Login / Access Code": "/api/account/status",
+        "Super Admin Dashboard": "/api/account/status",
+        "User Management": "/api/account/status",
+        "User Inspection Panel": "/api/account/status",
+        "Admin Analytics": "/api/account/status",
+        "Database Explorer": "/api/account/status",
+        "Security Center": "/api/account/status",
+        "Announcement Center": "/api/account/status",
+        "Admin Profile Hub": "/api/account/status",
+        "Admin Sync System": "/api/account/status",
+        "Advanced Security Layer": "/api/account/status",
+        "RBAC Roles": "/api/account/status",
+        "Owner / Super Admin Permissions": "/api/account/status",
+        "Secure Session Handling": "/api/account/status",
+        "Audit Logging": "/api/account/status",
+        "Upload Security": "/api/account/status",
+        "AI Abuse Protection": "/api/account/status",
+        "Rate Limiting": "/api/health",
+        "Secret Scan Script": "/api/health",
+        "Supabase Integration": "/api/health",
+        "Supabase pgvector Support": "/api/ai/status",
+        "Supabase Storage Support": "/api/health",
+        "Shared Warehouse Data Layer": "/api/health",
+        "Render Deployment Setup": "/api/health",
+        "GitHub Deployment Setup": "/api/health",
+        "Health Endpoints": "/api/health",
+        "Production Environment Config": "/api/config",
+        "Groq AI Provider Support": "/api/ai/status",
+        "OpenAI Provider Support": "/api/ai/status",
+        "AI Chat Like ChatGPT": "/api/chat/history",
+        "Memory-Aware AI Chat": "/api/chat/history",
+        "Evidence-Based AI Answers": "/api/chat/history",
+        "Relationship-Aware AI Chat": "/api/relationships",
+        "Prediction-Aware AI Chat": "/api/predictions",
+        "Life OS-Aware AI Chat": "/api/ai/life-os",
+        "Board of Advisors-Aware AI Chat": "/api/ai/board-of-advisors?query=What%20should%20I%20focus%20on%3F",
+        "Real Data / No Mock Intelligence Rules": "/api/health",
+      };
+
+      function featureCategory(feature) {
+        if (/admin|security|rbac|audit|upload|rate|secret|supabase|warehouse|render|github|health|config/i.test(feature)) return "Admin & Security";
+        if (/place|map|atlas|google|location|geo/i.test(feature)) return "Places";
+        if (/relationship|advisor|people|reconnect/i.test(feature)) return "Relationships";
+        if (/future|prediction|opportunity|simulation|decision|goal|mission|chief|coach/i.test(feature)) return "Future & Goals";
+        if (/capture|screenshot|voice|ocr|multimodal|image|auto memory/i.test(feature)) return "Capture";
+        if (/animation|gsap|cinematic|orb|particle|transition|profile|avatar|responsive|sidebar|hover|loading/i.test(feature)) return "Experience";
+        if (/chat|language|hinglish|openai|groq|assistant/i.test(feature)) return "AI Chat";
+        return "Memory OS";
+      }
+
+      const featureCatalog = pcFeatureParity.map(([title, key]) => {
+        const system = mobileSystemDefinitions.find((item) => item.key === key);
+        return {
+          id: title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+          title,
+          key,
+          category: featureCategory(title),
+          endpoint: featureEndpointOverrides[title] || system?.endpoint || featureEndpointByKey[key] || "/api/health",
+          view: featureViewByKey[key] || "systems",
+          systemTitle: system?.title || "Shared NeuroNest API",
+          label: system?.label || "NN",
+        };
+      });
+
+      let activeFeatureCategory = "all";
+      let activeFeatureSearch = "";
+
       async function safeApi(path, options = {}, fallback = null) {
         try {
           return await api(path, options);
@@ -3223,19 +3540,134 @@
         const target = q("#feature-parity-list");
         if (!target) return;
         q("#parity-count").textContent = `${pcFeatureParity.length} linked`;
-        target.innerHTML = pcFeatureParity.map(([feature, key]) => {
-          const definition = mobileSystemDefinitions.find((item) => item.key === key);
+        target.innerHTML = featureCatalog.map((feature) => {
           return `
-            <button class="parity-row" data-parity-key="${key}" type="button">
+            <button class="parity-row" data-feature-id="${feature.id}" type="button">
               <span class="parity-dot"></span>
-              <strong>${escapeHtml(feature)}</strong>
-              <small>${escapeHtml(definition?.title || "Shared API")}</small>
+              <strong>${escapeHtml(feature.title)}</strong>
+              <small>${escapeHtml(feature.systemTitle)}</small>
             </button>
           `;
         }).join("");
-        qa("[data-parity-key]", target).forEach((button) => {
-          button.onclick = () => renderSystemDetail(button.dataset.parityKey);
+        qa("[data-feature-id]", target).forEach((button) => {
+          button.onclick = () => openFeatureDetail(button.dataset.featureId);
         });
+      }
+
+      function setupFeatureCategoryOptions() {
+        const select = q("#feature-category");
+        if (!select || select.dataset.ready) return;
+        const categories = ["all", ...new Set(featureCatalog.map((feature) => feature.category).sort())];
+        select.innerHTML = categories.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category === "all" ? "All" : category)}</option>`).join("");
+        select.dataset.ready = "true";
+      }
+
+      function featureMatches(feature) {
+        const query = activeFeatureSearch.trim().toLowerCase();
+        const inCategory = activeFeatureCategory === "all" || feature.category === activeFeatureCategory;
+        if (!query) return inCategory;
+        return inCategory && `${feature.title} ${feature.category} ${feature.systemTitle} ${feature.endpoint}`.toLowerCase().includes(query);
+      }
+
+      function renderFeatureCommandCenter() {
+        setupFeatureCategoryOptions();
+        const target = q("#feature-command-grid");
+        if (!target) return;
+        const features = featureCatalog.filter(featureMatches);
+        q("#feature-command-count").textContent = `${features.length}/${featureCatalog.length} ready`;
+        target.innerHTML = features.map((feature) => `
+          <button class="feature-card" data-feature-id="${feature.id}" type="button">
+            <i>${escapeHtml(feature.label)}</i>
+            <span>
+              <strong>${escapeHtml(feature.title)}</strong>
+              <small>${escapeHtml(feature.systemTitle)} - ${escapeHtml(feature.category)}</small>
+              <span class="feature-meta">
+                <em class="feature-status">shared data</em>
+                <em class="endpoint-pill">${escapeHtml(feature.endpoint.replace(/^\/api\//, "api/"))}</em>
+              </span>
+            </span>
+          </button>
+        `).join("") || `<article class="advisor-card"><strong>No feature matched</strong><small>Try searching memory, place, future, admin, advisor, or screenshot.</small></article>`;
+        qa("[data-feature-id]", target).forEach((button) => {
+          button.onclick = () => openFeatureDetail(button.dataset.featureId);
+        });
+        animateCards(target);
+      }
+
+      async function openFeatureDetail(featureId) {
+        const feature = featureCatalog.find((item) => item.id === featureId);
+        if (!feature) return;
+        const target = q("#mobile-feature-detail");
+        if (!target) return;
+        target.innerHTML = `
+          <section class="panel">
+            <div class="system-panel-head">
+              <div>
+                <h2>${escapeHtml(feature.title)}</h2>
+                <p class="muted">Syncing ${escapeHtml(feature.endpoint)} from the shared NeuroNest backend...</p>
+              </div>
+              <span class="feature-status">loading</span>
+            </div>
+          </section>
+        `;
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        const data = await safeApi(feature.endpoint, {}, null);
+        const systemDefinition = mobileSystemDefinitions.find((item) => item.key === feature.key) || { title: feature.systemTitle, hint: feature.category };
+        const summary = systemSummary(systemDefinition, data);
+        const cards = pickFirstArray(data, [
+          "entries",
+          "memories",
+          "events",
+          "timeline",
+          "relationships",
+          "topPeople",
+          "reconnect",
+          "predictions",
+          "opportunities",
+          "goals",
+          "tasks",
+          "decisions",
+          "insights",
+          "scores",
+          "points",
+          "clusters",
+          "alerts",
+          "recommendations",
+          "advisors",
+          "chains",
+          "patterns",
+          "horizons",
+          "captures",
+          "samples",
+        ]);
+        target.innerHTML = `
+          <section class="panel">
+            <div class="system-panel-head">
+              <div>
+                <h2>${escapeHtml(feature.title)}</h2>
+                <p class="muted">${escapeHtml(summary)}</p>
+              </div>
+              <span class="feature-status">${data ? "live" : "empty"}</span>
+            </div>
+            <div class="feature-meta">
+              <em class="endpoint-pill">${escapeHtml(feature.endpoint)}</em>
+              <em class="feature-status">${escapeHtml(feature.category)}</em>
+              <em class="feature-status">${cards.length} evidence cards</em>
+            </div>
+            <div class="feature-detail-actions">
+              <button class="chip active" data-open="${feature.view}" type="button">Open ${escapeHtml(feature.view)}</button>
+              <button class="chip" data-feature-refresh="${feature.id}" type="button">Refresh</button>
+              <button class="chip" data-feature-ask="${escapeHtml(feature.title)}" type="button">Ask AI</button>
+            </div>
+            <div class="system-command" style="margin-top:14px">
+              ${renderMiniCards(cards, "This feature is wired to the shared backend. Add real memories or activity to unlock evidence.")}
+            </div>
+          </section>
+        `;
+        qa("[data-open]", target).forEach((button) => button.addEventListener("click", () => switchView(button.dataset.open)));
+        q("[data-feature-refresh]", target)?.addEventListener("click", () => openFeatureDetail(feature.id));
+        q("[data-feature-ask]", target)?.addEventListener("click", () => runSemanticPrompt(`Open ${feature.title} and explain what real evidence exists.`));
+        animateCards(target);
       }
 
       function renderLifeOsBriefing() {
@@ -3357,6 +3789,7 @@
         mobileSystems.relationshipGraph = await safeApi("/api/relationships/graph", {}, null);
         renderSystemGrid();
         renderFeatureParity();
+        renderFeatureCommandCenter();
         renderLifeOsBriefing();
         renderSystemDetail("lifeOs");
       }
@@ -3388,6 +3821,8 @@
           qa("[data-open-card]").forEach((card) => { card.onclick = () => switchView(card.dataset.openCard); });
           await hydrateMobileSystems();
         } catch (error) {
+          renderFeatureParity();
+          renderFeatureCommandCenter();
           notify(friendlyError(error));
         }
       }
@@ -3886,6 +4321,14 @@
         q("#time-machine-form").addEventListener("submit", (event) => {
           event.preventDefault();
           void runTimeMachineQuery(q("#time-machine-query").value);
+        });
+        q("#feature-search")?.addEventListener("input", (event) => {
+          activeFeatureSearch = event.target.value || "";
+          renderFeatureCommandCenter();
+        });
+        q("#feature-category")?.addEventListener("change", (event) => {
+          activeFeatureCategory = event.target.value || "all";
+          renderFeatureCommandCenter();
         });
         q("#enable-passive-tracking").addEventListener("click", () => setPassiveTracking(true));
         q("#disable-passive-tracking").addEventListener("click", () => setPassiveTracking(false));
