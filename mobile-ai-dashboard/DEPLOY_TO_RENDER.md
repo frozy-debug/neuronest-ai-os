@@ -1,122 +1,110 @@
 # Deploy NeuroNest Mobile On Render
 
-Use this folder only:
+Use this folder as the mobile app:
 
 ```text
-mobile-ai-dashboard
+mobile-ai-dashboard/
 ```
 
-Do not upload `.env`, `data/db.json`, `server.log`, `server.err`, or `node_modules`.
+The mobile app is a separate Render service, but it proxies real authenticated API
+traffic to the PC NeuroNest backend through `NEURONEST_API_BASE_URL`. That keeps
+PC, mobile, Supabase/warehouse, and Super Admin on the same data source.
 
-## 1. Push To GitHub
+## Render Web Service
 
-1. Create a GitHub repo, for example `neuronest-mobile-ai`.
-2. Upload the contents of `mobile-ai-dashboard`.
-3. Confirm these files are in the GitHub repo:
+Because the repository contains multiple apps, create the service from the full
+GitHub repository and use:
 
 ```text
-server.js
-package.json
-render.yaml
-public/index.html
-public/assets/neuronest-logo.png
+Root Directory: leave empty
+Build Command: cd mobile-ai-dashboard && npm install
+Start Command: node mobile-ai-dashboard/server.js
+Health Check Path: /api/health
 ```
 
-## 2. Create Render Web Service
+Do not set `PORT`; Render provides it automatically.
 
-1. Open Render Dashboard.
-2. New > Web Service.
-3. Connect the GitHub repo.
-4. Use:
+## Environment Variables
 
-```text
-Runtime: Node
-Build Command: leave empty
-Start Command: node server.js
-```
-
-If you uploaded the full parent project, set Render Root Directory to:
-
-```text
-mobile-ai-dashboard
-```
-
-If you uploaded only this folder's contents, leave Root Directory empty.
-
-## 3. Add Render Environment Variables
-
-Add these in Render > Environment:
+Required on the mobile Render service:
 
 ```text
 NODE_ENV=production
 SESSION_SECRET=make-a-long-random-secret
-GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_MAPS_API_KEY=your-google-maps-api-key
+GOOGLE_MAPS_API_KEY=your-google-maps-browser-key
+NEURONEST_API_BASE_URL=https://your-pc-service.onrender.com
+NEURONEST_MOBILE_URL=https://your-mobile-service.onrender.com
+NEURONEST_ADMIN_URL=https://your-admin-service.onrender.com
+RATE_LIMIT_PER_MINUTE=120
+MAX_REQUEST_BODY_BYTES=25000000
 ```
 
-The current app uses Google ID-token login, so `GOOGLE_CLIENT_SECRET` is stored only for future OAuth code-flow support. Never put it in HTML or public JavaScript.
+Keep OpenAI, Groq, Supabase service role, pgvector, and private AI keys on the
+PC backend Render service unless you intentionally run mobile in standalone
+backend mode. In the shared-backend setup, mobile calls PC APIs and never exposes
+private AI/database keys to the browser.
 
-## 4. Configure Google Login
+## Google OAuth
 
-After Render gives you a URL like:
+Fix `origin_mismatch` by adding every active origin to the same Google OAuth Web
+Client used by NeuroNest.
+
+Local development origins:
 
 ```text
-https://neuronest-mobile-ai.onrender.com
+http://127.0.0.1:3002
+http://localhost:3002
 ```
 
-Go to:
+Production origins:
 
 ```text
-Google Cloud Console > Google Auth Platform > Clients > your Web client
-```
-
-Add this under Authorized JavaScript origins:
-
-```text
-https://neuronest-mobile-ai.onrender.com
+https://your-mobile-service.onrender.com
+https://your-pc-service.onrender.com
+https://your-admin-service.onrender.com
 ```
 
 Do not add a trailing `/`.
 
-If the app is still in Testing, add your friend's Gmail as a test user or publish the app.
+## Google Maps Key
 
-## 5. Configure Google Maps Key
-
-Go to:
+Add these website restrictions to the Maps browser key:
 
 ```text
-Google Cloud Console > APIs & Services > Credentials > your Maps API key
+http://127.0.0.1:3002/*
+http://localhost:3002/*
+https://your-mobile-service.onrender.com/*
+https://your-pc-service.onrender.com/*
 ```
 
-Application restrictions:
-
-```text
-Websites
-```
-
-Allowed website:
-
-```text
-https://neuronest-mobile-ai.onrender.com/*
-```
-
-API restrictions:
+Enable:
 
 ```text
 Maps JavaScript API
 Places API
 Places API (New)
+Geocoding API
 ```
 
-Save, then redeploy or refresh the Render site.
+## Smoke Tests
 
-## 6. Share
-
-Send your friend the Render URL:
+After deploy:
 
 ```text
-https://neuronest-mobile-ai.onrender.com
+GET https://your-mobile-service.onrender.com/api/health
+GET https://your-mobile-service.onrender.com/api/config
 ```
 
-Free Render services can sleep after inactivity, so the first load can take a little time.
+Then verify:
+
+1. Google login works.
+2. Create a memory on mobile.
+3. Confirm the memory appears in PC.
+4. Confirm the memory appears in Super Admin.
+5. Upload screenshot on mobile.
+6. Record voice note on mobile.
+7. Enable passive place memory while the app is open.
+8. Check Relationship, Future Intelligence, Replay, Atlas, Digital Twin, and Life OS screens.
+9. Confirm no secrets appear in browser source or network JSON.

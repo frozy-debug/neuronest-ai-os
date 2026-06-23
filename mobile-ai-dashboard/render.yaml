@@ -3,7 +3,7 @@ services:
     name: neuronest-mobile-ai
     runtime: node
     plan: free
-    buildCommand: ""
+    buildCommand: "npm install"
     startCommand: "node server.js"
     healthCheckPath: "/api/health"
     envVars:
@@ -16,4 +16,6 @@ services:
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: NEURONEST_API_BASE_URL
         sync: false

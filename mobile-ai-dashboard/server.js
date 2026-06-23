@@ -9,7 +9,13 @@ const __dirname = path.dirname(__filename);
 
 loadEnv();
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 3002);
+const NEURONEST_API_BASE_URL = String(
+  process.env.NEURONEST_API_BASE_URL ||
+  process.env.MAIN_APP_API_URL ||
+  process.env.PC_API_BASE_URL ||
+  "",
+).replace(/\/+$/, "");
 const ALLOW_OFFLINE_GOOGLE_FALLBACK =
   process.env.ALLOW_OFFLINE_GOOGLE_FALLBACK !== "false" &&
   process.env.NODE_ENV !== "production" &&
@@ -45,6 +51,66 @@ function getGoogleClientId() {
 function getGoogleMapsApiKey() {
   loadEnv();
   return process.env.GOOGLE_MAPS_API_KEY || "";
+}
+
+function shouldProxyApi(req, url) {
+  if (!NEURONEST_API_BASE_URL) return false;
+  if (!url.pathname.startsWith("/api/")) return false;
+  if (url.pathname === "/api/health" || url.pathname === "/api/mobile-health") return false;
+  return true;
+}
+
+function readRawBody(req, limitBytes = 25_000_000) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > limitBytes) {
+        reject(new Error("Request body is too large."));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
+async function proxyApiRequest(req, res) {
+  const upstreamUrl = `${NEURONEST_API_BASE_URL}${req.url}`;
+  const body = ["GET", "HEAD"].includes(req.method || "GET") ? undefined : await readRawBody(req);
+  const headers = { ...req.headers };
+  delete headers.host;
+  delete headers.connection;
+  delete headers["content-length"];
+  delete headers["accept-encoding"];
+
+  const upstreamResponse = await fetch(upstreamUrl, {
+    method: req.method,
+    headers,
+    body,
+    redirect: "manual",
+  });
+
+  const responseHeaders = {};
+  for (const [key, value] of upstreamResponse.headers.entries()) {
+    const lower = key.toLowerCase();
+    if (["content-encoding", "content-length", "transfer-encoding", "connection"].includes(lower)) continue;
+    responseHeaders[key] = value;
+  }
+
+  const setCookies = typeof upstreamResponse.headers.getSetCookie === "function"
+    ? upstreamResponse.headers.getSetCookie()
+    : [];
+  const fallbackCookie = upstreamResponse.headers.get("set-cookie");
+  if (setCookies.length) responseHeaders["set-cookie"] = setCookies;
+  else if (fallbackCookie) responseHeaders["set-cookie"] = fallbackCookie;
+
+  const payload = Buffer.from(await upstreamResponse.arrayBuffer());
+  res.writeHead(upstreamResponse.status, responseHeaders);
+  res.end(payload);
 }
 
 function readDb() {
@@ -195,83 +261,7 @@ function setEntryDeleted(userId, entryId, deleted) {
 }
 
 function demoMemoryRecords() {
-  const now = new Date();
-  const isoAt = (hoursAgo) => new Date(now.getTime() - hoursAgo * 60 * 60 * 1000).toISOString();
-
-  return [
-    {
-      id: "demo-morning-plan",
-      kind: "note",
-      title: "Morning planning note",
-      body: "Saved goals for coding, gym, and a cleaner launch checklist.",
-      meta: "9:15 AM",
-      tags: ["productivity", "planning", "coding"],
-      createdAt: isoAt(10),
-      mood: "focused",
-      score: 88,
-      location: { lat: 30.3782, lng: 76.7767, label: "Home desk" },
-    },
-    {
-      id: "demo-blue-bottle",
-      kind: "place",
-      title: "Blue Bottle Cafe",
-      body: "Focus-friendly cafe visited repeatedly while working on AI ideas.",
-      meta: "Cafe",
-      tags: ["cafes", "focus", "startup"],
-      createdAt: isoAt(8),
-      mood: "inspired",
-      score: 82,
-      location: { lat: 30.3646, lng: 76.7819, label: "Cafe cluster" },
-    },
-    {
-      id: "demo-business-idea",
-      kind: "memory",
-      title: "AI tutoring platform idea",
-      body: "Startup idea connected to saved February project notes and screenshots.",
-      meta: "Idea",
-      tags: ["AI", "startup", "education"],
-      createdAt: isoAt(5),
-      mood: "excited",
-      score: 91,
-      location: { lat: 30.3625, lng: 76.7714, label: "Idea hotspot" },
-    },
-    {
-      id: "demo-workout",
-      kind: "memory",
-      title: "Upper Body Workout",
-      body: "Training plan and progress notes for the evening session.",
-      meta: "Health",
-      tags: ["fitness", "routine", "evening"],
-      createdAt: isoAt(2),
-      mood: "energized",
-      score: 74,
-      location: { lat: 30.3717, lng: 76.7891, label: "Gym zone" },
-    },
-    {
-      id: "demo-sorrento",
-      kind: "place",
-      title: "Sorrento Restaurant",
-      body: "Dinner memory with pasta note, location, and ambience comment.",
-      meta: "Restaurant",
-      tags: ["restaurant", "food", "evening"],
-      createdAt: isoAt(26),
-      mood: "happy",
-      score: 77,
-      location: { lat: 30.3749, lng: 76.7728, label: "Dinner area" },
-    },
-    {
-      id: "demo-voice-launch",
-      kind: "voice",
-      title: "Launch idea memo",
-      body: "Quick voice thought about turning NeuroNest into a full assistant.",
-      meta: "1:18",
-      tags: ["voice", "product", "AI"],
-      createdAt: isoAt(30),
-      mood: "curious",
-      score: 84,
-      location: { lat: 30.3813, lng: 76.7693, label: "Walk route" },
-    },
-  ];
+  return [];
 }
 
 function userEntryRecords(userId) {
@@ -879,7 +869,7 @@ function readBody(req) {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1_000_000) {
+      if (body.length > 15_000_000) {
         reject(new Error("Request body is too large."));
         req.destroy();
       }
@@ -959,6 +949,27 @@ async function verifyGoogleCredential(credential) {
 async function handleApi(req, res, url) {
   const session = getSession(req);
 
+  if (req.method === "GET" && (url.pathname === "/api/health" || url.pathname === "/api/mobile-health")) {
+    return sendJson(res, 200, {
+      ok: true,
+      service: "neuronest-mobile",
+      upstreamConfigured: Boolean(NEURONEST_API_BASE_URL),
+      upstream: NEURONEST_API_BASE_URL ? "pc-neuronest-api" : "local-mobile-fallback",
+    });
+  }
+
+  if (shouldProxyApi(req, url)) {
+    try {
+      await proxyApiRequest(req, res);
+      return;
+    } catch (error) {
+      return sendJson(res, 502, {
+        error: "Mobile app could not reach the main NeuroNest API.",
+        detail: error.message,
+      });
+    }
+  }
+
   if (req.method === "GET" && url.pathname === "/api/config") {
     const googleClientId = getGoogleClientId();
     const googleMapsApiKey = getGoogleMapsApiKey();
@@ -973,10 +984,6 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/me") {
     return sendJson(res, 200, { user: session?.user || null });
-  }
-
-  if (req.method === "GET" && url.pathname === "/api/health") {
-    return sendJson(res, 200, { ok: true });
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/google") {

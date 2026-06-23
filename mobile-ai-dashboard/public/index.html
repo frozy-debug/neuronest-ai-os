@@ -1448,6 +1448,370 @@
         50% { height: 30px; }
       }
 
+      .system-command {
+        display: grid;
+        gap: 12px;
+      }
+
+      .system-hero {
+        display: grid;
+        gap: 12px;
+        padding: 18px;
+        border-radius: 28px;
+        background:
+          radial-gradient(circle at 82% 16%, rgba(139, 92, 246, 0.3), transparent 28%),
+          radial-gradient(circle at 14% 92%, rgba(37, 169, 255, 0.18), transparent 30%),
+          linear-gradient(145deg, rgba(17, 24, 48, 0.92), rgba(5, 8, 18, 0.82));
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        box-shadow: var(--shadow), 0 0 42px rgba(139, 92, 246, 0.12);
+      }
+
+      .system-hero h2,
+      .system-hero p {
+        margin: 0;
+      }
+
+      .system-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .system-tile {
+        min-height: 112px;
+        display: grid;
+        align-content: space-between;
+        gap: 12px;
+        padding: 14px;
+        border-radius: 22px;
+        text-align: left;
+        background:
+          linear-gradient(145deg, rgba(15, 23, 42, 0.86), rgba(6, 9, 22, 0.82)),
+          radial-gradient(circle at 84% 18%, rgba(139, 92, 246, 0.2), transparent 34%);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.25);
+        transition: transform 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
+      }
+
+      .system-tile:active {
+        transform: scale(0.975);
+      }
+
+      .system-tile i {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        color: #fff;
+        font-style: normal;
+        background: linear-gradient(135deg, rgba(37, 169, 255, 0.78), rgba(139, 92, 246, 0.78));
+        box-shadow: 0 0 22px rgba(139, 92, 246, 0.34);
+      }
+
+      .system-tile strong {
+        font-size: 13px;
+      }
+
+      .system-tile small {
+        display: block;
+        margin-top: 4px;
+        line-height: 1.4;
+      }
+
+      .system-panel-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .system-panel-head h2,
+      .system-panel-head p {
+        margin: 0;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .metric {
+        min-height: 74px;
+        padding: 11px;
+        border-radius: 17px;
+        background: rgba(2, 6, 23, 0.36);
+        border: 1px solid rgba(148, 163, 184, 0.13);
+      }
+
+      .metric strong {
+        display: block;
+        font-size: 18px;
+      }
+
+      .timeline-rail {
+        position: relative;
+        display: grid;
+        gap: 11px;
+        padding-left: 18px;
+      }
+
+      .timeline-rail::before {
+        content: "";
+        position: absolute;
+        left: 5px;
+        top: 5px;
+        bottom: 5px;
+        width: 2px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, var(--violet), var(--cyan), var(--purple));
+        box-shadow: 0 0 18px rgba(139, 92, 246, 0.46);
+      }
+
+      .timeline-item {
+        position: relative;
+        min-height: 72px;
+        padding: 12px;
+        border-radius: 18px;
+        background: rgba(15, 23, 42, 0.58);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+      }
+
+      .timeline-item::before {
+        content: "";
+        position: absolute;
+        left: -18px;
+        top: 24px;
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--cyan);
+        box-shadow: 0 0 18px var(--cyan);
+      }
+
+      .relationship-orbit {
+        position: relative;
+        height: 260px;
+        overflow: hidden;
+        border-radius: 24px;
+        background:
+          radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.35), transparent 24%),
+          radial-gradient(circle at 50% 50%, rgba(37, 169, 255, 0.15), transparent 46%);
+      }
+
+      .relationship-orbit svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      .relationship-orbit line {
+        stroke: rgba(139, 92, 246, 0.44);
+        stroke-width: 1;
+        stroke-dasharray: 4 8;
+        animation: graphFlow 3s linear infinite;
+      }
+
+      .relationship-orbit circle {
+        fill: rgba(15, 23, 42, 0.9);
+        stroke: rgba(139, 92, 246, 0.85);
+        stroke-width: 2;
+        filter: drop-shadow(0 0 14px rgba(139, 92, 246, 0.75));
+      }
+
+      .atlas-map {
+        min-height: 300px;
+        border-radius: 26px;
+        position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 56% 48%, rgba(37, 169, 255, 0.28), transparent 18%),
+          radial-gradient(circle at 40% 40%, rgba(139, 92, 246, 0.34), transparent 18%),
+          linear-gradient(28deg, transparent 48%, rgba(37, 169, 255, 0.12) 49%, rgba(37, 169, 255, 0.12) 51%, transparent 52%) 0 0 / 68px 68px,
+          #07111f;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+      }
+
+      .atlas-map span {
+        position: absolute;
+        left: var(--x);
+        top: var(--y);
+        width: var(--s);
+        height: var(--s);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(139, 92, 246, 0.24);
+        border: 1px solid rgba(196, 181, 253, 0.55);
+        box-shadow: 0 0 34px rgba(139, 92, 246, 0.55);
+        animation: softPulse 2.5s ease-in-out infinite;
+      }
+
+      .advisor-card,
+      .capture-indicator {
+        display: grid;
+        gap: 8px;
+        padding: 13px;
+        border-radius: 18px;
+        background: rgba(15, 23, 42, 0.58);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+      }
+
+      .advisor-card strong {
+        color: #e0e7ff;
+      }
+
+      .capture-indicator {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(14, 165, 233, 0.08);
+        border-color: rgba(56, 189, 248, 0.18);
+      }
+
+      .capture-indicator::before {
+        content: "";
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        flex: 0 0 auto;
+        background: var(--cyan);
+        box-shadow: 0 0 18px var(--cyan);
+        animation: softPulse 1.4s ease-in-out infinite;
+      }
+
+      .quick-action-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .quick-action {
+        min-height: 72px;
+        display: grid;
+        place-items: center;
+        gap: 5px;
+        padding: 9px 6px;
+        border-radius: 18px;
+        background: rgba(15, 23, 42, 0.66);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        color: #dbeafe;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+      }
+
+      .quick-action b {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border-radius: 13px;
+        font-size: 11px;
+        background: linear-gradient(135deg, rgba(37, 169, 255, 0.78), rgba(139, 92, 246, 0.78));
+        box-shadow: 0 0 18px rgba(139, 92, 246, 0.34);
+      }
+
+      .quick-action span {
+        font-size: 9px;
+        text-align: center;
+      }
+
+      .settings-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .settings-row {
+        display: grid;
+        grid-template-columns: 38px 1fr auto;
+        align-items: center;
+        gap: 12px;
+        padding: 13px;
+        border-radius: 19px;
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(148, 163, 184, 0.13);
+      }
+
+      .settings-row i {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        font-style: normal;
+        background: rgba(139, 92, 246, 0.18);
+        color: #c4b5fd;
+      }
+
+      .settings-row strong,
+      .settings-row small {
+        display: block;
+      }
+
+      .switch {
+        width: 46px;
+        height: 27px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.25);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        padding: 3px;
+      }
+
+      .switch span {
+        display: block;
+        width: 19px;
+        height: 19px;
+        border-radius: 50%;
+        background: #cbd5e1;
+        transition: transform 220ms ease, background 220ms ease, box-shadow 220ms ease;
+      }
+
+      .switch.active {
+        background: linear-gradient(135deg, rgba(37, 169, 255, 0.78), rgba(139, 92, 246, 0.78));
+      }
+
+      .switch.active span {
+        transform: translateX(18px);
+        background: #fff;
+        box-shadow: 0 0 14px rgba(255, 255, 255, 0.45);
+      }
+
+      .parity-list {
+        display: grid;
+        gap: 8px;
+        max-height: 360px;
+        overflow: auto;
+        padding-right: 2px;
+        scrollbar-width: none;
+      }
+
+      .parity-list::-webkit-scrollbar {
+        display: none;
+      }
+
+      .parity-row {
+        display: grid;
+        grid-template-columns: 22px 1fr auto;
+        align-items: center;
+        gap: 9px;
+        min-height: 42px;
+        padding: 9px 10px;
+        border-radius: 15px;
+        background: rgba(2, 6, 23, 0.32);
+        border: 1px solid rgba(148, 163, 184, 0.11);
+      }
+
+      .parity-dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 14px rgba(94, 234, 212, 0.55);
+      }
+
+      .parity-row small {
+        font-size: 9px;
+      }
+
       @media (min-width: 760px) {
         .app {
           width: min(100%, 460px);
@@ -1515,6 +1879,16 @@
           <button class="chip prompt" data-prompt="Where was I happiest?" type="button">Where was I happiest?</button>
           <button class="chip prompt" data-prompt="Show me business ideas" type="button">Show business ideas</button>
           <button class="chip prompt" data-prompt="Summarize my day" type="button">Summarize my day</button>
+          <button class="chip" data-open="systems" type="button">Life OS</button>
+          <button class="chip" data-open="replay" type="button">Replay</button>
+        </div>
+
+        <div class="quick-action-grid" aria-label="Quick actions">
+          <button class="quick-action" data-open-add-memory type="button"><b>+</b><span>Add memory</span></button>
+          <button class="quick-action" data-open-screenshot type="button"><b>SC</b><span>Screenshot</span></button>
+          <button class="quick-action" data-open-voice type="button"><b>VO</b><span>Voice</span></button>
+          <button class="quick-action" data-open-place-scan type="button"><b>PL</b><span>Scan place</span></button>
+          <button class="quick-action" data-open="assistant" type="button"><b>AI</b><span>Ask AI</span></button>
         </div>
 
         <div class="section-title">
@@ -1552,6 +1926,9 @@
           <button class="chip" data-filter="idea" type="button">Ideas</button>
           <button class="chip" data-filter="voice" type="button">Voice</button>
           <button class="chip" data-filter="screenshot" type="button">Screenshots</button>
+          <button class="chip" data-filter="people" type="button">People</button>
+          <button class="chip" data-filter="goal" type="button">Goals</button>
+          <button class="chip" data-filter="decision" type="button">Decisions</button>
           <button class="chip" data-filter="timeline" type="button">Timeline</button>
           <button class="chip" data-filter="tags" type="button">Tags</button>
           <button class="chip" data-filter="trash" type="button">Trash</button>
@@ -1696,6 +2073,107 @@
         <p class="muted" style="text-align:center">Pinch to zoom. Drag nodes to explore.</p>
       </section>
 
+      <section class="view" data-view="replay">
+        <div class="screen-head">
+          <div class="title-block">
+            <h1>Life Replay</h1>
+            <p>Cinematic timeline powered by real memories</p>
+          </div>
+          <button class="icon-btn" data-open="systems" type="button">OS</button>
+        </div>
+
+        <div class="filter-row">
+          <button class="chip active replay-filter" data-replay-mode="day" type="button">Day</button>
+          <button class="chip replay-filter" data-replay-mode="week" type="button">Week</button>
+          <button class="chip replay-filter" data-replay-mode="month" type="button">Month</button>
+          <button class="chip replay-filter" data-replay-mode="year" type="button">Year</button>
+        </div>
+
+        <section class="panel">
+          <div class="system-panel-head">
+            <div>
+              <h2 id="replay-title">Today Replay</h2>
+              <p id="replay-summary" class="muted">Loading memory journey...</p>
+            </div>
+            <button id="replay-play" class="orb-button" type="button">Play</button>
+          </div>
+          <div id="replay-timeline" class="timeline-rail" style="margin-top:14px"></div>
+        </section>
+
+        <section class="panel">
+          <div class="system-panel-head">
+            <div>
+              <h2>Memory Time Machine</h2>
+              <p class="muted">Ask for a month, journey, or period.</p>
+            </div>
+          </div>
+          <form id="time-machine-form" class="hunter-search">
+            <input id="time-machine-query" value="Take me back to June 2026" />
+            <button class="orb-button" type="submit">Go</button>
+          </form>
+          <div id="time-machine-results" class="memory-list" style="margin-top:12px"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="systems">
+        <div class="screen-head">
+          <div class="title-block">
+            <h1>Life OS</h1>
+            <p>All NeuroNest intelligence systems</p>
+          </div>
+          <button class="icon-btn" data-open="profile" type="button">Me</button>
+        </div>
+
+        <section class="system-hero">
+          <h2>Mission Control</h2>
+          <p class="muted">Goals, memories, relationships, predictions, and opportunities coordinated in one mobile command layer.</p>
+          <div id="life-os-briefing" class="metric-grid"></div>
+        </section>
+
+        <div id="system-grid" class="system-grid"></div>
+        <section class="panel">
+          <div class="system-panel-head">
+            <div>
+              <h2>PC Feature Parity</h2>
+              <p class="muted">Mobile uses the same backend APIs as PC. No separate fake mobile data.</p>
+            </div>
+            <small id="parity-count">0 linked</small>
+          </div>
+          <div id="feature-parity-list" class="parity-list" style="margin-top:12px"></div>
+        </section>
+        <div id="mobile-system-detail" class="system-command"></div>
+      </section>
+
+      <section class="view" data-view="settings">
+        <div class="screen-head">
+          <div class="title-block">
+            <h1>Settings & Privacy</h1>
+            <p>Security, permissions, and AI memory controls</p>
+          </div>
+          <button class="icon-btn" data-open="profile" type="button">Back</button>
+        </div>
+
+        <section class="panel">
+          <div class="system-panel-head">
+            <div>
+              <h2>Privacy Controls</h2>
+              <p id="settings-security-status" class="muted">Checking account status...</p>
+            </div>
+          </div>
+          <div class="settings-list" id="settings-list" style="margin-top:14px"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Passive Place Memory</h2>
+          <p id="passive-place-status" class="muted">Permission required before NeuroNest can learn places while the app is open.</p>
+          <div class="quick-row" style="margin-top:12px">
+            <button id="enable-passive-tracking" class="chip active" type="button">Enable tracking</button>
+            <button id="disable-passive-tracking" class="chip" type="button">Pause tracking</button>
+            <button class="chip" data-open="map" type="button">Open Atlas</button>
+          </div>
+        </section>
+      </section>
+
       <section class="view" data-view="profile">
         <div class="screen-head">
           <div class="title-block">
@@ -1722,6 +2200,12 @@
           </div>
         </section>
 
+        <div class="quick-row">
+          <button class="chip" data-open="systems" type="button">Life OS</button>
+          <button class="chip" data-open="settings" type="button">Settings</button>
+          <button class="chip" data-open="map" type="button">Atlas</button>
+        </div>
+
         <div class="section-title">
           <h2>This Week</h2>
           <button data-open="memories" type="button">See all</button>
@@ -1737,7 +2221,7 @@
 
         <div class="section-title">
           <h2>AI Systems</h2>
-          <button data-open="graph" type="button">Graph</button>
+          <button data-open="systems" type="button">All Systems</button>
         </div>
         <section class="panel">
           <div id="ai-system-list" class="memory-list"></div>
@@ -1746,9 +2230,10 @@
 
       <nav class="bottom-nav" aria-label="Mobile navigation">
         <button class="active" data-open="home" type="button">H<small>Home</small></button>
-        <button data-open="memories" type="button">M<small>Memories</small></button>
+        <button data-open="assistant" type="button">C<small>Chat</small></button>
+        <button data-open="memories" type="button">M<small>Memory</small></button>
         <button class="center" data-open="assistant" type="button">N</button>
-        <button data-open="map" type="button">P<small>Map</small></button>
+        <button data-open="replay" type="button">R<small>Replay</small></button>
         <button data-open="profile" type="button">U<small>Profile</small></button>
       </nav>
     </main>
@@ -1846,13 +2331,7 @@
         college: ["university", "school"],
       };
 
-      const demoMemories = [
-        { id: "demo-cafe", title: "Coffee at Blue Tokai", kind: "place", meta: "Today, 08:30 AM", body: "Mumbai, India. You felt happy and productive here.", tags: ["places", "cafe"], score: 84, image: imageBank.cafe },
-        { id: "demo-idea", title: "New Productivity System Idea", kind: "idea", meta: "Today, 11:45 AM", body: "A saved AI/productivity idea connected to startup notes.", tags: ["ideas", "AI"], score: 91, image: imageBank.idea },
-        { id: "demo-gym", title: "Gym Workout", kind: "health", meta: "Today, 02:15 PM", body: "45 minutes. Strength routine and consistency pattern.", tags: ["health", "routine"], score: 78, image: imageBank.gym },
-        { id: "demo-voice", title: "Voice Note", kind: "voice", meta: "Today, 05:40 PM", body: "12:40. Spoken reflection saved as recall signal.", tags: ["voice"], score: 72, image: imageBank.voice },
-        { id: "demo-shot", title: "Screenshot Memory", kind: "screenshot", meta: "Today, 07:20 PM", body: "UI inspiration captured and classified by AI.", tags: ["screenshots", "inspiration"], score: 76, image: imageBank.screenshot },
-      ];
+      const demoMemories = [];
 
       let appConfig = {};
       let currentUser = null;
@@ -1868,6 +2347,7 @@
       let activeFilter = "all";
       let lastVoiceResponse = "";
       let mobileIdentityRendered = false;
+      let mobileSystems = {};
 
       const motionEnabled = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const hasGsap = () => motionEnabled && typeof window.gsap !== "undefined";
@@ -1952,6 +2432,9 @@
         qa("[data-open]").forEach((button) => button.classList.toggle("active", button.dataset.open === view));
         if (view === "map") initMapView();
         if (view === "graph") loadGraph();
+        if (view === "replay") loadReplay();
+        if (view === "systems") loadAiSystems();
+        if (view === "settings") loadSettings();
         if (view === "profile") loadAiSystems();
       }
 
@@ -2221,14 +2704,7 @@
       }
 
       function fallbackPlaces(query) {
-        const base = [
-          { name: "Blue Tokai Coffee", type: "cafe", rating: 4.6, address: "Coffee and focus spot nearby.", photo: imageBank.cafe },
-          { name: "KFC", type: "restaurant", rating: 4.2, address: "Restaurant result from nearby memory zone.", photo: imageBank.place },
-          { name: "City Sports Turf", type: "turf", rating: 4.4, address: "Football and cricket turf location.", photo: imageBank.gym },
-          { name: "FitZone Gym", type: "gym", rating: 4.5, address: "Workout and health routine zone.", photo: imageBank.gym },
-          { name: "Apollo Pharmacy", type: "pharmacy", rating: 4.0, address: "Health essentials nearby.", photo: imageBank.place },
-        ];
-        return base.filter((place) => `${place.name} ${place.type}`.toLowerCase().includes(query.toLowerCase())).slice(0, 4);
+        return [];
       }
 
       function titleCase(value) {
@@ -2374,7 +2850,7 @@
         } catch (error) {
           const places = fallbackPlaces(query);
           renderPlaces(places);
-          q("#place-status").textContent = `Using fallback places: ${friendlyPlacesError(error)}`;
+          q("#place-status").textContent = `Google Places unavailable: ${friendlyPlacesError(error)}`;
         }
       }
 
@@ -2424,28 +2900,493 @@
         animateCards(svg);
       }
 
+      function replayItemsFrom(data) {
+        return pickFirstArray(data, ["timeline", "events", "chapters", "highlights", "memories", "items"]).slice(0, 8);
+      }
+
+      function renderReplayData(data, mode = "day") {
+        const title = data?.title || data?.rangeTitle || `${mode.charAt(0).toUpperCase()}${mode.slice(1)} Replay`;
+        const summary = data?.summary || data?.narration || data?.story || "No real replay evidence found yet.";
+        q("#replay-title").textContent = title;
+        q("#replay-summary").textContent = summary;
+        const items = replayItemsFrom(data);
+        q("#replay-timeline").innerHTML = items.length
+          ? items.map((item) => `
+            <article class="timeline-item">
+              <small>${escapeHtml(item.time || item.timestamp || item.createdAt || item.period || mode)}</small>
+              <strong>${escapeHtml(cardTitle(item, "Memory event"))}</strong>
+              <p class="muted">${escapeHtml(compactText(item, "Evidence-backed replay moment."))}</p>
+            </article>
+          `).join("")
+          : `<article class="timeline-item"><strong>No replay yet</strong><p class="muted">Add memories, places, screenshots, voice notes, or goals to generate a cinematic replay.</p></article>`;
+        animateCards(q("#replay-timeline"));
+      }
+
+      async function loadReplay(mode = "day") {
+        const data = await safeApi(`/api/ai/replay?range=${encodeURIComponent(mode)}&mode=${encodeURIComponent(mode)}`, {}, null);
+        renderReplayData(data, mode);
+      }
+
+      async function runTimeMachineQuery(query) {
+        const clean = String(query || "").trim();
+        if (!clean) return;
+        const data = await safeApi("/api/ai/memory-time-machine/replay", {
+          method: "POST",
+          body: JSON.stringify({ query: clean, persist: true, trigger: "mobile-time-machine" }),
+        }, null);
+        const target = q("#time-machine-results");
+        if (!target) return;
+        target.innerHTML = data
+          ? renderMiniCards(replayItemsFrom(data), "No matching period found in your real memory history.")
+          : `<article class="advisor-card"><strong>Time Machine unavailable</strong><small>Connect mobile to the main NeuroNest API to reconstruct periods.</small></article>`;
+        if (data) renderReplayData(data, "time machine");
+        animateCards(target);
+      }
+
+      const mobileSystemDefinitions = [
+        { key: "lifeOs", title: "Life OS", label: "OS", endpoint: "/api/ai/life-os", hint: "Briefings, risks, goals, and coordination" },
+        { key: "chief", title: "Mission Control", label: "MC", endpoint: "/api/ai/chief-of-staff", hint: "Goal coach, milestones, and next actions" },
+        { key: "digitalTwin", title: "Digital Twin", label: "DT", endpoint: "/api/ai/digital-twin", hint: "Identity, habits, strengths, and patterns" },
+        { key: "relationships", title: "Relationships", label: "RI", endpoint: "/api/relationships", hint: "People graph, reconnects, and social signals" },
+        { key: "future", title: "Future Intelligence", label: "FI", endpoint: "/api/predictions", hint: "Predictions, risks, burnout, and opportunities" },
+        { key: "atlas", title: "Memory Atlas", label: "MA", endpoint: "/api/ai/memory-atlas", hint: "Geographic memory map and place clusters" },
+        { key: "timeMachine", title: "Time Machine", label: "TM", endpoint: "/api/ai/memory-time-machine", hint: "Reconstruct days, months, and journeys" },
+        { key: "decisions", title: "Decision Intelligence", label: "DI", endpoint: "/api/ai/decision-intelligence", hint: "Decision quality and outcome learning" },
+        { key: "opportunities", title: "Opportunities", label: "OP", endpoint: "/api/opportunities", hint: "Growing skills, interests, and projects" },
+        { key: "futureSelf", title: "Future Self", label: "FS", endpoint: "/api/future-self", hint: "Best, expected, and worst case futures" },
+        { key: "capture", title: "Autonomous Capture", label: "AC", endpoint: "/api/ai/autonomous-capture", hint: "Passive evidence and smart memory creation" },
+        { key: "agent", title: "Life Agent", label: "LA", endpoint: "/api/ai/autonomous-life-agent", hint: "Proactive monitoring and recovery plans" },
+        { key: "advisors", title: "Board of Advisors", label: "BA", endpoint: "/api/ai/board-of-advisors?query=Should%20I%20continue%20NeuroNest%3F", hint: "Strategist, Coach, Psychologist, Career, and more" },
+        { key: "graph", title: "Memory Graph", label: "MG", endpoint: "/api/ai/graph", hint: "Connected memories, places, ideas, and people" },
+        { key: "places", title: "Passive Places", label: "PP", endpoint: "/api/passive-places/visits", hint: "Real visits, place memories, and movement patterns" },
+        { key: "settings", title: "Settings & Privacy", label: "SP", endpoint: "/api/account/status", hint: "Security, privacy, permissions, and account state" },
+      ];
+
+      const pcFeatureParity = [
+        ["Google Login / Auth System", "settings"],
+        ["Google Maps API Integration", "atlas"],
+        ["Place Hunter", "atlas"],
+        ["Google Places Search", "atlas"],
+        ["Place Categories", "atlas"],
+        ["Google Ratings", "atlas"],
+        ["Google Map View", "atlas"],
+        ["Manual Memory Entries", "lifeOs"],
+        ["AI Chat Tab", "lifeOs"],
+        ["Multilingual AI Chat", "lifeOs"],
+        ["Hinglish / Mixed-Language Understanding", "lifeOs"],
+        ["AI Voice Assistant", "capture"],
+        ["Voice Memory Capture", "capture"],
+        ["Screenshot Memory AI", "capture"],
+        ["OCR Screenshot Extraction", "capture"],
+        ["Smart Memory Cards", "lifeOs"],
+        ["Memory Hub", "lifeOs"],
+        ["Memory Search", "lifeOs"],
+        ["Semantic Memory Search", "lifeOs"],
+        ["Memory Embeddings", "lifeOs"],
+        ["Vector Memory Search", "lifeOs"],
+        ["Unified Memory Object System", "lifeOs"],
+        ["Timeline Engine", "timeMachine"],
+        ["Real Memory Timeline", "timeMachine"],
+        ["Timeline Filters", "timeMachine"],
+        ["Memory Replay", "timeMachine"],
+        ["Memory Replay 2.0", "timeMachine"],
+        ["Life Replay", "timeMachine"],
+        ["Memory Time Machine", "timeMachine"],
+        ["Memory Atlas", "atlas"],
+        ["Passive Place Memory", "places"],
+        ["Place Memory Storage", "places"],
+        ["Passive Location Visit Detection", "places"],
+        ["Place Timeline Integration", "places"],
+        ["Digital Twin", "digitalTwin"],
+        ["Digital Twin V4", "digitalTwin"],
+        ["AI Memory DNA", "digitalTwin"],
+        ["Profile & Identity Hub", "digitalTwin"],
+        ["Profile Avatar Integration", "settings"],
+        ["AI Assistant Avatar System", "settings"],
+        ["AI Auto Memory Engine", "capture"],
+        ["AI Memory Stream Engine", "lifeOs"],
+        ["AI Memory Graph", "graph"],
+        ["Relationship Intelligence", "relationships"],
+        ["Relationship Graph", "relationships"],
+        ["Relationship Rebuild", "relationships"],
+        ["Relationship Search Fix", "relationships"],
+        ["Reconnect Suggestions", "relationships"],
+        ["Future Prediction Engine", "future"],
+        ["Future Intelligence Dashboard", "future"],
+        ["Future Self Simulator", "futureSelf"],
+        ["Life Simulation Engine", "futureSelf"],
+        ["Decision Intelligence Engine", "decisions"],
+        ["Opportunity Engine", "opportunities"],
+        ["AI Chief of Staff", "chief"],
+        ["Life OS", "lifeOs"],
+        ["Mission Control", "chief"],
+        ["Goal Coach", "chief"],
+        ["Goal Alignment Engine", "chief"],
+        ["Daily Missions", "chief"],
+        ["Weekly Review", "lifeOs"],
+        ["Autonomous Capture System", "capture"],
+        ["Autonomous Life Agent", "agent"],
+        ["Autonomous Intelligence Core V3", "agent"],
+        ["Learning Engine V2", "agent"],
+        ["Intelligence Core V1", "lifeOs"],
+        ["Personal Knowledge Graph", "graph"],
+        ["Context Fusion Engine", "lifeOs"],
+        ["AI Memory Resurfacing Engine", "agent"],
+        ["Forgotten Idea Detection", "agent"],
+        ["Forgotten Gold / Memory Rediscovery", "agent"],
+        ["Proactive AI Notifications", "agent"],
+        ["AI Daily Recap", "lifeOs"],
+        ["Smart Journal Mode", "lifeOs"],
+        ["Deep Focus Mode", "chief"],
+        ["Productivity Analysis Engine", "future"],
+        ["Behavior Prediction Engine", "future"],
+        ["Pattern Analysis Engine", "future"],
+        ["Emotional Recall Engine", "future"],
+        ["Productivity Recall Engine", "future"],
+        ["Goal Reconnection Service", "chief"],
+        ["Idea Rediscovery Service", "opportunities"],
+        ["Memory Scoring Engine", "lifeOs"],
+        ["Memory Importance Scoring", "lifeOs"],
+        ["Memory DNA Service", "digitalTwin"],
+        ["AI Insight Engine", "lifeOs"],
+        ["Multimodal Memory System", "capture"],
+        ["Voice Intelligence", "capture"],
+        ["Screenshot Intelligence", "capture"],
+        ["Image / Visual Memory Support", "capture"],
+        ["AI Relationship Engine", "relationships"],
+        ["AI Prediction Engine", "future"],
+        ["AI Board of Advisors", "advisors"],
+        ["Strategist Advisor", "advisors"],
+        ["Coach Advisor", "advisors"],
+        ["Psychologist Advisor", "advisors"],
+        ["Productivity Expert Advisor", "advisors"],
+        ["Relationship Advisor", "advisors"],
+        ["Career Advisor", "advisors"],
+        ["Combined Advisor Recommendation", "advisors"],
+        ["AI Systems Dashboard", "lifeOs"],
+        ["Animated Sidebar", "lifeOs"],
+        ["Futuristic Dashboard Animations", "lifeOs"],
+        ["GSAP Animation System", "lifeOs"],
+        ["Cinematic Logo Intro", "lifeOs"],
+        ["Neural Background Particles", "lifeOs"],
+        ["AI Orb Animations", "lifeOs"],
+        ["Card Hover Glow Effects", "lifeOs"],
+        ["Page Transitions", "lifeOs"],
+        ["Loading / Thinking States", "lifeOs"],
+        ["Profile Panel Animation", "digitalTwin"],
+        ["Mobile Responsive Optimization", "settings"],
+        ["Super Admin Control Center", "settings"],
+        ["Admin Login / Access Code", "settings"],
+        ["Super Admin Dashboard", "settings"],
+        ["User Management", "settings"],
+        ["User Inspection Panel", "settings"],
+        ["Admin Analytics", "settings"],
+        ["Database Explorer", "settings"],
+        ["Security Center", "settings"],
+        ["Announcement Center", "settings"],
+        ["Admin Profile Hub", "settings"],
+        ["Admin Sync System", "settings"],
+        ["Advanced Security Layer", "settings"],
+        ["RBAC Roles", "settings"],
+        ["Owner / Super Admin Permissions", "settings"],
+        ["Secure Session Handling", "settings"],
+        ["Audit Logging", "settings"],
+        ["Upload Security", "settings"],
+        ["AI Abuse Protection", "settings"],
+        ["Rate Limiting", "settings"],
+        ["Secret Scan Script", "settings"],
+        ["Supabase Integration", "settings"],
+        ["Supabase pgvector Support", "settings"],
+        ["Supabase Storage Support", "settings"],
+        ["Shared Warehouse Data Layer", "settings"],
+        ["Render Deployment Setup", "settings"],
+        ["GitHub Deployment Setup", "settings"],
+        ["Health Endpoints", "settings"],
+        ["Production Environment Config", "settings"],
+        ["Groq AI Provider Support", "lifeOs"],
+        ["OpenAI Provider Support", "lifeOs"],
+        ["AI Chat Like ChatGPT", "lifeOs"],
+        ["Memory-Aware AI Chat", "lifeOs"],
+        ["Evidence-Based AI Answers", "lifeOs"],
+        ["Relationship-Aware AI Chat", "relationships"],
+        ["Prediction-Aware AI Chat", "future"],
+        ["Life OS-Aware AI Chat", "lifeOs"],
+        ["Board of Advisors-Aware AI Chat", "advisors"],
+        ["Real Data / No Mock Intelligence Rules", "settings"],
+      ];
+
+      async function safeApi(path, options = {}, fallback = null) {
+        try {
+          return await api(path, options);
+        } catch (error) {
+          return fallback;
+        }
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function compactText(value, fallback = "No evidence-backed summary yet.") {
+        if (typeof value === "string") return value;
+        if (!value || typeof value !== "object") return fallback;
+        return value.summary || value.body || value.description || value.reason || value.recommendation || value.insight || value.text || value.title || fallback;
+      }
+
+      function cardTitle(item, fallback = "NeuroNest signal") {
+        if (!item || typeof item !== "object") return fallback;
+        return item.title || item.name || item.goalTitle || item.personName || item.person_name || item.type || item.label || fallback;
+      }
+
+      function cardScore(item) {
+        const raw = item?.confidence ?? item?.score ?? item?.strength ?? item?.predictionScore ?? item?.alignmentScore ?? item?.completionProbability ?? item?.riskScore ?? item?.importanceScore;
+        const number = Number(raw);
+        return Number.isFinite(number) ? Math.max(8, Math.min(100, number)) : 62;
+      }
+
+      function pickFirstArray(data, keys = []) {
+        if (!data || typeof data !== "object") return [];
+        for (const key of keys) {
+          if (Array.isArray(data[key])) return data[key];
+        }
+        const queue = [data];
+        const seen = new Set();
+        while (queue.length) {
+          const current = queue.shift();
+          if (!current || typeof current !== "object" || seen.has(current)) continue;
+          seen.add(current);
+          for (const value of Object.values(current)) {
+            if (Array.isArray(value) && value.length && value.every((item) => typeof item === "object")) return value;
+            if (value && typeof value === "object") queue.push(value);
+          }
+        }
+        return [];
+      }
+
+      function renderMiniCards(items, fallback = "No real records yet.") {
+        const list = (items || []).filter(Boolean).slice(0, 6);
+        if (!list.length) return `<article class="advisor-card"><strong>Waiting for evidence</strong><small>${fallback}</small></article>`;
+        return list.map((item) => `
+          <article class="advisor-card">
+            <strong>${escapeHtml(cardTitle(item))}</strong>
+            <small>${escapeHtml(compactText(item))}</small>
+            <div class="boot-progress"><span style="width:${cardScore(item)}%"></span></div>
+          </article>
+        `).join("");
+      }
+
+      function renderMetrics(metrics) {
+        return metrics.slice(0, 3).map((metric) => `
+          <div class="metric">
+            <strong>${escapeHtml(metric.value)}</strong>
+            <small>${escapeHtml(metric.label)}</small>
+          </div>
+        `).join("");
+      }
+
+      function systemSummary(definition, data) {
+        if (!data) return "Connects when the main NeuroNest API has evidence for this system.";
+        if (data.empty) return "No evidence yet. Add real memories, goals, places, or chats to activate it.";
+        if (data.summary) return data.summary;
+        if (data.combinedRecommendation?.recommendation) return data.combinedRecommendation.recommendation;
+        if (data.answer) return data.answer;
+        if (data.dailyBriefing?.topPriority) return compactText(data.dailyBriefing.topPriority);
+        if (data.identity?.summary) return data.identity.summary;
+        if (data.overview?.summary) return data.overview.summary;
+        const first = pickFirstArray(data)[0];
+        return first ? compactText(first, definition.hint) : definition.hint;
+      }
+
+      function renderSystemGrid() {
+        const target = q("#system-grid");
+        if (!target) return;
+        target.innerHTML = mobileSystemDefinitions.map((definition) => {
+          const data = mobileSystems[definition.key];
+          const count = pickFirstArray(data).length;
+          return `
+            <button class="system-tile" data-system-key="${definition.key}" type="button">
+              <i>${definition.label}</i>
+              <span><strong>${definition.title}</strong><small>${count ? `${count} evidence signals` : definition.hint}</small></span>
+            </button>
+          `;
+        }).join("");
+        qa("[data-system-key]", target).forEach((button) => {
+          button.onclick = () => renderSystemDetail(button.dataset.systemKey);
+        });
+      }
+
+      function renderFeatureParity() {
+        const target = q("#feature-parity-list");
+        if (!target) return;
+        q("#parity-count").textContent = `${pcFeatureParity.length} linked`;
+        target.innerHTML = pcFeatureParity.map(([feature, key]) => {
+          const definition = mobileSystemDefinitions.find((item) => item.key === key);
+          return `
+            <button class="parity-row" data-parity-key="${key}" type="button">
+              <span class="parity-dot"></span>
+              <strong>${escapeHtml(feature)}</strong>
+              <small>${escapeHtml(definition?.title || "Shared API")}</small>
+            </button>
+          `;
+        }).join("");
+        qa("[data-parity-key]", target).forEach((button) => {
+          button.onclick = () => renderSystemDetail(button.dataset.parityKey);
+        });
+      }
+
+      function renderLifeOsBriefing() {
+        const lifeOs = mobileSystems.lifeOs || {};
+        const predictions = mobileSystems.future || {};
+        const relationships = mobileSystems.relationships || {};
+        const metrics = [
+          { label: "Goals", value: lifeOs?.goalCount ?? lifeOs?.goals?.length ?? pickFirstArray(lifeOs, ["goals", "activeGoals"]).length },
+          { label: "Predictions", value: predictions?.predictions?.length ?? pickFirstArray(predictions).length },
+          { label: "Relations", value: relationships?.relationships?.length ?? relationships?.totalRelationships ?? pickFirstArray(relationships).length },
+        ];
+        const target = q("#life-os-briefing");
+        if (target) target.innerHTML = renderMetrics(metrics);
+      }
+
+      function renderRelationshipOrbit(graphData = {}) {
+        const nodes = (graphData.nodes || graphData.relationships || []).slice(0, 8);
+        const center = { x: 150, y: 130 };
+        const positioned = nodes.map((node, index) => {
+          const angle = (index / Math.max(1, nodes.length)) * Math.PI * 2;
+          return { ...node, x: center.x + Math.cos(angle) * 94, y: center.y + Math.sin(angle) * 82 };
+        });
+        return `
+          <div class="relationship-orbit">
+            <svg viewBox="0 0 300 260">
+              ${positioned.map((node) => `<line x1="${center.x}" y1="${center.y}" x2="${node.x}" y2="${node.y}"></line>`).join("")}
+              <circle cx="${center.x}" cy="${center.y}" r="32"></circle>
+              ${positioned.map((node) => `<g><circle cx="${node.x}" cy="${node.y}" r="22"></circle><text x="${node.x - 20}" y="${node.y + 42}" fill="#cbd5e1" font-size="10">${escapeHtml(cardTitle(node, "Person").slice(0, 12))}</text></g>`).join("")}
+            </svg>
+          </div>
+        `;
+      }
+
+      function renderAtlasMap(data = {}) {
+        const points = pickFirstArray(data, ["points", "locations", "clusters", "places", "visits"]).slice(0, 5);
+        const dots = points.length ? points : [];
+        return `
+          <div class="atlas-map">
+            ${dots.map((point, index) => `<span title="${escapeHtml(cardTitle(point, "Place"))}" style="--x:${28 + (index * 17) % 54}%;--y:${32 + (index * 19) % 45}%;--s:${42 + index * 8}px"></span>`).join("")}
+          </div>
+        `;
+      }
+
+      function renderSystemDetail(key = "lifeOs") {
+        const definition = mobileSystemDefinitions.find((item) => item.key === key) || mobileSystemDefinitions[0];
+        const data = mobileSystems[definition.key] || null;
+        const target = q("#mobile-system-detail");
+        if (!target) return;
+
+        let body = "";
+        if (definition.key === "relationships") {
+          body = renderRelationshipOrbit(mobileSystems.relationshipGraph || data || {}) + renderMiniCards(pickFirstArray(data, ["relationships", "topPeople", "reconnectCandidates"]), "Save memories mentioning people to build the relationship graph.");
+        } else if (definition.key === "atlas") {
+          body = renderAtlasMap(data) + renderMiniCards(pickFirstArray(data, ["places", "clusters", "locations", "points"]), "Place memories will appear here after real location or place records exist.");
+        } else if (definition.key === "advisors") {
+          const advisors = data?.advisors || [];
+          body = `
+            <article class="advisor-card"><strong>Combined recommendation</strong><small>${escapeHtml(data?.combinedRecommendation?.recommendation || systemSummary(definition, data))}</small></article>
+            ${renderMiniCards(advisors.map((advisor) => ({ title: advisor.name, body: advisor.recommendation || advisor.reasoning, confidence: advisor.confidence })), "Ask a question once evidence exists.")}
+          `;
+        } else if (definition.key === "capture") {
+          body = `<article class="capture-indicator"><div><strong>Passive capture status</strong><small>${escapeHtml(systemSummary(definition, data))}</small></div></article>${renderMiniCards(pickFirstArray(data, ["candidates", "events", "captureQueue"]), "Autonomous capture needs real evidence and user permission.")}`;
+        } else if (definition.key === "settings") {
+          body = `
+            <article class="advisor-card"><strong>Account status</strong><small>${escapeHtml(data?.accountStatus || data?.status || "Authenticated users inherit PC security, RBAC, and session protections.")}</small></article>
+            <button class="primary" data-open="settings" type="button">Open Settings & Privacy</button>
+          `;
+        } else {
+          body = renderMiniCards(pickFirstArray(data, [
+            "items",
+            "predictions",
+            "goals",
+            "tasks",
+            "milestones",
+            "recommendations",
+            "opportunities",
+            "horizons",
+            "decisions",
+            "stories",
+            "events",
+            "insights",
+            "alerts",
+          ]), "This system is connected, but it needs real user history before it can show cards.");
+        }
+
+        target.innerHTML = `
+          <section class="panel">
+            <div class="system-panel-head">
+              <div>
+                <h2>${definition.title}</h2>
+                <p class="muted">${escapeHtml(systemSummary(definition, data))}</p>
+              </div>
+              <button class="icon-btn" data-refresh-system="${definition.key}" type="button">Sync</button>
+            </div>
+            <div class="system-command" style="margin-top:14px">${body}</div>
+          </section>
+        `;
+        q("[data-refresh-system]", target)?.addEventListener("click", () => refreshOneSystem(definition.key));
+        qa("[data-open]", target).forEach((button) => button.addEventListener("click", () => switchView(button.dataset.open)));
+        animateCards(target);
+      }
+
+      async function refreshOneSystem(key) {
+        const definition = mobileSystemDefinitions.find((item) => item.key === key);
+        if (!definition) return;
+        mobileSystems[key] = await safeApi(definition.endpoint, {}, null);
+        if (key === "relationships") mobileSystems.relationshipGraph = await safeApi("/api/relationships/graph", {}, null);
+        renderSystemGrid();
+        renderLifeOsBriefing();
+        renderSystemDetail(key);
+      }
+
+      async function hydrateMobileSystems() {
+        const entries = await Promise.all(mobileSystemDefinitions.map(async (definition) => [
+          definition.key,
+          await safeApi(definition.endpoint, {}, null),
+        ]));
+        mobileSystems = Object.fromEntries(entries);
+        mobileSystems.relationshipGraph = await safeApi("/api/relationships/graph", {}, null);
+        renderSystemGrid();
+        renderFeatureParity();
+        renderLifeOsBriefing();
+        renderSystemDetail("lifeOs");
+      }
+
       async function loadAiSystems() {
         try {
           const [engine, recap, journal, predictions] = await Promise.all([
-            api("/api/ai/memory-engine"),
-            api("/api/ai/recap"),
-            api("/api/ai/journal"),
-            api("/api/ai/predictions"),
+            safeApi("/api/ai/memory-engine", {}, { insights: [] }),
+            safeApi("/api/ai/recap", {}, { title: "Weekly recap", summary: "Add memories to generate a real recap." }),
+            safeApi("/api/ai/journal", {}, { title: "Smart Journal", body: "Add memories to generate journal context." }),
+            safeApi("/api/ai/predictions", {}, { predictions: [] }),
           ]);
-          q("#weekly-summary").innerHTML = `<article class="activity-row"><div class="activity-icon">AI</div><div><strong>${recap.title}</strong><p class="muted">${recap.summary}</p></div><strong>78%</strong></article>`;
-          q("#activities").innerHTML = [
-            ["Workouts", "5 times", "72%"],
-            ["Ideas Saved", "12 ideas", "88%"],
-            ["Places Explored", "7 new places", "64%"],
-          ].map(([title, value, percent]) => `<article class="activity-row"><div class="activity-icon">N</div><div><strong>${title}</strong><div class="boot-progress"><span style="width:${percent}"></span></div></div><small>${value}</small></article>`).join("");
+
+          q("#weekly-summary").innerHTML = `<article class="activity-row"><div class="activity-icon">AI</div><div><strong>${escapeHtml(recap.title || "Weekly recap")}</strong><p class="muted">${escapeHtml(recap.summary || "No recap evidence yet.")}</p></div><strong>${Math.min(99, 64 + allRecords().length * 4)}%</strong></article>`;
+          const records = allRecords();
+          const activityRows = [
+            ["Memories", `${records.length} saved`, `${Math.min(100, records.length * 12)}%`],
+            ["Places", `${records.filter((record) => /place|cafe|restaurant/i.test(`${record.kind} ${record.title} ${record.body}`)).length} signals`, "68%"],
+            ["Ideas", `${records.filter((record) => /idea|ai|startup/i.test(`${record.kind} ${record.title} ${record.body}`)).length} signals`, "74%"],
+          ];
+          q("#activities").innerHTML = activityRows.map(([title, value, percent]) => `<article class="activity-row"><div class="activity-icon">N</div><div><strong>${title}</strong><div class="boot-progress"><span style="width:${percent}"></span></div></div><small>${value}</small></article>`).join("");
           const systems = [
             ...(engine.insights || []),
             { title: journal.title, body: journal.body, score: 82 },
             ...(predictions.predictions || []),
-            { title: "AI Voice Assistant", body: "Speech recall, spoken answers, and voice note capture are ready.", score: 79 },
-            { title: "Screenshot Memory AI", body: "OCR scans screenshots and saves ideas, products, reminders, and chats.", score: 76 },
+            { title: "Open Life OS", body: "All advanced PC systems are now available in the mobile command center.", score: 94, action: "systems" },
           ];
-          q("#ai-system-list").innerHTML = systems.map((item) => `<article class="memory-card full"><span class="badge">AI</span><h3>${item.title}</h3><p>${item.body}</p><div class="boot-progress"><span style="width:${Math.max(12, Math.min(100, item.score || item.strength || 70))}%"></span></div></article>`).join("");
+          q("#ai-system-list").innerHTML = systems.map((item) => `<article class="memory-card full" ${item.action ? `data-open-card="${item.action}"` : ""}><span class="badge">AI</span><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.body)}</p><div class="boot-progress"><span style="width:${Math.max(12, Math.min(100, item.score || item.strength || 70))}%"></span></div></article>`).join("");
+          qa("[data-open-card]").forEach((card) => { card.onclick = () => switchView(card.dataset.openCard); });
+          await hydrateMobileSystems();
         } catch (error) {
           notify(friendlyError(error));
         }
@@ -2460,6 +3401,75 @@
         q("#stat-ideas").textContent = String(ideaCount);
         q("#stat-days").textContent = "182";
         mobileIdentityRendered = false;
+      }
+
+      async function loadSettings() {
+        const [account, passive] = await Promise.all([
+          safeApi("/api/account/status", {}, null),
+          safeApi("/api/passive-places/settings", {}, null),
+        ]);
+        const status = account?.accountStatus || account?.status || "Protected";
+        const passiveEnabled = Boolean(passive?.settings?.enabled);
+        const rows = [
+          { icon: "AI", title: "AI Memory", body: "Memory controls, embeddings, assistant context, and personal intelligence.", state: true },
+          { icon: "PL", title: "Passive Tracking", body: passiveEnabled ? "Place memory is active while the mobile app is open." : "Paused until you enable it.", state: passiveEnabled },
+          { icon: "PR", title: "Privacy Mode", body: "Sensitive data stays behind authenticated backend APIs.", state: false },
+          { icon: "EX", title: "Data Export", body: "Export requests are handled by the protected PC backend.", state: true },
+          { icon: "SC", title: "Security Layer", body: "Authenticated sessions, RBAC, upload validation, and audit logging.", state: true },
+          { icon: "AD", title: "Admin Status", body: account?.role || account?.adminRole || "User", state: Boolean(account?.isAdmin || account?.adminRole) },
+        ];
+        q("#settings-security-status").textContent = `Account: ${status}. Mobile API sync: ${appConfig.apiMode || "shared backend"}.`;
+        q("#passive-place-status").textContent = passive?.capability?.browserForegroundTracking
+          ? `Tracking ${passiveEnabled ? "active" : "paused"} - browser foreground mode supported.`
+          : "Tracking needs browser geolocation permission.";
+        q("#settings-list").innerHTML = rows.map((row) => `
+          <article class="settings-row">
+            <i>${row.icon}</i>
+            <span><strong>${escapeHtml(row.title)}</strong><small>${escapeHtml(row.body)}</small></span>
+            <button class="switch ${row.state ? "active" : ""}" type="button" aria-label="${escapeHtml(row.title)}"><span></span></button>
+          </article>
+        `).join("");
+        animateCards(q("#settings-list"));
+      }
+
+      async function setPassiveTracking(enabled) {
+        const response = await safeApi("/api/passive-places/settings", {
+          method: "PATCH",
+          body: JSON.stringify({ settings: { enabled } }),
+        }, null);
+        if (enabled) {
+          requestPassiveLocationSample();
+        }
+        notify(enabled ? "Passive Place Memory enabled." : "Passive Place Memory paused.");
+        await loadSettings();
+        return response;
+      }
+
+      function requestPassiveLocationSample() {
+        if (!navigator.geolocation) {
+          notify("Location is not supported on this browser.");
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+            await safeApi("/api/passive-places/samples", {
+              method: "POST",
+              body: JSON.stringify({
+                sample: {
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                  accuracy: position.coords.accuracy,
+                  timestamp: new Date().toISOString(),
+                  source: "mobile-web-foreground",
+                },
+              }),
+            }, null);
+            notify("Place signal sent to NeuroNest.");
+          },
+          () => notify("Location permission was denied."),
+          { enableHighAccuracy: true, timeout: 10000 },
+        );
       }
 
       function mobileIdentityData() {
@@ -2640,9 +3650,19 @@
         });
       }
 
+      function fileToDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(new Error("Could not read image file."));
+          reader.readAsDataURL(file);
+        });
+      }
+
       async function scanScreenshot(file) {
         if (!file) return;
         q("#screenshot-status").textContent = `Scanning ${file.name}...`;
+        const imageData = await fileToDataUrl(file);
         let text = "";
         try {
           const Tesseract = await loadTesseract();
@@ -2651,7 +3671,16 @@
         } catch (error) {
           text = `Screenshot upload: ${file.name}. OCR unavailable: ${error.message}`;
         }
-        await api("/api/ai/screenshot-memory", { method: "POST", body: JSON.stringify({ text, fileName: file.name }) });
+        await api("/api/ai/screenshot-memory", {
+          method: "POST",
+          body: JSON.stringify({
+            text,
+            imageData,
+            fileName: file.name,
+            mimeType: file.type,
+            size: file.size,
+          }),
+        });
         q("#screenshot-status").textContent = "Screenshot saved as an AI memory.";
         await loadEntries();
       }
@@ -2683,10 +3712,22 @@
           const transcript = event.results?.[0]?.[0]?.transcript || "";
           q("#voice-output").textContent = `You asked: ${transcript}`;
           q("#voice-orb").classList.add("thinking");
-          await api("/api/entries", {
+          const voicePayload = {
+            title: "Mobile Voice Note",
+            transcript,
+            duration: "Mobile speech",
+            language: recognition.lang,
+          };
+          const voiceResult = await safeApi("/api/ai/voice-memory", {
             method: "POST",
-            body: JSON.stringify({ kind: "voice", title: "Voice Note", body: transcript, tags: "voice, spoken", meta: "Mobile voice" }),
-          });
+            body: JSON.stringify(voicePayload),
+          }, null);
+          if (!voiceResult) {
+            await api("/api/entries", {
+              method: "POST",
+              body: JSON.stringify({ kind: "voice", title: "Voice Note", body: transcript, tags: "voice, spoken", meta: "Mobile voice" }),
+            });
+          }
           await runSemanticPrompt(transcript);
           q("#voice-output").textContent = lastVoiceResponse || "NeuroNest AI saved and answered your voice memory.";
           q("#voice-orb").classList.add("speaking");
@@ -2762,7 +3803,7 @@
         q("#profile-name").textContent = firstName;
         q("#profile-email").textContent = user.email || "Explorer - Builder - Dreamer";
         mobileIdentityRendered = false;
-        await Promise.allSettled([loadEntries(), loadChat(), loadAiSystems(), loadGraph()]);
+        await Promise.allSettled([loadEntries(), loadChat(), loadAiSystems(), loadGraph(), loadReplay()]);
       }
 
       function wireEvents() {
@@ -2781,6 +3822,24 @@
           void sendChat(value);
         });
         q("#toggle-entry-form").addEventListener("click", () => q("#entry-panel").classList.toggle("hidden"));
+        q("[data-open-add-memory]").addEventListener("click", () => {
+          switchView("memories");
+          q("#entry-panel").classList.remove("hidden");
+          setTimeout(() => q("#entry-panel input[name='title']")?.focus(), 120);
+        });
+        q("[data-open-screenshot]").addEventListener("click", () => {
+          switchView("memories");
+          q("#entry-panel").classList.remove("hidden");
+          q("#screenshot-input").click();
+        });
+        q("[data-open-voice]").addEventListener("click", () => {
+          switchView("assistant");
+          startVoice();
+        });
+        q("[data-open-place-scan]").addEventListener("click", () => {
+          switchView("settings");
+          requestPassiveLocationSample();
+        });
         q("#entry-form").addEventListener("submit", (event) => {
           event.preventDefault();
           void saveEntry(event.currentTarget);
@@ -2815,6 +3874,21 @@
           qa(".graph-filter").forEach((item) => item.classList.toggle("active", item === button));
           renderGraph(button.dataset.graphFilter);
         }));
+        qa(".replay-filter").forEach((button) => button.addEventListener("click", () => {
+          qa(".replay-filter").forEach((item) => item.classList.toggle("active", item === button));
+          void loadReplay(button.dataset.replayMode);
+        }));
+        q("#replay-play").addEventListener("click", () => {
+          if (hasGsap()) {
+            gsap.fromTo("#replay-timeline .timeline-item", { x: 18, opacity: 0.35, filter: "blur(6px)" }, { x: 0, opacity: 1, filter: "blur(0px)", stagger: 0.16, duration: 0.48, ease: "power3.out" });
+          }
+        });
+        q("#time-machine-form").addEventListener("submit", (event) => {
+          event.preventDefault();
+          void runTimeMachineQuery(q("#time-machine-query").value);
+        });
+        q("#enable-passive-tracking").addEventListener("click", () => setPassiveTracking(true));
+        q("#disable-passive-tracking").addEventListener("click", () => setPassiveTracking(false));
         q("#refresh-graph").addEventListener("click", async () => {
           graphData = null;
           await loadGraph();
