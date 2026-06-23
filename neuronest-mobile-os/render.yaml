@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: neuronest-mobile-os
+    runtime: node
+    plan: free
+    buildCommand: ""
+    startCommand: "node server.js"
+    healthCheckPath: "/api/mobile-health"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: NEURONEST_API_BASE_URL
+        sync: false
