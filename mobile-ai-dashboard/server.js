@@ -10,12 +10,16 @@ const __dirname = path.dirname(__filename);
 loadEnv();
 
 const PORT = Number(process.env.PORT || 3002);
+const IS_PRODUCTION = process.env.NODE_ENV === "production" || Boolean(process.env.RENDER);
 const NEURONEST_API_BASE_URL = String(
   process.env.NEURONEST_API_BASE_URL ||
+  process.env.NEURONEST_APP_URL ||
   process.env.MAIN_APP_API_URL ||
   process.env.PC_API_BASE_URL ||
   "",
 ).replace(/\/+$/, "");
+const NEURONEST_MOBILE_URL = String(process.env.NEURONEST_MOBILE_URL || "").replace(/\/+$/, "");
+const NEURONEST_ADMIN_URL = String(process.env.NEURONEST_ADMIN_URL || "").replace(/\/+$/, "");
 const ALLOW_OFFLINE_GOOGLE_FALLBACK =
   process.env.ALLOW_OFFLINE_GOOGLE_FALLBACK !== "false" &&
   process.env.NODE_ENV !== "production" &&
@@ -48,6 +52,11 @@ function getGoogleClientId() {
   return process.env.GOOGLE_CLIENT_ID || "";
 }
 
+function getGoogleClientSecret() {
+  loadEnv();
+  return process.env.GOOGLE_CLIENT_SECRET || "";
+}
+
 function getGoogleClientIds() {
   loadEnv();
   return new Set(
@@ -68,10 +77,22 @@ function getGoogleMapsApiKey() {
 function shouldProxyApi(req, url) {
   if (!NEURONEST_API_BASE_URL) return false;
   if (!url.pathname.startsWith("/api/")) return false;
-  if (url.pathname === "/api/health" || url.pathname === "/api/mobile-health" || url.pathname === "/api/config") {
+  if (
+    url.pathname === "/api/health" ||
+    url.pathname === "/api/mobile-health" ||
+    url.pathname === "/api/config" ||
+    url.pathname === "/api/auth/google/start" ||
+    url.pathname === "/api/auth/google/callback"
+  ) {
     return false;
   }
   return true;
+}
+
+function requiresSharedBackend(url) {
+  if (!IS_PRODUCTION || NEURONEST_API_BASE_URL) return false;
+  if (!url.pathname.startsWith("/api/")) return false;
+  return !new Set(["/api/health", "/api/mobile-health", "/api/config"]).has(url.pathname);
 }
 
 function readRawBody(req, limitBytes = 25_000_000) {
@@ -92,6 +113,27 @@ function readRawBody(req, limitBytes = 25_000_000) {
   });
 }
 
+function getRequestOrigin(req) {
+  const proto = req.headers["x-forwarded-proto"] || (req.socket.encrypted ? "https" : "http");
+  const host = req.headers["x-forwarded-host"] || req.headers.host || `localhost:${PORT}`;
+  return `${String(proto).split(",")[0]}://${String(host).split(",")[0]}`;
+}
+
+function makeCookie(name, value, { maxAge = 600, httpOnly = true } = {}) {
+  const secureCookie = process.env.NODE_ENV === "production" || process.env.RENDER ? "; Secure" : "";
+  return `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax${httpOnly ? "; HttpOnly" : ""}${secureCookie}`;
+}
+
+function redirect(res, location, cookies = []) {
+  const headers = {
+    Location: location,
+    "Cache-Control": "no-store",
+  };
+  if (cookies.length) headers["Set-Cookie"] = cookies;
+  res.writeHead(302, headers);
+  res.end();
+}
+
 async function proxyApiRequest(req, res) {
   const upstreamUrl = `${NEURONEST_API_BASE_URL}${req.url}`;
   const body = ["GET", "HEAD"].includes(req.method || "GET") ? undefined : await readRawBody(req);
@@ -100,6 +142,7 @@ async function proxyApiRequest(req, res) {
   delete headers.connection;
   delete headers["content-length"];
   delete headers["accept-encoding"];
+  headers["x-neuronest-client"] = "mobile-web";
 
   const upstreamResponse = await fetch(upstreamUrl, {
     method: req.method,
@@ -967,8 +1010,10 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, {
       ok: true,
       service: "neuronest-mobile",
+      mode: IS_PRODUCTION ? "production" : "development",
       upstreamConfigured: Boolean(NEURONEST_API_BASE_URL),
-      upstream: NEURONEST_API_BASE_URL ? "pc-neuronest-api" : "local-mobile-fallback",
+      sharedDataReady: Boolean(NEURONEST_API_BASE_URL),
+      upstream: NEURONEST_API_BASE_URL ? "pc-neuronest-api" : "not-configured",
     });
   }
 
@@ -984,6 +1029,13 @@ async function handleApi(req, res, url) {
     }
   }
 
+  if (requiresSharedBackend(url)) {
+    return sendJson(res, 503, {
+      error: "NEURONEST_API_BASE_URL or NEURONEST_APP_URL is required in production.",
+      detail: "Mobile production must connect to the PC NeuroNest backend so PC, mobile, Supabase, and Super Admin share the same real data.",
+    });
+  }
+
   if (req.method === "GET" && url.pathname === "/api/config") {
     const googleClientId = getGoogleClientId();
     const googleMapsApiKey = getGoogleMapsApiKey();
@@ -993,6 +1045,11 @@ async function handleApi(req, res, url) {
       googleMapsApiKey,
       googleReady: Boolean(googleClientId),
       mapsReady: Boolean(googleMapsApiKey),
+      mobileReady: Boolean(NEURONEST_API_BASE_URL),
+      production: IS_PRODUCTION,
+      appUrlConfigured: Boolean(NEURONEST_API_BASE_URL),
+      mobileUrlConfigured: Boolean(NEURONEST_MOBILE_URL),
+      adminUrlConfigured: Boolean(NEURONEST_ADMIN_URL),
     });
   }
 

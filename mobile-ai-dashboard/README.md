@@ -3,8 +3,10 @@
 Premium mobile web app for NeuroNest.
 
 This app does not create a separate fake database. In production, set
-`NEURONEST_API_BASE_URL` to the deployed PC NeuroNest backend so mobile, PC,
-Supabase/warehouse, and Super Admin all share the same real users and records.
+`NEURONEST_API_BASE_URL` or `NEURONEST_APP_URL` to the deployed PC NeuroNest
+backend so mobile, PC, Supabase/warehouse, and Super Admin all share the same
+real users and records. Production mode refuses protected data APIs when that
+shared backend URL is missing.
 
 ## Local Run
 
@@ -59,6 +61,9 @@ The Life OS Systems Hub exposes the same real PC feature groups:
 - Autonomous Capture
 - Autonomous Life Agent
 - Board of Advisors
+- Personal Knowledge Universe
+- Life Decision Engine
+- Legacy Engine
 - Security/account status
 - Super Admin sync through the shared backend
 
@@ -71,8 +76,19 @@ GOOGLE_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_MAPS_API_KEY=your-google-maps-browser-key
 NEURONEST_API_BASE_URL=https://your-pc-service.onrender.com
+NEURONEST_APP_URL=https://your-pc-service.onrender.com
 NEURONEST_MOBILE_URL=https://your-mobile-service.onrender.com
 NEURONEST_ADMIN_URL=https://your-admin-service.onrender.com
+OPENAI_API_KEY=only-if-running-mobile-standalone
+OPENAI_CHAT_MODEL=gpt-4.1-mini
+OPENAI_TEXT_MODEL=gpt-4.1-mini
+OPENAI_VISION_MODEL=gpt-4.1-mini
+OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+ALLOW_LOCAL_AI_FALLBACK=false
+SUPABASE_URL=only-if-running-mobile-standalone
+SUPABASE_SERVICE_ROLE_KEY=only-if-running-mobile-standalone
+SUPABASE_MEDIA_BUCKET=neuronest-media
 RATE_LIMIT_PER_MINUTE=120
 MAX_REQUEST_BODY_BYTES=25000000
 ```

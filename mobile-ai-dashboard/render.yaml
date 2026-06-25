@@ -19,3 +19,33 @@ services:
         sync: false
       - key: NEURONEST_API_BASE_URL
         sync: false
+      - key: NEURONEST_APP_URL
+        sync: false
+      - key: NEURONEST_MOBILE_URL
+        sync: false
+      - key: NEURONEST_ADMIN_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_CHAT_MODEL
+        value: gpt-4.1-mini
+      - key: OPENAI_TEXT_MODEL
+        value: gpt-4.1-mini
+      - key: OPENAI_VISION_MODEL
+        value: gpt-4.1-mini
+      - key: OPENAI_TRANSCRIPTION_MODEL
+        value: gpt-4o-mini-transcribe
+      - key: OPENAI_EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: ALLOW_LOCAL_AI_FALLBACK
+        value: "false"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_MEDIA_BUCKET
+        value: neuronest-media
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "120"
+      - key: MAX_REQUEST_BODY_BYTES
+        value: "25000000"

@@ -9,6 +9,9 @@ mobile-ai-dashboard/
 The mobile app is a separate Render service, but it proxies real authenticated API
 traffic to the PC NeuroNest backend through `NEURONEST_API_BASE_URL`. That keeps
 PC, mobile, Supabase/warehouse, and Super Admin on the same data source.
+In production, the mobile service refuses protected data APIs if this shared PC
+backend URL is missing, so it cannot accidentally create isolated mobile-only
+records.
 
 ## Render Web Service
 
@@ -36,8 +39,19 @@ GOOGLE_CLIENT_IDS=optional-extra-google-web-client-ids
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_MAPS_API_KEY=your-google-maps-browser-key
 NEURONEST_API_BASE_URL=https://your-pc-service.onrender.com
+NEURONEST_APP_URL=https://your-pc-service.onrender.com
 NEURONEST_MOBILE_URL=https://your-mobile-service.onrender.com
 NEURONEST_ADMIN_URL=https://your-admin-service.onrender.com
+OPENAI_API_KEY=keep-on-pc-backend-unless-mobile-standalone
+OPENAI_CHAT_MODEL=gpt-4.1-mini
+OPENAI_TEXT_MODEL=gpt-4.1-mini
+OPENAI_VISION_MODEL=gpt-4.1-mini
+OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+ALLOW_LOCAL_AI_FALLBACK=false
+SUPABASE_URL=keep-on-pc-backend-unless-mobile-standalone
+SUPABASE_SERVICE_ROLE_KEY=keep-on-pc-backend-unless-mobile-standalone
+SUPABASE_MEDIA_BUCKET=neuronest-media
 RATE_LIMIT_PER_MINUTE=120
 MAX_REQUEST_BODY_BYTES=25000000
 ```
@@ -46,6 +60,11 @@ Keep OpenAI, Groq, Supabase service role, pgvector, and private AI keys on the
 PC backend Render service unless you intentionally run mobile in standalone
 backend mode. In the shared-backend setup, mobile calls PC APIs and never exposes
 private AI/database keys to the browser.
+
+If you copy environment variables from `neuronest-ai-os` to
+`neuronest-ai-os-mobile`, copy only server-side Render variables. Never place
+OpenAI, Groq, Supabase service role, or Google client secret values inside
+`public/index.html` or any frontend file.
 
 ## Google OAuth
 
