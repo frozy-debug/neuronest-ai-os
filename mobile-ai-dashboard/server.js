@@ -221,6 +221,8 @@ async function proxyApiRequest(req, res) {
   delete headers.connection;
   delete headers["content-length"];
   delete headers["accept-encoding"];
+  delete headers.origin;
+  delete headers.referer;
   headers["x-neuronest-client"] = "mobile-web";
 
   const upstreamResponse = await fetch(upstreamUrl, {
