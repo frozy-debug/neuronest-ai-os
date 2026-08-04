@@ -7,7 +7,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
     <link rel="preload" as="image" href="/assets/neuronest-ai-avatar.png" />
     <style>
@@ -286,15 +285,11 @@
         line-height: 1.6;
       }
 
-      #google-login {
-        margin-top: 18px;
-      }
-
       .auth-redirect {
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-top: 12px;
+        margin-top: 18px;
         min-height: 48px;
         text-decoration: none;
       }
@@ -1972,7 +1967,6 @@
         <img class="auth-logo" src="/assets/neuronest-logo.png" alt="NeuroNest" />
         <h1>Open NeuroNest</h1>
         <p>Sign in with Google to unlock your mobile AI memory OS, places, graph, entries, voice assistant, and AI insights.</p>
-        <div id="google-login"></div>
         <a id="google-redirect-login" class="primary auth-redirect" href="/api/auth/google/start">Continue with Google</a>
         <p id="auth-message" class="muted">Checking login...</p>
       </div>
@@ -4228,11 +4222,6 @@
         });
       }
 
-      function showGoogleOriginHelp(clientId) {
-        q("#auth-message").textContent =
-          `Google blocked the embedded button for this origin. Use Continue with Google, or add ${window.location.origin} to Authorized JavaScript origins for ${clientId}.`;
-      }
-
       function showAuthUrlMessage() {
         const params = new URLSearchParams(window.location.search);
         const authError = params.get("auth_error");
@@ -4297,9 +4286,9 @@
         const redirectLogin = q("#google-redirect-login");
         if (redirectLogin) {
           redirectLogin.href = "/api/auth/google/start";
-          redirectLogin.classList.toggle("disabled", appConfig.redirectLoginReady === false);
-          redirectLogin.textContent = appConfig.redirectLoginReady === false
-            ? "Google redirect login needs backend secret"
+          redirectLogin.classList.toggle("disabled", !clientId || appConfig.redirectLoginReady === false);
+          redirectLogin.textContent = !clientId || appConfig.redirectLoginReady === false
+            ? "Google login needs setup"
             : "Continue with Google";
         }
         const hasUrlMessage = showAuthUrlMessage();
@@ -4307,38 +4296,7 @@
           q("#auth-message").textContent = "GOOGLE_CLIENT_ID is missing.";
           return;
         }
-        const start = () => {
-          if (!window.google?.accounts?.id) {
-            setTimeout(start, 120);
-            return;
-          }
-          try {
-            google.accounts.id.initialize({
-              client_id: clientId,
-              ux_mode: "popup",
-              callback: async ({ credential }) => {
-                try {
-                  q("#auth-message").textContent = "Signing you in...";
-                  const data = await api("/api/auth/google", { method: "POST", body: JSON.stringify({ credential }) });
-                  await showApp(data.user);
-                } catch (error) {
-                  q("#auth-message").textContent = friendlyError(error);
-                }
-              },
-            });
-            google.accounts.id.renderButton(q("#google-login"), { theme: "filled_black", size: "large", width: 310, shape: "pill" });
-            if (!hasUrlMessage) q("#auth-message").textContent = "Choose Google login to continue.";
-            setTimeout(() => {
-              const loginSlot = q("#google-login");
-              if (!currentUser && (!loginSlot.children.length || loginSlot.getBoundingClientRect().height < 24)) {
-                showGoogleOriginHelp(clientId);
-              }
-            }, 1800);
-          } catch {
-            showGoogleOriginHelp(clientId);
-          }
-        };
-        start();
+        if (!hasUrlMessage) q("#auth-message").textContent = "Use Continue with Google to sign in securely.";
       }
 
       async function showApp(user) {

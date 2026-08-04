@@ -88,7 +88,8 @@ https://your-admin-service.onrender.com
 
 Do not add a trailing `/`.
 
-Also add this Authorized redirect URI for the mobile fallback redirect login:
+Mobile Google login uses the redirect flow so it avoids the embedded Google
+Identity Services origin check. Add this Authorized redirect URI:
 
 ```text
 https://your-mobile-service.onrender.com/auth/google/callback

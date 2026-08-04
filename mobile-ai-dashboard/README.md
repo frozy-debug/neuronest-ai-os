@@ -22,14 +22,8 @@ Open:
 http://127.0.0.1:3002
 ```
 
-For Google login locally, add these OAuth origins in Google Cloud:
-
-```text
-http://127.0.0.1:3002
-http://localhost:3002
-```
-
-For the mobile redirect login fallback, also add these Authorized redirect URIs:
+Mobile Google login uses the redirect flow so it does not depend on the
+embedded Google Identity Services button. Add these Authorized redirect URIs:
 
 ```text
 http://127.0.0.1:3002/auth/google/callback
