@@ -88,6 +88,26 @@ https://your-admin-service.onrender.com
 
 Do not add a trailing `/`.
 
+Also add this Authorized redirect URI for the mobile fallback redirect login:
+
+```text
+https://your-mobile-service.onrender.com/auth/google/callback
+```
+
+For local development, add:
+
+```text
+http://127.0.0.1:3002/auth/google/callback
+http://localhost:3002/auth/google/callback
+```
+
+If you also set `GOOGLE_CLIENT_SECRET` on the mobile Render service, add the
+server-code redirect URI too:
+
+```text
+https://your-mobile-service.onrender.com/api/auth/google/callback
+```
+
 ## Google Maps Key
 
 Add these website restrictions to the Maps browser key:

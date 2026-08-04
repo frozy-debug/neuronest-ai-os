@@ -20,6 +20,7 @@ const NEURONEST_API_BASE_URL = String(
 ).replace(/\/+$/, "");
 const NEURONEST_MOBILE_URL = String(process.env.NEURONEST_MOBILE_URL || "").replace(/\/+$/, "");
 const NEURONEST_ADMIN_URL = String(process.env.NEURONEST_ADMIN_URL || "").replace(/\/+$/, "");
+const GOOGLE_OAUTH_STATE_COOKIE = "neuronest.oauth_state";
 const ALLOW_OFFLINE_GOOGLE_FALLBACK =
   process.env.ALLOW_OFFLINE_GOOGLE_FALLBACK !== "false" &&
   process.env.NODE_ENV !== "production" &&
@@ -134,6 +135,84 @@ function redirect(res, location, cookies = []) {
   res.end();
 }
 
+function getSetCookiesFromResponse(response) {
+  if (typeof response.headers.getSetCookie === "function") return response.headers.getSetCookie();
+  const fallbackCookie = response.headers.get("set-cookie");
+  return fallbackCookie ? [fallbackCookie] : [];
+}
+
+function googleAuthErrorUrl(message) {
+  return `/?auth_error=${encodeURIComponent(String(message || "Google login failed.").slice(0, 220))}`;
+}
+
+function createSessionCookies(user) {
+  const sid = crypto.randomUUID();
+  sessions.set(sid, { user, createdAt: Date.now() });
+  return [makeCookie("neuronest.sid", sid, { maxAge: 604800 })];
+}
+
+function getGoogleCodeRedirectUri(req) {
+  return `${getRequestOrigin(req)}/api/auth/google/callback`;
+}
+
+function getGoogleImplicitRedirectUri(req) {
+  return `${getRequestOrigin(req)}/auth/google/callback`;
+}
+
+function buildGoogleAuthUrl(req, state) {
+  const googleClientId = getGoogleClientId();
+  if (!googleClientId) throw new Error("GOOGLE_CLIENT_ID is not configured.");
+  const googleClientSecret = getGoogleClientSecret();
+
+  const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  authUrl.searchParams.set("client_id", googleClientId);
+  authUrl.searchParams.set("redirect_uri", googleClientSecret ? getGoogleCodeRedirectUri(req) : getGoogleImplicitRedirectUri(req));
+  authUrl.searchParams.set("response_type", googleClientSecret ? "code" : "id_token");
+  authUrl.searchParams.set("scope", "openid email profile");
+  authUrl.searchParams.set("state", state);
+  authUrl.searchParams.set("nonce", state);
+  authUrl.searchParams.set("prompt", "select_account");
+  if (googleClientSecret) authUrl.searchParams.set("access_type", "online");
+  return authUrl.toString();
+}
+
+async function exchangeGoogleCode(code, redirectUri) {
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: getGoogleClientId(),
+      client_secret: getGoogleClientSecret(),
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code",
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.id_token) {
+    throw new Error(payload.error_description || payload.error || "Google authorization code exchange failed.");
+  }
+  return payload;
+}
+
+async function createSharedBackendSession(idToken) {
+  if (!NEURONEST_API_BASE_URL) return null;
+  const response = await fetch(`${NEURONEST_API_BASE_URL}/api/auth/google`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-neuronest-client": "mobile-web",
+    },
+    body: JSON.stringify({ credential: idToken }),
+    redirect: "manual",
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `Main NeuroNest login failed: ${response.status}`);
+  }
+  return { user: payload.user, cookies: getSetCookiesFromResponse(response) };
+}
+
 async function proxyApiRequest(req, res) {
   const upstreamUrl = `${NEURONEST_API_BASE_URL}${req.url}`;
   const body = ["GET", "HEAD"].includes(req.method || "GET") ? undefined : await readRawBody(req);
@@ -158,9 +237,7 @@ async function proxyApiRequest(req, res) {
     responseHeaders[key] = value;
   }
 
-  const setCookies = typeof upstreamResponse.headers.getSetCookie === "function"
-    ? upstreamResponse.headers.getSetCookie()
-    : [];
+  const setCookies = getSetCookiesFromResponse(upstreamResponse);
   const fallbackCookie = upstreamResponse.headers.get("set-cookie");
   if (setCookies.length) responseHeaders["set-cookie"] = setCookies;
   else if (fallbackCookie) responseHeaders["set-cookie"] = fallbackCookie;
@@ -899,18 +976,13 @@ function getSession(req) {
 }
 
 function setSession(res, user) {
-  const sid = crypto.randomUUID();
-  sessions.set(sid, { user, createdAt: Date.now() });
-  res.setHeader(
-    "Set-Cookie",
-    `neuronest.sid=${encodeURIComponent(sid)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`,
-  );
+  res.setHeader("Set-Cookie", createSessionCookies(user));
 }
 
 function clearSession(req, res) {
   const sid = parseCookies(req)["neuronest.sid"];
   if (sid) sessions.delete(sid);
-  res.setHeader("Set-Cookie", "neuronest.sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
+  res.setHeader("Set-Cookie", makeCookie("neuronest.sid", "", { maxAge: 0 }));
 }
 
 function sendJson(res, status, data) {
@@ -1017,6 +1089,47 @@ async function handleApi(req, res, url) {
     });
   }
 
+  if (req.method === "GET" && url.pathname === "/api/auth/google/start") {
+    try {
+      if (IS_PRODUCTION && !NEURONEST_API_BASE_URL) {
+        throw new Error("Mobile production login needs NEURONEST_API_BASE_URL or NEURONEST_APP_URL.");
+      }
+      const state = crypto.randomBytes(24).toString("hex");
+      const usesServerCodeFlow = Boolean(getGoogleClientSecret());
+      return redirect(res, buildGoogleAuthUrl(req, state), [
+        makeCookie(GOOGLE_OAUTH_STATE_COOKIE, state, { maxAge: 600, httpOnly: usesServerCodeFlow }),
+      ]);
+    } catch (error) {
+      return redirect(res, googleAuthErrorUrl(error.message));
+    }
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/auth/google/callback") {
+    const clearStateCookie = makeCookie(GOOGLE_OAUTH_STATE_COOKIE, "", { maxAge: 0 });
+    try {
+      const expectedState = parseCookies(req)[GOOGLE_OAUTH_STATE_COOKIE];
+      const state = url.searchParams.get("state");
+      const code = url.searchParams.get("code");
+      const googleError = url.searchParams.get("error");
+
+      if (googleError) throw new Error(url.searchParams.get("error_description") || googleError);
+      if (!expectedState || !state || expectedState !== state) throw new Error("Google login state expired. Please try again.");
+      if (!code) throw new Error("Google did not return an authorization code.");
+
+      const tokenPayload = await exchangeGoogleCode(code, getGoogleCodeRedirectUri(req));
+      const sharedSession = await createSharedBackendSession(tokenPayload.id_token);
+      if (sharedSession) {
+        return redirect(res, "/?login=success", [clearStateCookie, ...sharedSession.cookies]);
+      }
+
+      const profile = await verifyGoogleCredential(tokenPayload.id_token);
+      const user = upsertUser(profile);
+      return redirect(res, "/?login=success", [clearStateCookie, ...createSessionCookies(publicUser(user))]);
+    } catch (error) {
+      return redirect(res, googleAuthErrorUrl(error.message), [clearStateCookie]);
+    }
+  }
+
   if (shouldProxyApi(req, url)) {
     try {
       await proxyApiRequest(req, res);
@@ -1045,6 +1158,8 @@ async function handleApi(req, res, url) {
       googleMapsApiKey,
       googleReady: Boolean(googleClientId),
       mapsReady: Boolean(googleMapsApiKey),
+      redirectLoginReady: Boolean(googleClientId),
+      redirectLoginMode: getGoogleClientSecret() ? "server-code" : "browser-id-token",
       mobileReady: Boolean(NEURONEST_API_BASE_URL),
       production: IS_PRODUCTION,
       appUrlConfigured: Boolean(NEURONEST_API_BASE_URL),

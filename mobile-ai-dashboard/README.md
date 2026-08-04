@@ -29,6 +29,17 @@ http://127.0.0.1:3002
 http://localhost:3002
 ```
 
+For the mobile redirect login fallback, also add these Authorized redirect URIs:
+
+```text
+http://127.0.0.1:3002/auth/google/callback
+http://localhost:3002/auth/google/callback
+https://your-mobile-service.onrender.com/auth/google/callback
+```
+
+If `GOOGLE_CLIENT_SECRET` is configured on mobile, also add
+`https://your-mobile-service.onrender.com/api/auth/google/callback`.
+
 ## Mobile Screens
 
 - Home Dashboard
